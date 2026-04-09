@@ -1,4 +1,6 @@
 from learning_core.contracts.activity import ActivityGenerationInput
+from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
+from learning_core.runtime.context import RuntimeContext
 from learning_core.skills.activity_generate.skill import ActivityGenerateSkill
 
 
@@ -36,7 +38,15 @@ def test_activity_generate_preview_includes_lesson_title():
         }
     )
 
-    preview = ActivityGenerateSkill().build_prompt_preview(payload)
+    preview = ActivityGenerateSkill().build_prompt_preview(
+        payload,
+        RuntimeContext.create(
+            operation_name="activity_generate",
+            app_context=AppContext(product="homeschool-v2", surface="today_workspace"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+    )
 
     assert "Long Division" in preview.user_prompt
     assert "ActivitySpec" in preview.system_prompt

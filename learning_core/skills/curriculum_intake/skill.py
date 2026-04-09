@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from learning_core.contracts.curriculum import CurriculumGenerationRequest, CurriculumIntakeArtifact
+from learning_core.runtime.policy import ExecutionPolicy
+from learning_core.skills.base import StructuredOutputSkill
+from learning_core.skills.prompt_utils import append_user_authored_context, format_curriculum_transcript
+
+
+class CurriculumIntakeSkill(StructuredOutputSkill):
+    name = "curriculum_intake"
+    input_model = CurriculumGenerationRequest
+    output_model = CurriculumIntakeArtifact
+    policy = ExecutionPolicy(
+        skill_name="curriculum_intake",
+        skill_version="2026-04-09",
+        task_kind="chat",
+        max_tokens=4096,
+    )
+
+    def build_user_prompt(self, payload: CurriculumGenerationRequest, context) -> str:
+        lines = [
+            f"Active learner: {payload.learnerName}",
+            "",
+            "Current requirement hints:",
+            payload.requirementHints.model_dump_json(indent=2) if payload.requirementHints else "{}",
+            "",
+            "Conversation transcript:",
+            format_curriculum_transcript(payload.messages),
+        ]
+        append_user_authored_context(lines, context)
+        lines.extend(["", "Respond with the next assistant turn and the current intake state."])
+        return "\n".join(lines)

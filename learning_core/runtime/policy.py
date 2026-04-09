@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 class ExecutionPolicy:
     skill_name: str
     skill_version: str
+    task_kind: str = "generation"
     temperature: float = 0.2
     max_tokens: int = 4096
     allowed_tools: tuple[str, ...] = field(default_factory=tuple)
     max_attempts: int = 1
-

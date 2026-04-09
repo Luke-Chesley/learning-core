@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pydantic import Field
 
 from learning_core.contracts.base import StrictModel
+from learning_core.contracts.operation import OperationEnvelope
 
 
 class PromptPreview(StrictModel):
@@ -26,5 +27,5 @@ class ExecutionTrace(StrictModel):
     operation_name: str
     allowed_tools: list[str]
     prompt_preview: PromptPreview
+    request_envelope: OperationEnvelope
     executed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-

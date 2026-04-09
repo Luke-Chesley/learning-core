@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from learning_core.contracts.operation import OperationEnvelope
+from learning_core.contracts.responses import OperationExecuteResponse, OperationPromptPreviewResponse
 from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.errors import ContractValidationError, ProviderExecutionError
@@ -15,23 +17,66 @@ class AgentEngine:
         self.skill_registry = skill_registry
         self.tool_registry = tool_registry or ToolRegistry()
 
-    def execute(self, operation_name: str, payload: dict, request_id: str | None = None):
+    def execute(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
         skill = self.skill_registry.get(operation_name)
-        context = RuntimeContext.create(operation_name=operation_name, request_id=request_id)
-        parsed_payload = skill.input_model.model_validate(payload)
-        return skill.execute(self, parsed_payload, context)
+        envelope = OperationEnvelope.model_validate(envelope_data)
+        context = RuntimeContext.create(
+            operation_name=operation_name,
+            request_id=envelope.request_id,
+            app_context=envelope.app_context,
+            presentation_context=envelope.presentation_context,
+            user_authored_context=envelope.user_authored_context,
+        )
+        parsed_payload = skill.input_model.model_validate(envelope.input)
+        result = skill.execute(self, parsed_payload, context)
+        prompt_preview = (
+            result.trace.prompt_preview
+            if context.presentation_context.should_return_prompt_preview or context.app_context.debug
+            else None
+        )
+        return OperationExecuteResponse(
+            operation_name=operation_name,
+            artifact=result.artifact.model_dump(),
+            lineage=result.lineage,
+            trace=result.trace,
+            prompt_preview=prompt_preview,
+        )
 
-    def preview(self, operation_name: str, payload: dict) -> PromptPreview:
+    def preview(self, operation_name: str, envelope_data: dict) -> OperationPromptPreviewResponse:
         skill = self.skill_registry.get(operation_name)
-        parsed_payload = skill.input_model.model_validate(payload)
-        return skill.build_prompt_preview(parsed_payload)
+        envelope = OperationEnvelope.model_validate(envelope_data)
+        context = RuntimeContext.create(
+            operation_name=operation_name,
+            request_id=envelope.request_id,
+            app_context=envelope.app_context,
+            presentation_context=envelope.presentation_context,
+            user_authored_context=envelope.user_authored_context,
+        )
+        parsed_payload = skill.input_model.model_validate(envelope.input)
+        preview = skill.build_prompt_preview(parsed_payload, context)
+        return OperationPromptPreviewResponse(
+            operation_name=operation_name,
+            skill_name=skill.name,
+            skill_version=skill.policy.skill_version,
+            request_id=context.request_id,
+            allowed_tools=list(skill.policy.allowed_tools),
+            system_prompt=preview.system_prompt,
+            user_prompt=preview.user_prompt,
+            request_envelope=OperationEnvelope(
+                input=parsed_payload.model_dump(mode="json"),
+                app_context=context.app_context,
+                presentation_context=context.presentation_context,
+                user_authored_context=context.user_authored_context,
+                request_id=context.request_id,
+            ),
+        )
 
     def run_structured_output(self, *, skill, payload, context: RuntimeContext):
-        preview = skill.build_prompt_preview(payload)
+        preview = skill.build_prompt_preview(payload, context)
         self.tool_registry.resolve_many(skill.policy.allowed_tools)
         model_runtime = build_model_runtime(
             task_name=context.operation_name,
-            task_kind="generation",
+            task_kind=skill.policy.task_kind,
             temperature=skill.policy.temperature,
             max_tokens=skill.policy.max_tokens,
         )
@@ -64,5 +109,63 @@ class AgentEngine:
             operation_name=context.operation_name,
             allowed_tools=list(skill.policy.allowed_tools),
             prompt_preview=preview,
+            request_envelope=OperationEnvelope(
+                input=payload.model_dump(mode="json"),
+                app_context=context.app_context,
+                presentation_context=context.presentation_context,
+                user_authored_context=context.user_authored_context,
+                request_id=context.request_id,
+            ),
         )
         return artifact, lineage, trace
+
+    def run_text_output(self, *, skill, payload, context: RuntimeContext) -> tuple[str, ExecutionLineage, ExecutionTrace]:
+        preview = skill.build_prompt_preview(payload, context)
+        self.tool_registry.resolve_many(skill.policy.allowed_tools)
+        model_runtime = build_model_runtime(
+            task_name=context.operation_name,
+            task_kind=skill.policy.task_kind,
+            temperature=skill.policy.temperature,
+            max_tokens=skill.policy.max_tokens,
+        )
+
+        try:
+            response = model_runtime.client.invoke(
+                [
+                    SystemMessage(content=preview.system_prompt),
+                    HumanMessage(content=preview.user_prompt),
+                ]
+            )
+        except Exception as error:  # pragma: no cover - provider exceptions vary
+            raise ProviderExecutionError(str(error)) from error
+
+        raw_text = getattr(response, "content", "")
+        if isinstance(raw_text, list):
+            text = "".join(
+                item.get("text", "") if isinstance(item, dict) else str(item)
+                for item in raw_text
+            )
+        else:
+            text = raw_text if isinstance(raw_text, str) else str(raw_text)
+
+        lineage = ExecutionLineage(
+            operation_name=context.operation_name,
+            skill_name=skill.name,
+            skill_version=skill.policy.skill_version,
+            provider=model_runtime.provider,
+            model=model_runtime.model,
+        )
+        trace = ExecutionTrace(
+            request_id=context.request_id,
+            operation_name=context.operation_name,
+            allowed_tools=list(skill.policy.allowed_tools),
+            prompt_preview=preview,
+            request_envelope=OperationEnvelope(
+                input=payload.model_dump(mode="json"),
+                app_context=context.app_context,
+                presentation_context=context.presentation_context,
+                user_authored_context=context.user_authored_context,
+                request_id=context.request_id,
+            ),
+        )
+        return text, lineage, trace

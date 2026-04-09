@@ -28,22 +28,20 @@ Rules:
 
 Return JSON in exactly this shape:
 {
-  "progression": {
-    "phases": [
-      {
-        "title": "string",
-        "description": "string optional",
-        "skillRefs": ["string"]
-      }
-    ],
-    "edges": [
-      {
-        "fromSkillRef": "string",
-        "toSkillRef": "string",
-        "kind": "hardPrerequisite" | "recommendedBefore" | "revisitAfter" | "coPractice"
-      }
-    ]
-  }
+  "phases": [
+    {
+      "title": "string",
+      "description": "string optional",
+      "skillRefs": ["string"]
+    }
+  ],
+  "edges": [
+    {
+      "fromSkillRef": "string",
+      "toSkillRef": "string",
+      "kind": "hardPrerequisite" | "recommendedBefore" | "revisitAfter" | "coPractice"
+    }
+  ]
 }
 
 Do not include markdown fences.
