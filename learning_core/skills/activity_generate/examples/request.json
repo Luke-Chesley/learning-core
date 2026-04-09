@@ -1,0 +1,48 @@
+{
+  "learner_name": "Alex",
+  "learner_grade_level": "4th grade",
+  "workflow_mode": "family_guided",
+  "subject": "Math",
+  "source_title": "Math Curriculum",
+  "lesson_session_id": "session_123",
+  "lead_plan_item_id": "plan_123",
+  "plan_item_ids": ["route_1", "route_2"],
+  "linked_skill_titles": ["Long Division", "Division Review"],
+  "linked_objective_ids": [],
+  "standard_ids": ["std_1"],
+  "lesson_draft": {
+    "schema_version": "1.0",
+    "title": "Long Division",
+    "lesson_focus": "Practice the long division algorithm with support.",
+    "primary_objectives": [
+      "Perform long division with a one-digit divisor"
+    ],
+    "success_criteria": [
+      "Learner can solve at least three long division problems"
+    ],
+    "total_minutes": 35,
+    "blocks": [
+      {
+        "type": "model",
+        "title": "Model the algorithm",
+        "minutes": 10,
+        "purpose": "Show the full sequence once",
+        "teacher_action": "Work through an example on the board",
+        "learner_action": "Take notes and ask questions",
+        "check_for": null,
+        "materials_needed": [],
+        "optional": false
+      }
+    ],
+    "materials": ["Workbook", "Pencil"],
+    "teacher_notes": ["Use D-M-S-B language"],
+    "adaptations": [],
+    "assessment_artifact": "Completed workbook page",
+    "lesson_shape": "demonstration_then_try",
+    "prep": [],
+    "extension": null,
+    "follow_through": null,
+    "accommodations": []
+  }
+}
+

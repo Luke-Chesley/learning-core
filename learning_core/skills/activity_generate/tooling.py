@@ -1,0 +1,2 @@
+ACTIVITY_GENERATE_ALLOWED_TOOLS: tuple[str, ...] = ()
+
