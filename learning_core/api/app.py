@@ -8,6 +8,7 @@ from fastapi import FastAPI, Header
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from learning_core.runtime.env import load_runtime_env
 from learning_core.runtime.engine import AgentEngine
 from learning_core.runtime.errors import LearningCoreError
 from learning_core.runtime.gateway import (
@@ -17,6 +18,8 @@ from learning_core.runtime.gateway import (
     stream_text,
 )
 from learning_core.skills.catalog import build_skill_registry
+
+load_runtime_env()
 
 
 class OperationRequest(BaseModel):
@@ -81,11 +84,15 @@ def create_app() -> FastAPI:
         x_learning_core_key: str | None = Header(default=None),
     ):
         await _authorize(x_learning_core_key)
+        gateway_request = GatewayRequest(**request.model_dump())
 
         async def event_stream():
-            async for delta in stream_text(GatewayRequest(**request.model_dump())):
-                yield json.dumps({"delta": delta, "done": False}) + "\n"
-            yield json.dumps({"delta": "", "done": True}) + "\n"
+            try:
+                async for delta in stream_text(gateway_request):
+                    yield json.dumps({"delta": delta, "done": False}) + "\n"
+                yield json.dumps({"delta": "", "done": True}) + "\n"
+            except LearningCoreError as error:
+                yield json.dumps({"error": str(error), "done": True}) + "\n"
 
         return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 

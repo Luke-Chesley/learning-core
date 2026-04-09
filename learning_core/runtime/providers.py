@@ -7,7 +7,10 @@ from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
 
+from learning_core.runtime.env import load_runtime_env
 from learning_core.runtime.errors import ConfigurationError
+
+load_runtime_env()
 
 
 @dataclass(frozen=True)

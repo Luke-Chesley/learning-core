@@ -36,6 +36,7 @@
    - `uv run learning-core`
 
 The service defaults to `http://127.0.0.1:8000`.
+`learning-core` now auto-loads `.env` and `.env.local` from the repo root without requiring you to `source` them first.
 
 ## Folder Tree
 

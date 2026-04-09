@@ -16,13 +16,13 @@ dependencies = [
   "langchain-ollama>=0.3.0",
   "langchain-openai>=0.3.0",
   "pydantic>=2.10.0",
+  "python-dotenv>=1.0.0",
   "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3.0",
-  "python-dotenv>=1.0.0",
 ]
 
 [project.scripts]
