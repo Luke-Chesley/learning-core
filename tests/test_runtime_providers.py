@@ -8,6 +8,8 @@ def test_openai_service_tier_from_env(monkeypatch):
     monkeypatch.setenv("LEARNING_CORE_CHAT_MODEL", "gpt-5.4-mini")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "flex")
+    monkeypatch.delenv("LEARNING_CORE_CHAT_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("LEARNING_CORE_ACTIVITY_GENERATE_MAX_TOKENS", raising=False)
 
     runtime = build_model_runtime(
         task_name="activity_generate",
@@ -30,6 +32,8 @@ def test_openai_service_tier_omitted_when_blank(monkeypatch):
     monkeypatch.setenv("LEARNING_CORE_CHAT_MODEL", "gpt-5.4-mini")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "   ")
+    monkeypatch.delenv("LEARNING_CORE_CHAT_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("LEARNING_CORE_ACTIVITY_GENERATE_MAX_TOKENS", raising=False)
 
     runtime = build_model_runtime(
         task_name="activity_generate",

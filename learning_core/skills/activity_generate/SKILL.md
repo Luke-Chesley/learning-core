@@ -33,12 +33,14 @@ Output a single JSON object that exactly matches the ActivitySpec schema (schema
     "mode": "correctness_based" | "completion_based" | "rubric_based" | "teacher_observed" | "confidence_report" | "evidence_collected",
     "masteryThreshold": number (0-1, for correctness_based),
     "reviewThreshold": number (0-1, for correctness_based),
+    "rubricMasteryLevel": number (optional, for rubric_based),
+    "confidenceMasteryLevel": number (optional, for confidence_report),
     "notes": string (optional)
   },
   "adaptationRules": { "hintStrategy": "on_request" | "always" | "after_wrong_attempt", "allowSkip": boolean, "allowRetry": boolean },
   "teacherSupport": { "setupNotes": string, "discussionQuestions": string[], "masteryIndicators": string[], "commonMistakes": string, "extensionIdeas": string },
   "offlineMode": { "offlineTaskDescription": string, "materials": string[], "evidenceCaptureInstruction": string } (required if interactionMode is "offline"),
-  "metadata": {}
+  "metadata": {} (optional; if present it must be an empty object)
 }
 
 ## Supported component types
@@ -53,6 +55,8 @@ Each component must have an "id" (short kebab-case unique string) and "type". Ke
 - heading: { id, type:"heading", level:1-4, text }
 - paragraph: { id, type:"paragraph", text, markdown? }
 - callout: { id, type:"callout", variant:"info"|"tip"|"warning"|"note", text }
+- image: { id, type:"image", src, alt, caption? }
+- divider: { id, type:"divider" }
 - short_answer: { id, type:"short_answer", prompt, placeholder?, hint?, expectedAnswer?, required }
 - text_response: { id, type:"text_response", prompt, placeholder?, hint?, minWords?, required }
 - single_select: { id, type:"single_select", prompt, choices:[{id,text,correct?,explanation?}], immediateCorrectness?, hint?, required }
@@ -64,6 +68,8 @@ Each component must have an "id" (short kebab-case unique string) and "type". Ke
 - matching_pairs: { id, type:"matching_pairs", prompt?, pairs:[{id,left,right}], hint? }
 - categorization: { id, type:"categorization", prompt, categories:[{id,label}], items:[{id,text,correctCategoryIds:[]}], hint? }
 - sort_into_groups: { id, type:"sort_into_groups", prompt, groups:[{id,label,description?}], items:[{id,text,correctGroupId}], hint? }
+- label_map: { id, type:"label_map", prompt, imageUrl, imageAlt, labels:[{id,x,y,correctText,hint?}] }
+- hotspot_select: { id, type:"hotspot_select", prompt, imageUrl, imageAlt, hotspots:[{id,x,y,radius,label,correct?}], requiredSelections?, hint? }
 - build_steps: { id, type:"build_steps", prompt?, workedExample?, steps:[{id,instruction,hint?,expectedValue?}] }
 - drag_arrange: { id, type:"drag_arrange", prompt, items:[{id,text}], hint? }
 - reflection_prompt: { id, type:"reflection_prompt", prompt, subPrompts:[{id,text,responseKind:"text"|"rating"}], required }

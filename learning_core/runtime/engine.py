@@ -27,7 +27,15 @@ class AgentEngine:
         payload,
         prompt_preview: PromptPreview,
         response_mode: str,
+        structured_output_method: str | None = None,
     ) -> dict:
+        provider_request_kind = "text_completion"
+        if response_mode == "structured":
+            provider_request_kind = (
+                f"structured_output_{structured_output_method}"
+                if structured_output_method
+                else "structured_output"
+            )
         return {
             "request_id": context.request_id,
             "operation_name": context.operation_name,
@@ -41,7 +49,7 @@ class AgentEngine:
             "max_tokens": model_runtime.max_tokens,
             "max_tokens_source": model_runtime.max_tokens_source,
             "response_mode": response_mode,
-            "provider_request_kind": "structured_output" if response_mode == "structured" else "text_completion",
+            "provider_request_kind": provider_request_kind,
             "allowed_tools": list(skill.policy.allowed_tools),
             "provider_messages": [
                 {"role": "system", "content": prompt_preview.system_prompt},
@@ -56,6 +64,11 @@ class AgentEngine:
                 request_id=context.request_id,
             ).model_dump(mode="json"),
         }
+
+    def _structured_output_method_for_provider(self, provider: str) -> str | None:
+        if provider == "openai":
+            return "function_calling"
+        return None
 
     def execute(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
         skill = self.skill_registry.get(operation_name)
@@ -76,7 +89,7 @@ class AgentEngine:
         )
         return OperationExecuteResponse(
             operation_name=operation_name,
-            artifact=result.artifact.model_dump(),
+            artifact=result.artifact.model_dump(mode="json", exclude_none=True),
             lineage=result.lineage,
             trace=result.trace,
             prompt_preview=prompt_preview,
@@ -120,6 +133,7 @@ class AgentEngine:
             temperature=skill.policy.temperature,
             max_tokens=skill.policy.max_tokens,
         )
+        structured_output_method = self._structured_output_method_for_provider(model_runtime.provider)
         provider_request = self._provider_request_payload(
             context=context,
             skill=skill,
@@ -127,10 +141,19 @@ class AgentEngine:
             payload=payload,
             prompt_preview=preview,
             response_mode="structured",
+            structured_output_method=structured_output_method,
         )
 
         try:
-            structured = model_runtime.client.with_structured_output(skill.output_model)
+            structured_kwargs = (
+                {"method": structured_output_method}
+                if structured_output_method
+                else {}
+            )
+            structured = model_runtime.client.with_structured_output(
+                skill.output_model,
+                **structured_kwargs,
+            )
             raw_artifact = structured.invoke(
                 [
                     SystemMessage(content=preview.system_prompt),
@@ -167,7 +190,7 @@ class AgentEngine:
             response={
                 "status": "success",
                 "raw_response": raw_artifact,
-                "validated_artifact": artifact.model_dump(mode="json"),
+                "validated_artifact": artifact.model_dump(mode="json", exclude_none=True),
             },
         )
 

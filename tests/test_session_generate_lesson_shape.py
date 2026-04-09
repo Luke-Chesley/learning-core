@@ -73,8 +73,10 @@ class _FakeStructuredInvoker:
 class _FakeClient:
     def __init__(self, artifact: dict) -> None:
         self.artifact = artifact
+        self.structured_output_method = None
 
-    def with_structured_output(self, _output_model):
+    def with_structured_output(self, _output_model, **kwargs):
+        self.structured_output_method = kwargs.get("method")
         return _FakeStructuredInvoker(self.artifact)
 
 
@@ -154,6 +156,10 @@ def test_session_generate_execute_rejects_prose_lesson_shape(monkeypatch, tmp_pa
             provider="test",
             model="fake-session-generate",
             client=_FakeClient(_lesson_artifact("Short teach-practice-check sequence")),
+            temperature=0.2,
+            max_tokens=4096,
+            max_tokens_source="test",
+            provider_settings={},
         ),
     )
 
@@ -172,6 +178,10 @@ def test_session_generate_execute_accepts_canonical_lesson_shape(monkeypatch, tm
             provider="test",
             model="fake-session-generate",
             client=_FakeClient(_lesson_artifact("direct_instruction")),
+            temperature=0.2,
+            max_tokens=4096,
+            max_tokens_source="test",
+            provider_settings={},
         ),
     )
 
@@ -179,3 +189,51 @@ def test_session_generate_execute_accepts_canonical_lesson_shape(monkeypatch, tm
     result = engine.execute("session_generate", _session_generate_envelope())
 
     assert result.artifact["lesson_shape"] == "direct_instruction"
+
+
+def test_openai_structured_output_uses_function_calling(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    fake_client = _FakeClient(_lesson_artifact("direct_instruction"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-session-generate",
+            client=fake_client,
+            temperature=0.2,
+            max_tokens=4096,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("session_generate", _session_generate_envelope())
+
+    assert result.artifact["lesson_shape"] == "direct_instruction"
+    assert fake_client.structured_output_method == "function_calling"
+
+
+def test_ollama_structured_output_does_not_use_openai_method(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    fake_client = _FakeClient(_lesson_artifact("direct_instruction"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="ollama",
+            model="fake-session-generate",
+            client=fake_client,
+            temperature=0.2,
+            max_tokens=4096,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("session_generate", _session_generate_envelope())
+
+    assert result.artifact["lesson_shape"] == "direct_instruction"
+    assert fake_client.structured_output_method is None
