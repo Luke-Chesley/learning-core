@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from learning_core.contracts.activity import ActivityArtifact, ActivityGenerationInput
 from learning_core.runtime.context import RuntimeContext
+from learning_core.skills.activity_generate.scripts.policy import ACTIVITY_GENERATE_POLICY
+from learning_core.skills.activity_generate.scripts.schemas import ActivityArtifact, ActivityGenerationInput
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.skills.activity_generate.policy import ACTIVITY_GENERATE_POLICY
+
 
 def _build_user_prompt(payload: ActivityGenerationInput, context: RuntimeContext) -> str:
     lesson = payload.lesson_draft

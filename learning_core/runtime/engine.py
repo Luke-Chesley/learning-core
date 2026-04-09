@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from learning_core.contracts.operation import OperationEnvelope
 from learning_core.contracts.responses import OperationExecuteResponse, OperationPromptPreviewResponse
 from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
+from learning_core.observability.provider_logs import write_provider_exchange_log
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.errors import ContractValidationError, ProviderExecutionError
 from learning_core.runtime.providers import build_model_runtime
@@ -16,6 +17,42 @@ class AgentEngine:
     def __init__(self, skill_registry: SkillRegistry, tool_registry: ToolRegistry | None = None) -> None:
         self.skill_registry = skill_registry
         self.tool_registry = tool_registry or ToolRegistry()
+
+    def _provider_request_payload(
+        self,
+        *,
+        context: RuntimeContext,
+        skill,
+        model_runtime,
+        payload,
+        prompt_preview: PromptPreview,
+        response_mode: str,
+    ) -> dict:
+        return {
+            "request_id": context.request_id,
+            "operation_name": context.operation_name,
+            "skill_name": skill.name,
+            "skill_version": skill.policy.skill_version,
+            "provider": model_runtime.provider,
+            "model": model_runtime.model,
+            "task_kind": skill.policy.task_kind,
+            "temperature": skill.policy.temperature,
+            "max_tokens": skill.policy.max_tokens,
+            "response_mode": response_mode,
+            "allowed_tools": list(skill.policy.allowed_tools),
+            "provider_messages": [
+                {"role": "system", "content": prompt_preview.system_prompt},
+                {"role": "user", "content": prompt_preview.user_prompt},
+            ],
+            "input_payload": payload.model_dump(mode="json"),
+            "request_envelope": OperationEnvelope(
+                input=payload.model_dump(mode="json"),
+                app_context=context.app_context,
+                presentation_context=context.presentation_context,
+                user_authored_context=context.user_authored_context,
+                request_id=context.request_id,
+            ).model_dump(mode="json"),
+        }
 
     def execute(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
         skill = self.skill_registry.get(operation_name)
@@ -80,6 +117,14 @@ class AgentEngine:
             temperature=skill.policy.temperature,
             max_tokens=skill.policy.max_tokens,
         )
+        provider_request = self._provider_request_payload(
+            context=context,
+            skill=skill,
+            model_runtime=model_runtime,
+            payload=payload,
+            prompt_preview=preview,
+            response_mode="structured",
+        )
 
         try:
             structured = model_runtime.client.with_structured_output(skill.output_model)
@@ -90,12 +135,38 @@ class AgentEngine:
                 ]
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
+            write_provider_exchange_log(
+                request=provider_request,
+                response={
+                    "status": "error",
+                    "error_type": error.__class__.__name__,
+                    "error": str(error),
+                },
+            )
             raise ProviderExecutionError(str(error)) from error
 
         try:
             artifact = skill.output_model.model_validate(raw_artifact)
         except Exception as error:
+            write_provider_exchange_log(
+                request=provider_request,
+                response={
+                    "status": "validation_error",
+                    "error_type": error.__class__.__name__,
+                    "error": str(error),
+                    "raw_response": raw_artifact,
+                },
+            )
             raise ContractValidationError(str(error)) from error
+
+        write_provider_exchange_log(
+            request=provider_request,
+            response={
+                "status": "success",
+                "raw_response": raw_artifact,
+                "validated_artifact": artifact.model_dump(mode="json"),
+            },
+        )
 
         lineage = ExecutionLineage(
             operation_name=context.operation_name,
@@ -128,6 +199,14 @@ class AgentEngine:
             temperature=skill.policy.temperature,
             max_tokens=skill.policy.max_tokens,
         )
+        provider_request = self._provider_request_payload(
+            context=context,
+            skill=skill,
+            model_runtime=model_runtime,
+            payload=payload,
+            prompt_preview=preview,
+            response_mode="text",
+        )
 
         try:
             response = model_runtime.client.invoke(
@@ -137,6 +216,14 @@ class AgentEngine:
                 ]
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
+            write_provider_exchange_log(
+                request=provider_request,
+                response={
+                    "status": "error",
+                    "error_type": error.__class__.__name__,
+                    "error": str(error),
+                },
+            )
             raise ProviderExecutionError(str(error)) from error
 
         raw_text = getattr(response, "content", "")
@@ -147,6 +234,15 @@ class AgentEngine:
             )
         else:
             text = raw_text if isinstance(raw_text, str) else str(raw_text)
+
+        write_provider_exchange_log(
+            request=provider_request,
+            response={
+                "status": "success",
+                "raw_response": response,
+                "normalized_text": text,
+            },
+        )
 
         lineage = ExecutionLineage(
             operation_name=context.operation_name,

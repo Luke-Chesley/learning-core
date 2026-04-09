@@ -7,7 +7,7 @@ from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.curriculum_common import build_skill_catalog_from_document
-from learning_core.skills.progression_generate.skill import ProgressionGenerateSkill
+from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
 from learning_core.skills.prompt_utils import append_user_authored_context, format_curriculum_transcript
 
 

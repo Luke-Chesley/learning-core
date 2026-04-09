@@ -21,8 +21,13 @@ class StructuredOutputSkill(SkillDefinition):
 
     def read_skill_markdown(self) -> str:
         skill_module_path = Path(inspect.getfile(type(self))).resolve()
-        skill_markdown_path = skill_module_path.with_name(self.skill_file)
-        return skill_markdown_path.read_text(encoding="utf-8").strip()
+        for candidate_dir in skill_module_path.parents:
+            skill_markdown_path = candidate_dir / self.skill_file
+            if skill_markdown_path.exists():
+                return skill_markdown_path.read_text(encoding="utf-8").strip()
+        raise FileNotFoundError(
+            f"Could not find {self.skill_file} for {type(self).__name__} starting at {skill_module_path}"
+        )
 
     def execute(self, engine, payload, context) -> SkillExecutionResult:
         artifact, lineage, trace = engine.run_structured_output(

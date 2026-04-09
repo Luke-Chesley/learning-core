@@ -1,7 +1,7 @@
 from learning_core.contracts.activity import ActivityGenerationInput
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
 from learning_core.runtime.context import RuntimeContext
-from learning_core.skills.activity_generate.skill import ActivityGenerateSkill
+from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
 
 
 def test_activity_generate_preview_includes_lesson_title():

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from learning_core.runtime.registry import SkillRegistry
-from learning_core.skills.activity_generate.skill import ActivityGenerateSkill
-from learning_core.skills.copilot_chat.skill import CopilotChatSkill
-from learning_core.skills.curriculum_generate.skill import CurriculumGenerateSkill
-from learning_core.skills.curriculum_intake.skill import CurriculumIntakeSkill
-from learning_core.skills.curriculum_revise.skill import CurriculumReviseSkill
-from learning_core.skills.curriculum_update_propose.skill import CurriculumUpdateProposeSkill
-from learning_core.skills.progression_generate.skill import ProgressionGenerateSkill
-from learning_core.skills.progression_revise.skill import ProgressionReviseSkill
-from learning_core.skills.session_evaluate.skill import SessionEvaluateSkill
-from learning_core.skills.session_generate.skill import SessionGenerateSkill
+from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
+from learning_core.skills.copilot_chat.scripts.main import CopilotChatSkill
+from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
+from learning_core.skills.curriculum_intake.scripts.main import CurriculumIntakeSkill
+from learning_core.skills.curriculum_revise.scripts.main import CurriculumReviseSkill
+from learning_core.skills.curriculum_update_propose.scripts.main import CurriculumUpdateProposeSkill
+from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
+from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
+from learning_core.skills.session_evaluate.scripts.main import SessionEvaluateSkill
+from learning_core.skills.session_generate.scripts.main import SessionGenerateSkill
 
 
 def build_skill_registry() -> SkillRegistry:

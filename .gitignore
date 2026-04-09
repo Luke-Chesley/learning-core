@@ -7,3 +7,5 @@ build/
 *.egg-info/
 *.pyc
 .env.local
+logs/*
+!logs/.gitkeep

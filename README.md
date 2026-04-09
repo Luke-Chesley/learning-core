@@ -12,6 +12,8 @@
 - Shared operation-envelope runtime is in place.
 - All extracted operations are exposed through `/v1/operations/{operation_name}`.
 - Prompt ownership lives in `SKILL.md` plus Python prompt builders inside `learning-core`.
+- Skill runtime code lives under `learning_core/skills/<skill>/scripts/main.py` and any
+  skill-local helper modules live alongside it in `scripts/`.
 
 ## Local Dev
 
@@ -38,6 +40,14 @@
 The service defaults to `http://127.0.0.1:8000`.
 `learning-core` now auto-loads `.env` and `.env.local` from the repo root without requiring you to `source` them first.
 
+## Provider Logs
+
+- Every provider request/response exchange is written to `logs/YYYY-MM-DD/`.
+- Each file is named with the request timestamp.
+- The top half of the file is the provider request payload.
+- The bottom half is the provider response payload or provider error.
+- For tests or custom local setups, you can override the log root with `LEARNING_CORE_LOG_DIR`.
+
 ## Folder Tree
 
 ```text
@@ -48,15 +58,48 @@ learning_core/
   runtime/
   skills/
     activity_generate/
+      SKILL.md
+      scripts/
+        main.py
+        policy.py
+        schemas.py
+        tooling.py
     copilot_chat/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_generate/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_intake/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_revise/
+      SKILL.md
+      scripts/
+        main.py
     progression_generate/
+      SKILL.md
+      scripts/
+        main.py
     progression_revise/
+      SKILL.md
+      scripts/
+        main.py
     session_generate/
+      SKILL.md
+      scripts/
+        main.py
     session_evaluate/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_update_propose/
+      SKILL.md
+      scripts/
+        main.py
 ```
 
 ## API
