@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from pydantic import Field
 
@@ -29,3 +30,4 @@ class ExecutionTrace(StrictModel):
     prompt_preview: PromptPreview
     request_envelope: OperationEnvelope
     executed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    agent_trace: dict[str, Any] | None = None

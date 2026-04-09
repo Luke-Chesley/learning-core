@@ -43,45 +43,14 @@ Output a single JSON object that exactly matches the ActivitySpec schema (schema
   "metadata": {} (optional; if present it must be an empty object)
 }
 
-## Supported component types
+## Component types
 
 Only use component types from this exact list:
 heading, paragraph, callout, image, divider, short_answer, text_response, rich_text_response, single_select, multi_select, rating, confidence_check, checklist, ordered_sequence, matching_pairs, categorization, sort_into_groups, label_map, hotspot_select, build_steps, drag_arrange, reflection_prompt, rubric_self_check, file_upload, image_capture, audio_capture, observation_record, teacher_checkoff, compare_and_explain, choose_next_step, construction_space
 
-## Component schemas
+Every component requires an `id` (short kebab-case, unique within the activity) and `type`.
 
-Each component must have an "id" (short kebab-case unique string) and "type". Key shapes:
-
-- heading: { id, type:"heading", level:1-4, text }
-- paragraph: { id, type:"paragraph", text, markdown? }
-- callout: { id, type:"callout", variant:"info"|"tip"|"warning"|"note", text }
-- image: { id, type:"image", src, alt, caption? }
-- divider: { id, type:"divider" }
-- short_answer: { id, type:"short_answer", prompt, placeholder?, hint?, expectedAnswer?, required }
-- text_response: { id, type:"text_response", prompt, placeholder?, hint?, minWords?, required }
-- single_select: { id, type:"single_select", prompt, choices:[{id,text,correct?,explanation?}], immediateCorrectness?, hint?, required }
-- multi_select: { id, type:"multi_select", prompt, choices:[{id,text,correct?}], minSelections?, maxSelections?, hint?, required }
-- rating: { id, type:"rating", prompt, min:1, max:5, lowLabel?, highLabel?, required }
-- confidence_check: { id, type:"confidence_check", prompt?, labels:[5 strings] }
-- checklist: { id, type:"checklist", prompt?, items:[{id,label,description?,required}], allowPartialSubmit }
-- ordered_sequence: { id, type:"ordered_sequence", prompt, items:[{id,text,correctIndex}], hint? }
-- matching_pairs: { id, type:"matching_pairs", prompt?, pairs:[{id,left,right}], hint? }
-- categorization: { id, type:"categorization", prompt, categories:[{id,label}], items:[{id,text,correctCategoryIds:[]}], hint? }
-- sort_into_groups: { id, type:"sort_into_groups", prompt, groups:[{id,label,description?}], items:[{id,text,correctGroupId}], hint? }
-- label_map: { id, type:"label_map", prompt, imageUrl, imageAlt, labels:[{id,x,y,correctText,hint?}] }
-- hotspot_select: { id, type:"hotspot_select", prompt, imageUrl, imageAlt, hotspots:[{id,x,y,radius,label,correct?}], requiredSelections?, hint? }
-- build_steps: { id, type:"build_steps", prompt?, workedExample?, steps:[{id,instruction,hint?,expectedValue?}] }
-- drag_arrange: { id, type:"drag_arrange", prompt, items:[{id,text}], hint? }
-- reflection_prompt: { id, type:"reflection_prompt", prompt, subPrompts:[{id,text,responseKind:"text"|"rating"}], required }
-- rubric_self_check: { id, type:"rubric_self_check", prompt?, criteria:[{id,label,description?}], levels:[{value,label,description?}], notePrompt? }
-- file_upload: { id, type:"file_upload", prompt, accept?:[".pdf",".jpg",...], maxFiles:1-5, notePrompt?, required }
-- image_capture: { id, type:"image_capture", prompt, instructions?, maxImages?, required }
-- audio_capture: { id, type:"audio_capture", prompt, maxDurationSeconds?, required }
-- observation_record: { id, type:"observation_record", prompt, fields:[{id,label,inputKind:"text"|"rating"|"checkbox"}], filledBy:"teacher"|"parent"|"learner" }
-- teacher_checkoff: { id, type:"teacher_checkoff", prompt, items:[{id,label,description?}], acknowledgmentLabel?, notePrompt? }
-- compare_and_explain: { id, type:"compare_and_explain", prompt, itemA, itemB, responsePrompt?, required }
-- choose_next_step: { id, type:"choose_next_step", prompt, choices:[{id,label,description?}] }
-- construction_space: { id, type:"construction_space", prompt, scaffoldText?, hint?, required }
+A compressed registry index is included in your context showing each component's purpose, evidence kind, and interaction cost. If you want the full field contract, examples, and usage guidance for a specific component, call `read_ui_component` with its doc path (e.g., `ui_components/short_answer.md`). Only read docs for components you are seriously considering — typically 0-2 reads.
 
 ## Evidence capture kinds
 

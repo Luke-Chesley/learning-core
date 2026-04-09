@@ -1,108 +1,222 @@
+import json
 from pathlib import Path
+from unittest.mock import patch
 
-import learning_core.runtime.engine as engine_module
+from learning_core.agent import AgentResult, ToolCallEvent
 from learning_core.contracts.activity import ActivityArtifact, ActivityGenerationInput
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.engine import AgentEngine
 from learning_core.runtime.providers import ModelRuntime
-from learning_core.skills.catalog import build_skill_registry
 from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
+from learning_core.skills.catalog import build_skill_registry
+
+# -- Shared test fixtures --
+
+_LESSON_DRAFT = {
+    "schema_version": "1.0",
+    "title": "Long Division",
+    "lesson_focus": "Learn the long division algorithm.",
+    "primary_objectives": ["Divide with support"],
+    "success_criteria": ["Finish three problems"],
+    "total_minutes": 35,
+    "blocks": [
+        {
+            "type": "model",
+            "title": "Model it",
+            "minutes": 10,
+            "purpose": "Show the method",
+            "teacher_action": "Demonstrate on whiteboard",
+            "learner_action": "Take notes",
+            "materials_needed": [],
+            "optional": False,
+        }
+    ],
+    "materials": ["Workbook"],
+    "teacher_notes": ["Use D-M-S-B language"],
+    "adaptations": [],
+    "assessment_artifact": "Workbook page",
+}
+
+_VALID_ARTIFACT = {
+    "schemaVersion": "2",
+    "title": "Place Value Practice",
+    "purpose": "Practice identifying digit place values in 5-digit numbers.",
+    "activityKind": "guided_practice",
+    "linkedObjectiveIds": [],
+    "linkedSkillTitles": ["place value"],
+    "estimatedMinutes": 15,
+    "interactionMode": "digital",
+    "components": [
+        {
+            "type": "paragraph",
+            "id": "intro",
+            "text": "Work through the following steps.",
+        },
+        {
+            "type": "short_answer",
+            "id": "q1",
+            "prompt": "What is the value of the digit 4 in 34,827?",
+            "hint": "Think about which place the 4 occupies.",
+            "required": True,
+        },
+        {
+            "type": "confidence_check",
+            "id": "confidence",
+            "prompt": "How confident are you?",
+            "labels": ["Not yet", "A little", "Getting there", "Pretty good", "Got it!"],
+        },
+    ],
+    "completionRules": {"strategy": "all_interactive_components"},
+    "evidenceSchema": {
+        "captureKinds": ["answer_response", "confidence_signal"],
+        "requiresReview": False,
+        "autoScorable": False,
+    },
+    "scoringModel": {
+        "mode": "completion_based",
+        "masteryThreshold": 0.8,
+        "reviewThreshold": 0.6,
+    },
+}
+
+_VALID_ARTIFACT_WITH_NULLS = {
+    "schemaVersion": "2",
+    "title": "Place Value Practice",
+    "purpose": "Practice identifying digit place values in 5-digit numbers.",
+    "activityKind": "guided_practice",
+    "linkedObjectiveIds": [],
+    "linkedSkillTitles": ["place value"],
+    "estimatedMinutes": 15,
+    "interactionMode": "digital",
+    "components": [
+        {
+            "type": "paragraph",
+            "id": "intro",
+            "text": "Work through the following steps.",
+            "markdown": None,
+        },
+        {
+            "type": "short_answer",
+            "id": "q1",
+            "prompt": "What is the value of the digit 4 in 34,827?",
+            "hint": "Think about which place the 4 occupies.",
+            "required": True,
+        },
+        {
+            "type": "build_steps",
+            "id": "steps",
+            "steps": [
+                {
+                    "id": "step-1",
+                    "instruction": "Read the number.",
+                    "expectedValue": None,
+                }
+            ],
+        },
+    ],
+    "completionRules": {
+        "strategy": "all_interactive_components",
+        "minimumComponents": None,
+    },
+    "evidenceSchema": {
+        "captureKinds": ["answer_response"],
+        "requiresReview": False,
+        "autoScorable": False,
+    },
+    "scoringModel": {
+        "mode": "completion_based",
+        "masteryThreshold": 0.8,
+        "reviewThreshold": 0.6,
+        "rubricMasteryLevel": None,
+        "confidenceMasteryLevel": None,
+    },
+}
+
+_ENVELOPE_DATA = {
+    "input": {
+        "learner_name": "Alex",
+        "workflow_mode": "family_guided",
+        "subject": "Math",
+        "linked_skill_titles": ["Long Division"],
+        "lesson_draft": _LESSON_DRAFT,
+    },
+    "app_context": {
+        "product": "homeschool-v2",
+        "surface": "today_workspace",
+    },
+}
+
+
+def _make_payload():
+    return ActivityGenerationInput.model_validate(_ENVELOPE_DATA["input"])
+
+
+def _make_context():
+    return RuntimeContext.create(
+        operation_name="activity_generate",
+        app_context=AppContext(product="homeschool-v2", surface="today_workspace"),
+        presentation_context=PresentationContext(),
+        user_authored_context=UserAuthoredContext(),
+    )
+
+
+def _fake_model_runtime():
+    return ModelRuntime(
+        provider="openai",
+        model="fake-activity-generate",
+        client=_FakeClient(),
+        temperature=0.2,
+        max_tokens=4096,
+        max_tokens_source="test",
+        provider_settings={},
+    )
+
+
+class _FakeClient:
+    """Minimal fake that satisfies model_runtime.client interface for repair calls."""
+
+    def __init__(self, repair_content: str = "{}"):
+        self._repair_content = repair_content
+
+    def invoke(self, messages):
+        return type("FakeResponse", (), {"content": self._repair_content})()
+
+
+def _fake_agent_result(artifact_dict: dict, tool_calls: list[ToolCallEvent] | None = None) -> AgentResult:
+    return AgentResult(
+        final_text=json.dumps(artifact_dict),
+        tool_calls=tool_calls or [],
+        messages=[],
+    )
+
+
+# -- Preview tests --
 
 
 def test_activity_generate_preview_includes_lesson_title():
-    payload = ActivityGenerationInput.model_validate(
-        {
-            "learner_name": "Alex",
-            "workflow_mode": "family_guided",
-            "subject": "Math",
-            "linked_skill_titles": ["Long Division"],
-            "lesson_draft": {
-                "schema_version": "1.0",
-                "title": "Long Division",
-                "lesson_focus": "Learn the long division algorithm.",
-                "primary_objectives": ["Divide with support"],
-                "success_criteria": ["Finish three problems"],
-                "total_minutes": 35,
-                "blocks": [
-                    {
-                        "type": "model",
-                        "title": "Model it",
-                        "minutes": 10,
-                        "purpose": "Show the method",
-                        "teacher_action": "Demonstrate on whiteboard",
-                        "learner_action": "Take notes",
-                        "materials_needed": [],
-                        "optional": False,
-                    }
-                ],
-                "materials": ["Workbook"],
-                "teacher_notes": ["Use D-M-S-B language"],
-                "adaptations": [],
-                "assessment_artifact": "Workbook page",
-            },
-        }
-    )
-
-    preview = ActivityGenerateSkill().build_prompt_preview(
-        payload,
-        RuntimeContext.create(
-            operation_name="activity_generate",
-            app_context=AppContext(product="homeschool-v2", surface="today_workspace"),
-            presentation_context=PresentationContext(),
-            user_authored_context=UserAuthoredContext(),
-        ),
-    )
-
+    preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
     assert "Long Division" in preview.user_prompt
     assert "ActivitySpec" in preview.system_prompt
 
 
-def test_activity_artifact_accepts_canonical_minimal_spec():
-    artifact = ActivityArtifact.model_validate(
-        {
-            "schemaVersion": "2",
-            "title": "Place Value Practice",
-            "purpose": "Practice identifying digit place values in 5-digit numbers.",
-            "activityKind": "guided_practice",
-            "linkedObjectiveIds": [],
-            "linkedSkillTitles": ["place value"],
-            "estimatedMinutes": 15,
-            "interactionMode": "digital",
-            "components": [
-                {
-                    "type": "paragraph",
-                    "id": "intro",
-                    "text": "Work through the following steps.",
-                },
-                {
-                    "type": "short_answer",
-                    "id": "q1",
-                    "prompt": "What is the value of the digit 4 in 34,827?",
-                    "hint": "Think about which place the 4 occupies.",
-                    "required": True,
-                },
-                {
-                    "type": "confidence_check",
-                    "id": "confidence",
-                    "prompt": "How confident are you?",
-                    "labels": ["Not yet", "A little", "Getting there", "Pretty good", "Got it!"],
-                },
-            ],
-            "completionRules": {"strategy": "all_interactive_components"},
-            "evidenceSchema": {
-                "captureKinds": ["answer_response", "confidence_signal"],
-                "requiresReview": False,
-                "autoScorable": False,
-            },
-            "scoringModel": {
-                "mode": "completion_based",
-                "masteryThreshold": 0.8,
-                "reviewThreshold": 0.6,
-            },
-        }
-    )
+def test_activity_generate_preview_includes_registry_index():
+    preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
+    assert "UI Component Registry" in preview.user_prompt
+    assert "read_ui_component" in preview.user_prompt
 
+
+def test_activity_generate_preview_includes_tool_usage_instruction():
+    preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
+    assert "read_ui_component" in preview.user_prompt
+    assert "typically 0-2" in preview.user_prompt
+
+
+# -- Artifact validation tests --
+
+
+def test_activity_artifact_accepts_canonical_minimal_spec():
+    artifact = ActivityArtifact.model_validate(_VALID_ARTIFACT)
     assert artifact.schemaVersion == "2"
     assert artifact.components[1].type == "short_answer"
 
@@ -129,143 +243,162 @@ def test_activity_artifact_json_schema_has_no_open_objects():
                 walk(value, f"{path}[{index}]")
 
     walk(schema, "$")
-
     assert open_paths == []
     assert tuple_paths == []
     assert format_paths == []
 
 
-class _FakeStructuredInvoker:
-    def __init__(self, artifact: dict) -> None:
-        self.artifact = artifact
-
-    def invoke(self, _messages):
-        return self.artifact
+# -- Execution tests (agent path) --
 
 
-class _FakeClient:
-    def __init__(self, artifact: dict) -> None:
-        self.artifact = artifact
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_happy_path(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+    mock_build_runtime.return_value = _fake_model_runtime()
+    mock_agent_loop.return_value = _fake_agent_result(_VALID_ARTIFACT)
 
-    def with_structured_output(self, _output_model, **_kwargs):
-        return _FakeStructuredInvoker(self.artifact)
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+
+    assert result.operation_name == "activity_generate"
+    assert result.artifact["schemaVersion"] == "2"
+    assert result.artifact["title"] == "Place Value Practice"
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["repair_attempted"] is False
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
 
 
-def test_activity_execute_omits_null_optional_fields(monkeypatch, tmp_path: Path):
-    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
-    monkeypatch.setattr(
-        engine_module,
-        "build_model_runtime",
-        lambda **_kwargs: ModelRuntime(
-            provider="openai",
-            model="fake-activity-generate",
-            client=_FakeClient(
-                {
-                    "schemaVersion": "2",
-                    "title": "Place Value Practice",
-                    "purpose": "Practice identifying digit place values in 5-digit numbers.",
-                    "activityKind": "guided_practice",
-                    "linkedObjectiveIds": [],
-                    "linkedSkillTitles": ["place value"],
-                    "estimatedMinutes": 15,
-                    "interactionMode": "digital",
-                    "components": [
-                        {
-                            "type": "paragraph",
-                            "id": "intro",
-                            "text": "Work through the following steps.",
-                            "markdown": None,
-                        },
-                        {
-                            "type": "short_answer",
-                            "id": "q1",
-                            "prompt": "What is the value of the digit 4 in 34,827?",
-                            "hint": "Think about which place the 4 occupies.",
-                            "required": True,
-                        },
-                        {
-                            "type": "build_steps",
-                            "id": "steps",
-                            "steps": [
-                                {
-                                    "id": "step-1",
-                                    "instruction": "Read the number.",
-                                    "expectedValue": None,
-                                }
-                            ],
-                        },
-                    ],
-                    "completionRules": {
-                        "strategy": "all_interactive_components",
-                        "minimumComponents": None,
-                    },
-                    "evidenceSchema": {
-                        "captureKinds": ["answer_response"],
-                        "requiresReview": False,
-                        "autoScorable": False,
-                    },
-                    "scoringModel": {
-                        "mode": "completion_based",
-                        "masteryThreshold": 0.8,
-                        "reviewThreshold": 0.6,
-                        "rubricMasteryLevel": None,
-                        "confidenceMasteryLevel": None,
-                    },
-                }
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_with_tool_calls(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+    mock_build_runtime.return_value = _fake_model_runtime()
+    mock_agent_loop.return_value = _fake_agent_result(
+        _VALID_ARTIFACT,
+        tool_calls=[
+            ToolCallEvent(
+                tool_name="read_ui_component",
+                tool_args={"path": "ui_components/short_answer.md"},
+                tool_output="# short_answer\n...",
             ),
-            temperature=0.2,
-            max_tokens=4096,
-            max_tokens_source="test",
-            provider_settings={},
-        ),
+        ],
     )
 
     engine = AgentEngine(build_skill_registry())
-    result = engine.execute(
-        "activity_generate",
-        {
-            "input": {
-                "learner_name": "Alex",
-                "workflow_mode": "family_guided",
-                "subject": "Math",
-                "linked_skill_titles": ["Long Division"],
-                "lesson_draft": {
-                    "schema_version": "1.0",
-                    "title": "Long Division",
-                    "lesson_focus": "Learn the long division algorithm.",
-                    "primary_objectives": ["Divide with support"],
-                    "success_criteria": ["Finish three problems"],
-                    "total_minutes": 35,
-                    "blocks": [
-                        {
-                            "type": "model",
-                            "title": "Model it",
-                            "minutes": 10,
-                            "purpose": "Show the method",
-                            "teacher_action": "Demonstrate on whiteboard",
-                            "learner_action": "Take notes",
-                            "materials_needed": [],
-                            "optional": False,
-                        }
-                    ],
-                    "materials": ["Workbook"],
-                    "teacher_notes": ["Use D-M-S-B language"],
-                    "adaptations": [],
-                    "assessment_artifact": "Workbook page",
-                },
-            },
-            "app_context": {
-                "product": "homeschool-v2",
-                "surface": "today_workspace",
-            },
-        },
-    )
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+
+    assert result.artifact["schemaVersion"] == "2"
+    assert result.trace.agent_trace["component_docs_read"] == ["ui_components/short_answer.md"]
+    assert len(result.trace.agent_trace["tool_calls"]) == 1
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_omits_null_optional_fields(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+    mock_build_runtime.return_value = _fake_model_runtime()
+    mock_agent_loop.return_value = _fake_agent_result(_VALID_ARTIFACT_WITH_NULLS)
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
 
     paragraph = result.artifact["components"][0]
     build_steps = result.artifact["components"][2]
-
     assert "markdown" not in paragraph
     assert "expectedValue" not in build_steps["steps"][0]
     assert "minimumComponents" not in result.artifact["completionRules"]
     assert "rubricMasteryLevel" not in result.artifact["scoringModel"]
     assert "confidenceMasteryLevel" not in result.artifact["scoringModel"]
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_repair_on_invalid_json(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+
+    # Return a client whose invoke() returns the valid artifact (for repair pass).
+    fake_runtime = ModelRuntime(
+        provider="openai",
+        model="fake-activity-generate",
+        client=_FakeClient(repair_content=json.dumps(_VALID_ARTIFACT)),
+        temperature=0.2,
+        max_tokens=4096,
+        max_tokens_source="test",
+        provider_settings={},
+    )
+    mock_build_runtime.return_value = fake_runtime
+
+    # Agent returns invalid JSON that fails validation.
+    mock_agent_loop.return_value = AgentResult(
+        final_text='{"schemaVersion": "2", "title": "Bad"}',
+        tool_calls=[],
+        messages=[],
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+
+    assert result.artifact["schemaVersion"] == "2"
+    assert result.trace.agent_trace["repair_attempted"] is True
+    assert result.trace.agent_trace["repair_succeeded"] is True
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_repair_failure_raises(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    import pytest
+    from learning_core.runtime.errors import ContractValidationError
+
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+
+    # Repair returns still-invalid JSON.
+    fake_runtime = ModelRuntime(
+        provider="openai",
+        model="fake-activity-generate",
+        client=_FakeClient(repair_content='{"still": "broken"}'),
+        temperature=0.2,
+        max_tokens=4096,
+        max_tokens_source="test",
+        provider_settings={},
+    )
+    mock_build_runtime.return_value = fake_runtime
+
+    mock_agent_loop.return_value = AgentResult(
+        final_text='{"schemaVersion": "2", "title": "Bad"}',
+        tool_calls=[],
+        messages=[],
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    with pytest.raises(ContractValidationError, match="repair"):
+        engine.execute("activity_generate", _ENVELOPE_DATA)
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_extracts_json_from_markdown_fence(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+    mock_build_runtime.return_value = _fake_model_runtime()
+
+    fenced = f"Here is the activity:\n```json\n{json.dumps(_VALID_ARTIFACT)}\n```"
+    mock_agent_loop.return_value = AgentResult(
+        final_text=fenced,
+        tool_calls=[],
+        messages=[],
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+    assert result.artifact["schemaVersion"] == "2"
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)

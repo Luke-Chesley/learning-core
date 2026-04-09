@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from learning_core.contracts.base import StrictModel
 from learning_core.contracts.lesson_draft import StructuredLessonDraft
@@ -189,7 +189,7 @@ class RichTextResponseComponent(StrictModel):
 
 class SingleSelectChoice(StrictModel):
     id: str
-    text: str
+    text: str = Field(validation_alias=AliasChoices("text", "label"))
     correct: bool | None = None
     explanation: str | None = None
 
@@ -198,7 +198,7 @@ class SingleSelectComponent(StrictModel):
     type: Literal["single_select"]
     id: str
     prompt: str
-    choices: list[SingleSelectChoice] = Field(min_length=2)
+    choices: list[SingleSelectChoice] = Field(min_length=2, validation_alias=AliasChoices("choices", "options"))
     immediateCorrectness: bool = False
     hint: str | None = None
     required: bool = True
@@ -206,7 +206,7 @@ class SingleSelectComponent(StrictModel):
 
 class MultiSelectChoice(StrictModel):
     id: str
-    text: str
+    text: str = Field(validation_alias=AliasChoices("text", "label"))
     correct: bool | None = None
 
 
@@ -214,7 +214,7 @@ class MultiSelectComponent(StrictModel):
     type: Literal["multi_select"]
     id: str
     prompt: str
-    choices: list[MultiSelectChoice] = Field(min_length=2)
+    choices: list[MultiSelectChoice] = Field(min_length=2, validation_alias=AliasChoices("choices", "options"))
     minSelections: int | None = Field(default=None, ge=0)
     maxSelections: int | None = Field(default=None, gt=0)
     hint: str | None = None

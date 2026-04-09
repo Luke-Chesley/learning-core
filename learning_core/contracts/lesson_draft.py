@@ -52,6 +52,7 @@ class StructuredLessonDraft(StrictModel):
     blocks: list[LessonBlock] = Field(default_factory=list)
     materials: list[str] = Field(default_factory=list)
     teacher_notes: list[str] = Field(default_factory=list)
+    co_teacher_notes: list[str] = Field(default_factory=list)
     adaptations: list[LessonAdaptation] = Field(default_factory=list)
     assessment_artifact: str | None = None
     lesson_shape: LessonShape | None = None
