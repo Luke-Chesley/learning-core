@@ -29,7 +29,7 @@ class SkillDefinition(ABC, Generic[InputModelT, OutputModelT]):
     policy: ExecutionPolicy
 
     @abstractmethod
-    def build_prompt_preview(self, payload: InputModelT) -> PromptPreview:
+    def build_prompt_preview(self, payload: InputModelT, context: RuntimeContext) -> PromptPreview:
         raise NotImplementedError
 
     @abstractmethod

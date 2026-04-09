@@ -1,115 +1,59 @@
 from __future__ import annotations
 
-from learning_core.contracts import (
-    ActivityArtifact,
-    ActivityGenerationInput,
-    CurriculumArtifact,
-    CurriculumGenerationRequest,
-    CurriculumRevisionRequest,
-    CurriculumUpdateProposalArtifact,
-    CurriculumUpdateProposalRequest,
-    EvaluationArtifact,
-    ProgressionArtifact,
-    ProgressionGenerationRequest,
-    ProgressionRevisionRequest,
-    SessionEvaluationRequest,
-    SessionPlanArtifact,
-    SessionPlanGenerationRequest,
-)
 from learning_core.runtime.registry import SkillRegistry
 from learning_core.skills.activity_generate.skill import ActivityGenerateSkill
-from learning_core.skills.stub import StubSkillConfig, UnimplementedSkill
+from learning_core.skills.copilot_chat.skill import CopilotChatSkill
+from learning_core.skills.curriculum_generate.skill import CurriculumGenerateSkill
+from learning_core.skills.curriculum_intake.skill import CurriculumIntakeSkill
+from learning_core.skills.curriculum_revise.skill import CurriculumReviseSkill
+from learning_core.skills.curriculum_update_propose.skill import CurriculumUpdateProposeSkill
+from learning_core.skills.progression_generate.skill import ProgressionGenerateSkill
+from learning_core.skills.progression_revise.skill import ProgressionReviseSkill
+from learning_core.skills.session_evaluate.skill import SessionEvaluateSkill
+from learning_core.skills.session_generate.skill import SessionGenerateSkill
 
 
 def build_skill_registry() -> SkillRegistry:
     registry = SkillRegistry()
     registry.register(
-        "generate-activities-from-plan-session",
+        "activity_generate",
         ActivityGenerateSkill(),
     )
+    registry.register(
+        "session_generate",
+        SessionGenerateSkill(),
+    )
+    registry.register(
+        "curriculum_intake",
+        CurriculumIntakeSkill(),
+    )
+    registry.register(
+        "copilot_chat",
+        CopilotChatSkill(),
+    )
+    registry.register(
+        "curriculum_generate",
+        CurriculumGenerateSkill(),
+    )
+    registry.register(
+        "curriculum_revise",
+        CurriculumReviseSkill(),
+    )
+    registry.register(
+        "progression_generate",
+        ProgressionGenerateSkill(),
+    )
+    registry.register(
+        "progression_revise",
+        ProgressionReviseSkill(),
+    )
+    registry.register(
+        "session_evaluate",
+        SessionEvaluateSkill(),
+    )
+    registry.register(
+        "curriculum_update_propose",
+        CurriculumUpdateProposeSkill(),
+    )
 
-    registry.register(
-        "generate-curriculum-from-scratch",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="curriculum_generate",
-                operation_name="generate-curriculum-from-scratch",
-                skill_version="2026-04-08",
-                input_model=CurriculumGenerationRequest,
-                output_model=CurriculumArtifact,
-            )
-        ),
-    )
-    registry.register(
-        "revise-existing-curriculum",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="curriculum_revise",
-                operation_name="revise-existing-curriculum",
-                skill_version="2026-04-08",
-                input_model=CurriculumRevisionRequest,
-                output_model=CurriculumArtifact,
-            )
-        ),
-    )
-    registry.register(
-        "generate-progression-model",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="progression_generate",
-                operation_name="generate-progression-model",
-                skill_version="2026-04-08",
-                input_model=ProgressionGenerationRequest,
-                output_model=ProgressionArtifact,
-            )
-        ),
-    )
-    registry.register(
-        "revise-progression-model",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="progression_revise",
-                operation_name="revise-progression-model",
-                skill_version="2026-04-08",
-                input_model=ProgressionRevisionRequest,
-                output_model=ProgressionArtifact,
-            )
-        ),
-    )
-    registry.register(
-        "generate-daily-session-plan",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="session_generate",
-                operation_name="generate-daily-session-plan",
-                skill_version="2026-04-08",
-                input_model=SessionPlanGenerationRequest,
-                output_model=SessionPlanArtifact,
-            )
-        ),
-    )
-    registry.register(
-        "evaluate-completed-session",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="session_evaluate",
-                operation_name="evaluate-completed-session",
-                skill_version="2026-04-08",
-                input_model=SessionEvaluationRequest,
-                output_model=EvaluationArtifact,
-            )
-        ),
-    )
-    registry.register(
-        "propose-curriculum-progression-updates",
-        UnimplementedSkill(
-            StubSkillConfig(
-                name="curriculum_update_propose",
-                operation_name="propose-curriculum-progression-updates",
-                skill_version="2026-04-08",
-                input_model=CurriculumUpdateProposalRequest,
-                output_model=CurriculumUpdateProposalArtifact,
-            )
-        ),
-    )
     return registry

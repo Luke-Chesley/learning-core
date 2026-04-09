@@ -10,7 +10,7 @@ def test_openai_service_tier_from_env(monkeypatch):
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "flex")
 
     runtime = build_model_runtime(
-        task_name="generate-activities-from-plan-session",
+        task_name="activity_generate",
         task_kind="chat",
         temperature=None,
         max_tokens=None,
@@ -29,7 +29,7 @@ def test_openai_service_tier_omitted_when_blank(monkeypatch):
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "   ")
 
     runtime = build_model_runtime(
-        task_name="generate-activities-from-plan-session",
+        task_name="activity_generate",
         task_kind="chat",
         temperature=None,
         max_tokens=None,

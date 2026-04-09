@@ -1,7 +1,21 @@
 from learning_core.contracts.activity import ActivityArtifact, ActivityGenerationInput
+from learning_core.contracts.copilot import CopilotChatArtifact, CopilotChatContext, CopilotChatRequest
+from learning_core.contracts.operation import (
+    AppContext,
+    OperationEnvelope,
+    PresentationContext,
+    UserAuthoredContext,
+)
+from learning_core.contracts.responses import (
+    OperationDescriptor,
+    OperationExecuteResponse,
+    OperationPromptPreviewResponse,
+)
 from learning_core.contracts.curriculum import (
     CurriculumArtifact,
+    CurriculumIntakeArtifact,
     CurriculumGenerationRequest,
+    CurriculumRevisionTurn,
     CurriculumRevisionRequest,
     CurriculumUpdateProposalArtifact,
     CurriculumUpdateProposalRequest,
@@ -18,12 +32,23 @@ from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPla
 __all__ = [
     "ActivityArtifact",
     "ActivityGenerationInput",
+    "AppContext",
+    "CopilotChatArtifact",
+    "CopilotChatContext",
+    "CopilotChatRequest",
     "CurriculumArtifact",
+    "CurriculumIntakeArtifact",
     "CurriculumGenerationRequest",
     "CurriculumRevisionRequest",
+    "CurriculumRevisionTurn",
     "CurriculumUpdateProposalArtifact",
     "CurriculumUpdateProposalRequest",
     "EvaluationArtifact",
+    "OperationDescriptor",
+    "OperationEnvelope",
+    "OperationExecuteResponse",
+    "OperationPromptPreviewResponse",
+    "PresentationContext",
     "ProgressionArtifact",
     "ProgressionGenerationRequest",
     "ProgressionRevisionRequest",
@@ -31,4 +56,5 @@ __all__ = [
     "SessionPlanArtifact",
     "SessionPlanGenerationRequest",
     "StructuredLessonDraft",
+    "UserAuthoredContext",
 ]

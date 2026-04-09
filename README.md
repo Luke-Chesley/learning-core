@@ -9,9 +9,9 @@
 
 ## Current Slice
 
-- Fully scaffolded runtime for the long-term split.
-- First implemented operation: `generate-activities-from-plan-session`.
-- Remaining seven operations are registered as explicit fail-fast stubs.
+- Shared operation-envelope runtime is in place.
+- All extracted operations are exposed through `/v1/operations/{operation_name}`.
+- Prompt ownership lives in `SKILL.md` plus Python prompt builders inside `learning-core`.
 
 ## Local Dev
 
@@ -48,7 +48,9 @@ learning_core/
   runtime/
   skills/
     activity_generate/
+    copilot_chat/
     curriculum_generate/
+    curriculum_intake/
     curriculum_revise/
     progression_generate/
     progression_revise/
@@ -61,11 +63,21 @@ learning_core/
 
 - `GET /healthz`
 - `GET /v1/operations`
-- `POST /v1/gateway/complete`
-- `POST /v1/gateway/complete-json`
-- `POST /v1/gateway/stream`
-- `POST /v1/operations/generate-activities-from-plan-session/prompt-preview`
-- `POST /v1/operations/generate-activities-from-plan-session/execute`
+- `POST /v1/operations/{operation_name}/prompt-preview`
+- `POST /v1/operations/{operation_name}/execute`
+
+Current first-class operations:
+
+- `activity_generate`
+- `session_generate`
+- `curriculum_intake`
+- `copilot_chat`
+- `curriculum_generate`
+- `curriculum_revise`
+- `progression_generate`
+- `progression_revise`
+- `session_evaluate`
+- `curriculum_update_propose`
 
 ## Design Rules
 
@@ -74,4 +86,6 @@ learning_core/
 - Missing model/provider config fails immediately.
 - Runtime/provider defaults do not live in code; define them in `.env.local`.
 - Contract mismatches fail immediately.
-- Product repos persist artifacts; `learning-core` returns typed artifacts.
+- Product repos persist artifacts; `learning-core` returns typed artifacts, lineage, and traces.
+- Product repos send structured request envelopes only. They do not send prompt fragments or raw system prompts.
+- The legacy generic gateway surface is deleted. Apps call named operations only.
