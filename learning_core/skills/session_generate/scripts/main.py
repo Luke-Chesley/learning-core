@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from learning_core.contracts.lesson_draft import LESSON_SHAPE_VALUES
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
@@ -70,10 +71,14 @@ class SessionGenerateSkill(StructuredOutputSkill):
             f"Route items: {len(payload.routeItems)}",
             f"Total time: {total_minutes} minutes",
             f"Objectives in scope: {len(payload.objectives)}",
+            f"Allowed lesson_shape slugs: {', '.join(LESSON_SHAPE_VALUES)}",
         ]
 
         if payload.lessonShape:
-            lines.append(f"Lesson shape preference: {payload.lessonShape}")
+            lines.append(
+                "Lesson shape preference (canonical lesson_shape slug; reuse exactly if included): "
+                f"{payload.lessonShape}"
+            )
 
         if payload.teacherContext:
             if payload.teacherContext.subject_comfort:

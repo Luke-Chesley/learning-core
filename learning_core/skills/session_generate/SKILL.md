@@ -20,7 +20,7 @@ Schema (all fields are strings or string arrays unless annotated):
   "follow_through": string,
   "co_teacher_notes": string[],
   "accommodations": string[],
-  "lesson_shape": string
+  "lesson_shape": one of [balanced, direct_instruction, discussion_heavy, project_based, practice_heavy, gentle_short_blocks]
 }
 
 Block shape:
@@ -52,3 +52,5 @@ Rules:
 - If total time is tight, mark lower-priority blocks as optional:true.
 - Adaptations are short, actionable, and ready to use during live teaching.
 - Do not include optional top-level fields unless they add clear value for this lesson.
+- `lesson_shape` is machine-readable metadata. If you include it, emit only one canonical slug from the allowed list.
+- Do not emit descriptive prose labels for `lesson_shape` such as "Short teach-practice-check sequence".

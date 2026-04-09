@@ -21,7 +21,7 @@ from learning_core.contracts.curriculum import (
     CurriculumUpdateProposalRequest,
 )
 from learning_core.contracts.evaluation import EvaluationArtifact, SessionEvaluationRequest
-from learning_core.contracts.lesson_draft import StructuredLessonDraft
+from learning_core.contracts.lesson_draft import LESSON_SHAPE_VALUES, LessonShape, StructuredLessonDraft
 from learning_core.contracts.progression import (
     ProgressionArtifact,
     ProgressionGenerationRequest,
@@ -44,6 +44,8 @@ __all__ = [
     "CurriculumUpdateProposalArtifact",
     "CurriculumUpdateProposalRequest",
     "EvaluationArtifact",
+    "LESSON_SHAPE_VALUES",
+    "LessonShape",
     "OperationDescriptor",
     "OperationEnvelope",
     "OperationExecuteResponse",
