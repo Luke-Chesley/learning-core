@@ -38,11 +38,10 @@
     "teacher_notes": ["Use D-M-S-B language"],
     "adaptations": [],
     "assessment_artifact": "Completed workbook page",
-    "lesson_shape": "demonstration_then_try",
+    "lesson_shape": "direct_instruction",
     "prep": [],
     "extension": null,
     "follow_through": null,
     "accommodations": []
   }
 }
-

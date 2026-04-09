@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import Field
 
 from learning_core.contracts.base import StrictModel
-from learning_core.contracts.lesson_draft import StructuredLessonDraft
+from learning_core.contracts.lesson_draft import LessonShape, StructuredLessonDraft
 
 
 class LessonDraftResolvedTiming(StrictModel):
@@ -38,7 +38,7 @@ class SessionPlanGenerationRequest(StrictModel):
     objectives: list[str] = Field(default_factory=list)
     routeItems: list[LessonDraftRouteItem] = Field(default_factory=list)
     materials: list[str] = Field(default_factory=list)
-    lessonShape: str | None = None
+    lessonShape: LessonShape | None = None
     teacherContext: TeacherContext | None = None
     context: dict[str, Any] | None = None
 

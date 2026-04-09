@@ -1,10 +1,28 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from pydantic import Field
 
 from learning_core.contracts.base import StrictModel
+
+LESSON_SHAPE_VALUES = (
+    "balanced",
+    "direct_instruction",
+    "discussion_heavy",
+    "project_based",
+    "practice_heavy",
+    "gentle_short_blocks",
+)
+
+LessonShape: TypeAlias = Literal[
+    "balanced",
+    "direct_instruction",
+    "discussion_heavy",
+    "project_based",
+    "practice_heavy",
+    "gentle_short_blocks",
+]
 
 
 class LessonAdaptation(StrictModel):
@@ -36,9 +54,8 @@ class StructuredLessonDraft(StrictModel):
     teacher_notes: list[str] = Field(default_factory=list)
     adaptations: list[LessonAdaptation] = Field(default_factory=list)
     assessment_artifact: str | None = None
-    lesson_shape: str | None = None
+    lesson_shape: LessonShape | None = None
     prep: list[str] = Field(default_factory=list)
     extension: str | None = None
     follow_through: str | None = None
     accommodations: list[str] = Field(default_factory=list)
-
