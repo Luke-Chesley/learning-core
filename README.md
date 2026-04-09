@@ -30,6 +30,11 @@
    - `LEARNING_CORE_PROVIDER`
    - `LEARNING_CORE_DEFAULT_TEMPERATURE`
    - `LEARNING_CORE_MAX_TOKENS`
+   - optional token overrides:
+     - `LEARNING_CORE_CHAT_MAX_TOKENS`
+     - `LEARNING_CORE_FAST_MAX_TOKENS`
+     - `LEARNING_CORE_GENERATION_MAX_TOKENS`
+     - `LEARNING_CORE_<OPERATION_NAME>_MAX_TOKENS`
    - `LEARNING_CORE_CHAT_MODEL`
    - `LEARNING_CORE_FAST_MODEL`
    - `LEARNING_CORE_GENERATION_MODEL`
@@ -46,6 +51,8 @@ The service defaults to `http://127.0.0.1:8000`.
 - Each file is named with the request timestamp.
 - The top half of the file is the provider request payload.
 - The bottom half is the provider response payload or provider error.
+- The request block includes request classification fields such as `operation_name`, `task_kind`, `response_mode`, `provider_request_kind`, and provider-specific settings such as `openai_service_tier`.
+- The request block also includes the resolved `max_tokens` and `max_tokens_source`.
 - For tests or custom local setups, you can override the log root with `LEARNING_CORE_LOG_DIR`.
 
 ## Folder Tree

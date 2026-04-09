@@ -18,6 +18,10 @@ class ModelRuntime:
     provider: str
     model: str
     client: object
+    temperature: float
+    max_tokens: int
+    max_tokens_source: str
+    provider_settings: dict[str, object]
 
 
 def _parse_optional_int(value: str | None) -> int | None:
@@ -41,13 +45,6 @@ def _read_required_str(name: str) -> str:
     value = _parse_optional_str(os.getenv(name))
     if value is None:
         raise ConfigurationError(f"{name} is required.")
-    return value
-
-
-def _read_required_int(name: str) -> int:
-    value = _parse_optional_int(os.getenv(name))
-    if value is None:
-        raise ConfigurationError(f"{name} is required and must be a positive integer.")
     return value
 
 
@@ -94,6 +91,31 @@ def _resolve_model(task_name: str, task_kind: str, model_override: str | None) -
     )
 
 
+def _resolve_max_tokens(task_name: str, task_kind: str, policy_max_tokens: int | None) -> tuple[int, str]:
+    operation_env_name = f"LEARNING_CORE_{task_name.upper()}_MAX_TOKENS"
+    operation_override = _parse_optional_int(os.getenv(operation_env_name))
+    if operation_override is not None:
+        return operation_override, operation_env_name
+
+    task_kind_env_name = f"LEARNING_CORE_{task_kind.upper()}_MAX_TOKENS"
+    task_kind_override = _parse_optional_int(os.getenv(task_kind_env_name))
+    if task_kind_override is not None:
+        return task_kind_override, task_kind_env_name
+
+    global_override = _parse_optional_int(os.getenv("LEARNING_CORE_MAX_TOKENS"))
+    if global_override is not None:
+        return global_override, "LEARNING_CORE_MAX_TOKENS"
+
+    if policy_max_tokens is not None:
+        return policy_max_tokens, "skill_policy"
+
+    raise ConfigurationError(
+        "Max token routing is incomplete for "
+        f"task '{task_name}'. Set {operation_env_name}, {task_kind_env_name}, "
+        "LEARNING_CORE_MAX_TOKENS, or a skill policy override."
+    )
+
+
 def build_model_runtime(
     *,
     task_name: str,
@@ -109,11 +131,7 @@ def build_model_runtime(
         if temperature is None
         else temperature
     )
-    resolved_max_tokens = (
-        _read_required_int("LEARNING_CORE_MAX_TOKENS")
-        if max_tokens is None
-        else max_tokens
-    )
+    resolved_max_tokens, max_tokens_source = _resolve_max_tokens(task_name, task_kind, max_tokens)
 
     if provider == "anthropic":
         api_key = _read_required_str("ANTHROPIC_API_KEY")
@@ -124,7 +142,15 @@ def build_model_runtime(
             anthropic_api_key=api_key,
             timeout=None,
         )
-        return ModelRuntime(provider=provider, model=model, client=client)
+        return ModelRuntime(
+            provider=provider,
+            model=model,
+            client=client,
+            temperature=resolved_temperature,
+            max_tokens=resolved_max_tokens,
+            max_tokens_source=max_tokens_source,
+            provider_settings={},
+        )
 
     if provider == "openai":
         api_key = _read_required_str("OPENAI_API_KEY")
@@ -137,7 +163,17 @@ def build_model_runtime(
             service_tier=service_tier,
             timeout=None,
         )
-        return ModelRuntime(provider=provider, model=model, client=client)
+        return ModelRuntime(
+            provider=provider,
+            model=model,
+            client=client,
+            temperature=resolved_temperature,
+            max_tokens=resolved_max_tokens,
+            max_tokens_source=max_tokens_source,
+            provider_settings={
+                "openai_service_tier": service_tier,
+            },
+        )
 
     base_url = _read_required_str("OLLAMA_BASE_URL")
     auth_token = _parse_optional_str(os.getenv("OLLAMA_AUTH_TOKEN"))
@@ -153,4 +189,16 @@ def build_model_runtime(
         keep_alive=keep_alive,
         client_kwargs=client_kwargs,
     )
-    return ModelRuntime(provider=provider, model=model, client=client)
+    return ModelRuntime(
+        provider=provider,
+        model=model,
+        client=client,
+        temperature=resolved_temperature,
+        max_tokens=resolved_max_tokens,
+        max_tokens_source=max_tokens_source,
+        provider_settings={
+            "ollama_base_url": base_url,
+            "ollama_num_ctx": num_ctx,
+            "ollama_keep_alive": keep_alive,
+        },
+    )

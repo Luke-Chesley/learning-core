@@ -11,6 +11,8 @@ def test_write_provider_exchange_log_creates_daily_log_file(monkeypatch, tmp_pat
     path = write_provider_exchange_log(
         request={
             "operation_name": "copilot_chat",
+            "max_tokens": 4096,
+            "max_tokens_source": "LEARNING_CORE_CHAT_MAX_TOKENS",
             "provider_messages": [
                 {"role": "system", "content": "System prompt"},
                 {"role": "user", "content": "Hello"},
@@ -28,4 +30,6 @@ def test_write_provider_exchange_log_creates_daily_log_file(monkeypatch, tmp_pat
     assert "REQUEST" in body
     assert "RESPONSE" in body
     assert '"operation_name": "copilot_chat"' in body
+    assert '"max_tokens": 4096' in body
+    assert '"max_tokens_source": "LEARNING_CORE_CHAT_MAX_TOKENS"' in body
     assert '"normalized_text": "Hi there."' in body

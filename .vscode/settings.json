@@ -1,0 +1,7 @@
+{
+  "git.repositoryScanIgnoredFolders": [
+    ".worktrees"
+  ],
+  "scm.repositories.selectionMode": "single",
+  "scm.alwaysShowRepositories": false
+}
