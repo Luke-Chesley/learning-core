@@ -17,74 +17,18 @@ from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.errors import ContractValidationError, ProviderExecutionError
 from learning_core.runtime.providers import build_model_runtime
 from learning_core.runtime.skill import SkillDefinition, SkillExecutionResult
+from learning_core.skills.activity_generate.packs import ALL_PACKS, Pack
 from learning_core.skills.activity_generate.scripts.policy import ACTIVITY_GENERATE_POLICY
 from learning_core.skills.activity_generate.scripts.schemas import ActivityArtifact, ActivityGenerationInput
-from learning_core.skills.activity_generate.scripts.tooling import (
-    chess_apply_move,
-    chess_describe_position,
-    chess_legal_moves,
-    chess_normalize_move,
-    read_ui_spec,
-)
+from learning_core.skills.activity_generate.scripts.tooling import read_ui_spec
 
 _SKILL_DIR = Path(__file__).resolve().parent.parent
 _REGISTRY_INDEX_PATH = _SKILL_DIR / "ui_registry_index.md"
 _PACKS_DIR = _SKILL_DIR / "packs"
 _PACK_INDEX_PATH = _PACKS_DIR / "index.md"
-_PACK_DOC_FILENAMES = ("pack.md", "patterns.md", "examples.md")
 _TOOL_OUTPUT_PREVIEW_CHARS = 320
 
-_PACK_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "math": (
-        "math",
-        "arithmetic",
-        "fraction",
-        "fractions",
-        "division",
-        "long division",
-        "multiply",
-        "multiplication",
-        "addition",
-        "subtraction",
-        "algebra",
-        "equation",
-        "geometry",
-        "decimal",
-        "decimals",
-        "percent",
-        "ratio",
-        "measurement",
-        "word problem",
-        "place value",
-        "number line",
-    ),
-    "chess": (
-        "chess",
-        "checkmate",
-        "check",
-        "opening",
-        "middlegame",
-        "endgame",
-        "fork",
-        "pin",
-        "skewer",
-        "tactic",
-        "tactics",
-        "candidate move",
-        "best move",
-        "threat",
-        "blunder",
-        "zugzwang",
-        "mate",
-        "rook",
-        "bishop",
-        "knight",
-        "queen",
-        "king",
-        "pawn",
-        "fen",
-    ),
-}
+_PACKS_BY_NAME: dict[str, Pack] = {pack.name: pack for pack in ALL_PACKS}
 
 
 @dataclass(frozen=True)
@@ -104,14 +48,6 @@ def _read_registry_index() -> str:
 
 def _read_pack_index() -> str:
     return _PACK_INDEX_PATH.read_text(encoding="utf-8").strip()
-
-
-def _read_pack_docs(pack_name: str) -> list[str]:
-    pack_dir = _PACKS_DIR / pack_name
-    sections: list[str] = []
-    for filename in _PACK_DOC_FILENAMES:
-        sections.append((pack_dir / filename).read_text(encoding="utf-8").strip())
-    return sections
 
 
 def _contains_keyword(text: str, keyword: str) -> bool:
@@ -147,12 +83,12 @@ def _select_packs(payload: ActivityGenerationInput) -> PackSelection:
     pack_selection_reason: dict[str, list[str]] = {}
     included_packs: list[str] = []
 
-    for pack_name, keywords in _PACK_KEYWORDS.items():
+    for pack in ALL_PACKS:
         pack_matches: dict[str, list[str]] = {}
         pack_reasons: list[str] = []
 
         for source_name, source_value in lowered_sources.items():
-            hits = [keyword for keyword in keywords if _contains_keyword(source_value, keyword)]
+            hits = [keyword for keyword in pack.keywords if _contains_keyword(source_value, keyword)]
             if not hits:
                 continue
             deduped_hits = _dedupe_preserve_order(hits)
@@ -160,10 +96,10 @@ def _select_packs(payload: ActivityGenerationInput) -> PackSelection:
             label = source_name.replace("_", " ")
             pack_reasons.append(f"{label} matched: {', '.join(deduped_hits)}")
 
-        matched_keywords[pack_name] = pack_matches
-        pack_selection_reason[pack_name] = pack_reasons
+        matched_keywords[pack.name] = pack_matches
+        pack_selection_reason[pack.name] = pack_reasons
         if pack_reasons:
-            included_packs.append(pack_name)
+            included_packs.append(pack.name)
 
     subject_inference = {
         "provided_subject": payload.subject,
@@ -302,10 +238,11 @@ def _build_user_prompt(
         lines.append(_read_pack_index())
 
         for pack_name in pack_selection.included_packs:
+            pack = _PACKS_BY_NAME[pack_name]
             lines.append("")
             lines.append("---")
             lines.append("")
-            for section in _read_pack_docs(pack_name):
+            for section in pack.prompt_sections():
                 lines.append(section)
                 lines.append("")
             if lines[-1] == "":
@@ -428,8 +365,8 @@ class ActivityGenerateSkill(SkillDefinition):
         )
 
         tools = [read_ui_spec]
-        if "chess" in pack_selection.included_packs:
-            tools.extend([chess_legal_moves, chess_describe_position, chess_apply_move, chess_normalize_move])
+        for pack_name in pack_selection.included_packs:
+            tools.extend(_PACKS_BY_NAME[pack_name].tools())
 
         try:
             agent_result = run_agent_loop(
@@ -551,6 +488,7 @@ class ActivityGenerateSkill(SkillDefinition):
             agent_trace={
                 "tool_calls": tool_call_log,
                 "ui_specs_read": ui_specs_read,
+                "active_tools": [t.name for t in tools],
                 "included_packs": list(pack_selection.included_packs),
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,

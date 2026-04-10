@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from langchain_core.tools import tool
-
-from learning_core.domain.chess_engine import apply_move, describe_position, legal_moves, normalize_move
 
 _SKILL_DIR = Path(__file__).resolve().parent.parent
 
@@ -49,17 +46,7 @@ ALLOWED_UI_SPEC_PATHS: frozenset[str] = frozenset(
     }
 )
 
-ACTIVITY_GENERATE_ALLOWED_TOOLS: tuple[str, ...] = (
-    "read_ui_spec",
-    "chess_legal_moves",
-    "chess_describe_position",
-    "chess_apply_move",
-    "chess_normalize_move",
-)
-
-
-def _serialize_tool_payload(payload: object) -> str:
-    return json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True)
+BASE_ALLOWED_TOOLS: tuple[str, ...] = ("read_ui_spec",)
 
 
 def _resolve_ui_spec_path(path: str) -> Path:
@@ -98,41 +85,5 @@ def read_ui_spec(path: str) -> str:
         return spec_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         return f"Error: UI spec not found at {path}"
-    except ValueError as error:
-        return f"Error: {error}"
-
-
-@tool
-def chess_legal_moves(fen: str) -> str:
-    """Return normalized legal chess moves for a FEN position."""
-    try:
-        return _serialize_tool_payload({"legalMoves": legal_moves(fen)})
-    except ValueError as error:
-        return f"Error: {error}"
-
-
-@tool
-def chess_describe_position(fen: str) -> str:
-    """Return a compact chess position summary for a FEN position."""
-    try:
-        return _serialize_tool_payload(describe_position(fen))
-    except ValueError as error:
-        return f"Error: {error}"
-
-
-@tool
-def chess_apply_move(fen: str, move: str) -> str:
-    """Apply a legal move to a FEN position and return the resulting state."""
-    try:
-        return _serialize_tool_payload(apply_move(fen, move))
-    except ValueError as error:
-        return f"Error: {error}"
-
-
-@tool
-def chess_normalize_move(fen: str, move: str) -> str:
-    """Normalize a SAN or UCI move against a FEN position."""
-    try:
-        return _serialize_tool_payload(normalize_move(fen, move))
     except ValueError as error:
         return f"Error: {error}"
