@@ -11,6 +11,7 @@ from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.engine import AgentEngine
 from learning_core.runtime.providers import ModelRuntime
 from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill, _select_packs
+from learning_core.skills.activity_generate.validation.widgets import normalize_and_validate_widget_activity
 from learning_core.skills.catalog import build_skill_registry
 
 # -- Shared test fixtures --
@@ -400,6 +401,50 @@ def test_activity_artifact_json_schema_has_no_open_objects():
     assert open_paths == []
     assert tuple_paths == []
     assert format_paths == []
+
+
+def test_semantic_widget_validation_rejects_board_centered_supporting_board():
+    artifact = ActivityArtifact.model_validate(
+        {
+            **_VALID_CHESS_ARTIFACT,
+            "components": [
+                {
+                    **_VALID_CHESS_ARTIFACT["components"][0],
+                    "widget": {
+                        **_VALID_CHESS_ARTIFACT["components"][0]["widget"],
+                        "display": {
+                            "showSideToMove": True,
+                            "showCoordinates": True,
+                            "showMoveHint": True,
+                            "boardRole": "supporting",
+                        },
+                    },
+                }
+            ],
+        }
+    )
+
+    _, errors = normalize_and_validate_widget_activity(artifact)
+
+    assert any("board-centered chess lesson" in error for error in errors)
+
+
+def test_semantic_widget_validation_rejects_prompt_board_fact_contradiction():
+    artifact = ActivityArtifact.model_validate(
+        {
+            **_VALID_CHESS_ARTIFACT,
+            "components": [
+                {
+                    **_VALID_CHESS_ARTIFACT["components"][0],
+                    "prompt": "White to move. The king is in check. Find the queen move that gives check.",
+                }
+            ],
+        }
+    )
+
+    _, errors = normalize_and_validate_widget_activity(artifact)
+
+    assert any("prompt claims the current position is check" in error for error in errors)
 
 
 # -- Execution tests (agent path) --

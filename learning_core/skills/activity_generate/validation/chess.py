@@ -4,7 +4,7 @@ import re
 
 import chess
 
-from learning_core.contracts.activity import InteractiveWidgetComponent
+from learning_core.contracts.activity import ActivityArtifact, InteractiveWidgetComponent
 from learning_core.contracts.widgets import ChessBoardWidget
 from learning_core.domain.chess_engine import describe_position, normalize_move, validate_fen
 
@@ -20,6 +20,14 @@ _CURRENT_CHECKMATE_PATTERNS = (
     re.compile(r"\bposition is checkmate\b", re.IGNORECASE),
     re.compile(r"\balready checkmate\b", re.IGNORECASE),
 )
+_POSITION_CENTERED_PATTERNS = (
+    re.compile(r"\bbest move\b", re.IGNORECASE),
+    re.compile(r"\bfind (?:the )?(?:best|winning|forcing|checking) move\b", re.IGNORECASE),
+    re.compile(r"\bplay (?:the )?(?:best|winning|forcing|checking) move\b", re.IGNORECASE),
+    re.compile(r"\bfrom the position\b", re.IGNORECASE),
+    re.compile(r"\buse the board\b", re.IGNORECASE),
+    re.compile(r"\bside to move\b", re.IGNORECASE),
+)
 
 
 def _occupied_squares(fen: str) -> set[str]:
@@ -27,9 +35,37 @@ def _occupied_squares(fen: str) -> set[str]:
     return {chess.square_name(square) for square in board.piece_map()}
 
 
+def _all_visible_text(component: InteractiveWidgetComponent, widget: ChessBoardWidget) -> str:
+    return " ".join(
+        value.strip()
+        for value in [component.prompt or "", widget.instructionText or "", widget.caption or ""]
+        if value and value.strip()
+    )
+
+
+def _activity_context_text(artifact: ActivityArtifact, component: InteractiveWidgetComponent, widget: ChessBoardWidget) -> str:
+    pieces = [
+        artifact.title,
+        artifact.purpose or "",
+        " ".join(artifact.linkedSkillTitles),
+        _all_visible_text(component, widget),
+    ]
+    return " ".join(value.strip() for value in pieces if value and value.strip())
+
+
+def _legal_targets_by_source(fen: str) -> dict[str, set[str]]:
+    board = chess.Board(fen)
+    targets: dict[str, set[str]] = {}
+    for move in board.legal_moves:
+        from_square = chess.square_name(move.from_square)
+        targets.setdefault(from_square, set()).add(chess.square_name(move.to_square))
+    return targets
+
+
 def normalize_chess_widget(widget: ChessBoardWidget) -> ChessBoardWidget:
     normalized = widget.model_copy(deep=True)
     normalized.state.fen = validate_fen(widget.state.fen)
+    normalized.state.initialFen = validate_fen(widget.state.initialFen or widget.state.fen)
 
     deduped_moves: list[str] = []
     for move in widget.evaluation.expectedMoves:
@@ -41,14 +77,26 @@ def normalize_chess_widget(widget: ChessBoardWidget) -> ChessBoardWidget:
 
 
 def validate_chess_widget(
+    artifact: ActivityArtifact,
     component: InteractiveWidgetComponent,
     widget: ChessBoardWidget,
 ) -> list[str]:
     errors: list[str] = []
-    prompt = (component.prompt or "").strip()
+    prompt = _all_visible_text(component, widget)
+    activity_text = _activity_context_text(artifact, component, widget)
     position = describe_position(widget.state.fen)
     occupied_squares = _occupied_squares(widget.state.fen)
+    legal_targets_by_source = _legal_targets_by_source(widget.state.fen)
     side_to_move = position["sideToMove"]
+    expected_move_sources = {normalized_move[:2] for normalized_move in widget.evaluation.expectedMoves}
+    expected_move_targets = {
+        normalized_move[2:4] for normalized_move in widget.evaluation.expectedMoves if len(normalized_move) >= 4
+    }
+
+    if widget.state.initialFen != widget.state.fen:
+        errors.append(
+            f'Interactive widget "{component.id}" must start from its initialFen. Generated widgets should not begin mid-transition.'
+        )
 
     if widget.interaction.mode == "move_input" and not widget.evaluation.expectedMoves:
         errors.append(
@@ -62,8 +110,18 @@ def validate_chess_widget(
 
     if widget.interaction.mode == "move_input" and widget.display.boardRole != "primary":
         errors.append(
-            f'Interactive widget "{component.id}" uses move_input but display.boardRole is not "primary".'
+            f'Interactive widget "{component.id}" is a board-centered chess lesson with move input, so display.boardRole must be "primary".'
         )
+
+    if any(pattern.search(activity_text) for pattern in _POSITION_CENTERED_PATTERNS):
+        if widget.display.boardRole != "primary":
+            errors.append(
+                f'Interactive widget "{component.id}" appears in a board-centered chess lesson but is not marked primary.'
+            )
+        if widget.interaction.mode != "move_input":
+            errors.append(
+                f'Interactive widget "{component.id}" appears in a board-centered chess lesson but does not accept move input.'
+            )
 
     has_white_to_move = _WHITE_TO_MOVE_PATTERN.search(prompt) is not None
     has_black_to_move = _BLACK_TO_MOVE_PATTERN.search(prompt) is not None
@@ -91,11 +149,7 @@ def validate_chess_widget(
         )
 
     for square in widget.annotations.highlightSquares:
-        if square not in occupied_squares and square not in {
-            normalized_move[:2] for normalized_move in widget.evaluation.expectedMoves
-        } | {
-            normalized_move[2:4] for normalized_move in widget.evaluation.expectedMoves if len(normalized_move) >= 4
-        }:
+        if square not in occupied_squares and square not in expected_move_sources | expected_move_targets:
             errors.append(
                 f'Interactive widget "{component.id}" highlights "{square}" without tying it to a piece or expected move.'
             )
@@ -104,6 +158,13 @@ def validate_chess_widget(
         if arrow.fromSquare not in occupied_squares:
             errors.append(
                 f'Interactive widget "{component.id}" has an arrow starting from empty square "{arrow.fromSquare}".'
+            )
+            continue
+
+        legal_targets = legal_targets_by_source.get(arrow.fromSquare, set())
+        if arrow.toSquare not in legal_targets and arrow.toSquare not in expected_move_targets and arrow.toSquare not in occupied_squares:
+            errors.append(
+                f'Interactive widget "{component.id}" has an arrow to "{arrow.toSquare}" that is not a legal target, occupied square, or expected-move target.'
             )
 
     return errors

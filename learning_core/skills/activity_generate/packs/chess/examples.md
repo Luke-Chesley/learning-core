@@ -5,10 +5,12 @@
 Use `interactive_widget(board_surface/chess)` for the move itself. Keep `evaluation.expectedMoves` bounded to the acceptable moves.
 
 Make the board primary, keep side to move explicit, and pair the move with a nearby reasoning component only when the lesson genuinely needs explanation.
+Use a short prompt, then local widget instructions or caption only when they add concrete guidance.
 
 ## Compare and explain around a position
 
 Use a board widget for the position and `compare_and_explain` for two candidate moves. This keeps the widget focused and captures reasoning separately.
+The board should remain primary if the learner still needs to inspect the actual position to decide.
 
 ## Confidence check after analysis
 
@@ -21,3 +23,4 @@ If the lesson is about recurring tactical misses or endgame habits, use a brief 
 ## Text-only chess, used sparingly
 
 Use plain components without a board only when the learning target does not depend on a live position.
+Do not claim checks, mates, threats, or side-to-move facts unless they match the actual FEN used in the activity.

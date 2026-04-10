@@ -6,6 +6,8 @@ _CHESS_WIDGET = {
     "surfaceKind": "board_surface",
     "engineKind": "chess",
     "version": "1",
+    "instructionText": "Play the move on the board.",
+    "caption": "Use the board as the main evidence.",
     "surface": {"orientation": "white"},
     "display": {
         "showSideToMove": True,
@@ -13,7 +15,10 @@ _CHESS_WIDGET = {
         "showMoveHint": True,
         "boardRole": "primary",
     },
-    "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+    "state": {
+        "fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1",
+        "initialFen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1",
+    },
     "interaction": {
         "mode": "move_input",
         "submissionMode": "immediate",
@@ -78,6 +83,44 @@ def test_widget_transition_submit_move_returns_canonical_next_state_and_feedback
     assert result.artifact["nextResponse"]["uci"] == "e2b5"
     assert result.artifact["canonicalWidget"]["state"]["fen"].startswith("4k3/8/8/1Q6")
     assert result.artifact["immediateFeedback"]["status"] == "correct"
+    assert result.artifact["immediateFeedback"]["allowRetry"] is False
+
+
+def test_widget_transition_wrong_legal_move_keeps_retryable_board_at_initial_state():
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute(
+        "widget_transition",
+        _transition_envelope(
+            {
+                "type": "submit_move",
+                "move": {"fromSquare": "e2", "toSquare": "e4"},
+            }
+        ),
+    )
+
+    assert result.artifact["accepted"] is True
+    assert result.artifact["normalizedLearnerAction"]["uci"] == "e2e4"
+    assert result.artifact.get("nextResponse") is None
+    assert result.artifact["canonicalWidget"]["state"]["fen"] == _CHESS_WIDGET["state"]["initialFen"]
+    assert result.artifact["immediateFeedback"]["status"] == "incorrect"
+    assert result.artifact["immediateFeedback"]["allowRetry"] is True
+
+
+def test_widget_transition_invalid_move_returns_backend_legal_targets():
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute(
+        "widget_transition",
+        _transition_envelope(
+            {
+                "type": "submit_move",
+                "move": {"fromSquare": "e2", "toSquare": "e1"},
+            }
+        ),
+    )
+
+    assert result.artifact["accepted"] is False
+    assert "b5" in result.artifact["legalTargets"]
+    assert result.artifact["errorMessage"] == "Move is not legal in the provided position."
 
 
 def test_widget_transition_reset_returns_initial_state():
@@ -89,4 +132,28 @@ def test_widget_transition_reset_returns_initial_state():
 
     assert result.artifact["accepted"] is True
     assert result.artifact.get("nextResponse") is None
-    assert result.artifact["canonicalWidget"]["state"]["fen"] == _CHESS_WIDGET["state"]["fen"]
+    assert result.artifact["canonicalWidget"]["state"]["fen"] == _CHESS_WIDGET["state"]["initialFen"]
+
+
+def test_widget_transition_reset_uses_initial_fen_after_board_has_progressed():
+    progressed_widget = {
+        **_CHESS_WIDGET,
+        "state": {
+            "fen": "4k3/8/8/1Q6/8/8/8/4K3 b - - 1 1",
+            "initialFen": _CHESS_WIDGET["state"]["initialFen"],
+        },
+    }
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute(
+        "widget_transition",
+        {
+            **_transition_envelope({"type": "reset"}),
+            "input": {
+                **_transition_envelope({"type": "reset"})["input"],
+                "widget": progressed_widget,
+            },
+        },
+    )
+
+    assert result.artifact["accepted"] is True
+    assert result.artifact["canonicalWidget"]["state"]["fen"] == _CHESS_WIDGET["state"]["initialFen"]
