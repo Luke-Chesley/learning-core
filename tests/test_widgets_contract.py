@@ -23,6 +23,8 @@ def test_chess_widget_payload_validates():
 
     assert widget.engineKind == "chess"
     assert widget.state.fen.startswith("4k3")
+    assert widget.display.boardRole == "primary"
+    assert widget.feedback.displayMode == "inline"
 
 
 def test_math_widget_payload_validates():

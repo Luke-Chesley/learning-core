@@ -6,6 +6,7 @@ def test_registry_contains_activity_operation():
     operation_names = [operation.operation_name for operation in registry.list_operations()]
     assert "activity_generate" in operation_names
     assert "activity_feedback" in operation_names
+    assert "widget_transition" in operation_names
 
 
 def test_registry_contains_required_operations():
@@ -14,6 +15,7 @@ def test_registry_contains_required_operations():
     assert {
         "activity_generate",
         "activity_feedback",
+        "widget_transition",
         "session_generate",
         "curriculum_generate",
         "curriculum_revise",

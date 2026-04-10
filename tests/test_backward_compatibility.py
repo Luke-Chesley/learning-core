@@ -15,6 +15,7 @@ def test_other_skills_are_structured_output_skills():
     registry = build_skill_registry()
     deterministic_operations = {
         "activity_feedback",
+        "widget_transition",
         "session_generate",
         "curriculum_intake",
         "curriculum_generate",

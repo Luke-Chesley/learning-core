@@ -8,6 +8,8 @@ Use this pack when the request is clearly about chess.
 - Focus on candidate moves, plans, threats, tactics, evaluation, or endgame technique.
 - Capture evidence from an actual position when the learner should inspect or play a move.
 - Use text-only chess sparingly and only when the board is not the main evidence.
+- Make side to move obvious in the widget display or the prompt.
+- Keep claims about the current position aligned with real board facts.
 
 ## Stay simple when the board is not central
 
@@ -32,3 +34,4 @@ Do not escalate when the task is really a vocabulary or history question.
 
 The board widget should usually do one bounded job well. Put explanation, confidence, and reflection in normal components around it instead of overloading the widget.
 
+If the lesson is position-centered, the board should be the primary evidence instead of a decorative supporting component.

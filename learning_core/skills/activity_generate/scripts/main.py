@@ -21,6 +21,7 @@ from learning_core.skills.activity_generate.packs import ALL_PACKS, Pack
 from learning_core.skills.activity_generate.scripts.policy import ACTIVITY_GENERATE_POLICY
 from learning_core.skills.activity_generate.scripts.schemas import ActivityArtifact, ActivityGenerationInput
 from learning_core.skills.activity_generate.scripts.tooling import read_ui_spec
+from learning_core.skills.activity_generate.validation.widgets import normalize_and_validate_widget_activity
 
 _SKILL_DIR = Path(__file__).resolve().parent.parent
 _REGISTRY_INDEX_PATH = _SKILL_DIR / "ui_registry_index.md"
@@ -308,6 +309,13 @@ def _extract_ui_specs_read(tool_calls: list[ToolCallEvent]) -> list[str]:
     return specs_read
 
 
+def _build_active_tools(pack_selection: PackSelection) -> list[Any]:
+    tools: list[Any] = [read_ui_spec]
+    for pack_name in pack_selection.included_packs:
+        tools.extend(_PACKS_BY_NAME[pack_name].tools())
+    return tools
+
+
 def _extract_json(text: str) -> str:
     """Extract JSON from text that may include markdown fences or surrounding prose."""
     match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
@@ -364,9 +372,8 @@ class ActivityGenerateSkill(SkillDefinition):
             response_mode="agent",
         )
 
-        tools = [read_ui_spec]
-        for pack_name in pack_selection.included_packs:
-            tools.extend(_PACKS_BY_NAME[pack_name].tools())
+        tools = _build_active_tools(pack_selection)
+        active_tool_names = [tool.name for tool in tools]
 
         try:
             agent_result = run_agent_loop(
@@ -398,6 +405,8 @@ class ActivityGenerateSkill(SkillDefinition):
         repair_attempted = False
         repair_succeeded = False
         validation_error_text = None
+        semantic_validation_errors: list[str] = []
+        semantic_validation_failures: list[str] = []
 
         try:
             parsed = json.loads(json_text)
@@ -450,6 +459,61 @@ class ActivityGenerateSkill(SkillDefinition):
                     f"Validation failed after repair. Initial: {validation_error_text}. Repair: {repair_error}"
                 ) from repair_error
 
+        artifact, semantic_validation_errors = normalize_and_validate_widget_activity(artifact)
+        if semantic_validation_errors:
+            semantic_validation_failures = list(semantic_validation_errors)
+            repair_attempted = True
+            try:
+                repair_prompt = (
+                    "The JSON you produced passed schema validation but failed semantic widget validation.\n\n"
+                    "Issues:\n"
+                    + "\n".join(f"- {error}" for error in semantic_validation_errors)
+                    + "\n\nCurrent JSON:\n```json\n"
+                    + artifact.model_dump_json(indent=2)
+                    + "\n```\n\n"
+                    "Return only the corrected JSON object. No text outside the JSON."
+                )
+                repair_response = model_runtime.client.invoke(
+                    [
+                        SystemMessage(content=preview.system_prompt),
+                        HumanMessage(content=repair_prompt),
+                    ]
+                )
+                repair_text = getattr(repair_response, "content", "")
+                if isinstance(repair_text, list):
+                    repair_text = "".join(
+                        item.get("text", "") if isinstance(item, dict) else str(item)
+                        for item in repair_text
+                    )
+                repair_json = _extract_json(str(repair_text))
+                repaired = json.loads(repair_json)
+                artifact = ActivityArtifact.model_validate(repaired)
+                artifact, semantic_validation_errors = normalize_and_validate_widget_activity(artifact)
+                if semantic_validation_errors:
+                    raise ContractValidationError("; ".join(semantic_validation_errors))
+                repair_succeeded = True
+                raw_text = str(repair_text)
+                json_text = repair_json
+            except Exception as repair_error:
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "semantic_validation_error",
+                        "errors": semantic_validation_failures,
+                        "repair_error": str(repair_error),
+                        "raw_agent_response": agent_result.final_text,
+                        "tool_calls": tool_call_log,
+                        "ui_specs_read": ui_specs_read,
+                        "active_tools": active_tool_names,
+                        "included_packs": list(pack_selection.included_packs),
+                        "pack_selection_reason": pack_selection.pack_selection_reason,
+                        "subject_inference": pack_selection.subject_inference,
+                    },
+                )
+                raise ContractValidationError(
+                    f"Semantic validation failed after repair: {repair_error}"
+                ) from repair_error
+
         write_provider_exchange_log(
             request=provider_request,
             response={
@@ -458,8 +522,10 @@ class ActivityGenerateSkill(SkillDefinition):
                 "validated_artifact": artifact.model_dump(mode="json", exclude_none=True),
                 "tool_calls": tool_call_log,
                 "ui_specs_read": ui_specs_read,
+                "active_tools": active_tool_names,
                 "repair_attempted": repair_attempted,
                 "repair_succeeded": repair_succeeded,
+                "semantic_validation_errors": semantic_validation_failures,
                 "included_packs": list(pack_selection.included_packs),
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,
@@ -488,13 +554,14 @@ class ActivityGenerateSkill(SkillDefinition):
             agent_trace={
                 "tool_calls": tool_call_log,
                 "ui_specs_read": ui_specs_read,
-                "active_tools": [t.name for t in tools],
+                "active_tools": active_tool_names,
                 "included_packs": list(pack_selection.included_packs),
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,
                 "repair_attempted": repair_attempted,
                 "repair_succeeded": repair_succeeded,
                 "validation_error": validation_error_text,
+                "semantic_validation_errors": semantic_validation_failures,
             },
         )
 

@@ -155,8 +155,23 @@ _VALID_CHESS_ARTIFACT = {
                 "engineKind": "chess",
                 "version": "1",
                 "surface": {"orientation": "white"},
+                "display": {
+                    "showSideToMove": True,
+                    "showCoordinates": True,
+                    "showMoveHint": True,
+                    "boardRole": "primary",
+                },
                 "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
-                "interaction": {"mode": "move_input"},
+                "interaction": {
+                    "mode": "move_input",
+                    "submissionMode": "immediate",
+                    "selectionMode": "click_click",
+                    "showLegalTargets": True,
+                    "allowReset": True,
+                    "resetPolicy": "reset_to_initial",
+                    "attemptPolicy": "allow_retry",
+                },
+                "feedback": {"mode": "immediate", "displayMode": "inline"},
                 "evaluation": {"expectedMoves": ["Qb5+", "e2b5"]},
                 "annotations": {"highlightSquares": [], "arrows": []},
             },
@@ -173,6 +188,25 @@ _VALID_CHESS_ARTIFACT = {
         "masteryThreshold": 0.8,
         "reviewThreshold": 0.6,
     },
+}
+
+_SEMANTICALLY_INVALID_CHESS_ARTIFACT = {
+    **_VALID_CHESS_ARTIFACT,
+    "components": [
+        {
+            **_VALID_CHESS_ARTIFACT["components"][0],
+            "prompt": "Find the queen move that gives check.",
+            "widget": {
+                **_VALID_CHESS_ARTIFACT["components"][0]["widget"],
+                "display": {
+                    "showSideToMove": False,
+                    "showCoordinates": True,
+                    "showMoveHint": True,
+                    "boardRole": "primary",
+                },
+            },
+        }
+    ],
 }
 
 _ENVELOPE_DATA = {
@@ -471,6 +505,35 @@ def test_activity_execute_repair_on_invalid_json(mock_build_runtime, mock_agent_
     assert result.artifact["schemaVersion"] == "2"
     assert result.trace.agent_trace["repair_attempted"] is True
     assert result.trace.agent_trace["repair_succeeded"] is True
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_repairs_semantic_widget_validation(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+
+    fake_runtime = ModelRuntime(
+        provider="openai",
+        model="fake-activity-generate",
+        client=_FakeClient(repair_content=json.dumps(_VALID_CHESS_ARTIFACT)),
+        temperature=0.2,
+        max_tokens=4096,
+        max_tokens_source="test",
+        provider_settings={},
+    )
+    mock_build_runtime.return_value = fake_runtime
+    mock_agent_loop.return_value = _fake_agent_result(_SEMANTICALLY_INVALID_CHESS_ARTIFACT)
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+
+    widget = result.artifact["components"][0]["widget"]
+    assert widget["display"]["showSideToMove"] is True
+    assert result.trace.agent_trace["repair_attempted"] is True
+    assert result.trace.agent_trace["repair_succeeded"] is True
+    assert result.trace.agent_trace["semantic_validation_errors"]
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)
 
 

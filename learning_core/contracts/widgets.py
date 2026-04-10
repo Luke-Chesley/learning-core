@@ -10,6 +10,13 @@ from learning_core.contracts.base import StrictModel
 
 SurfaceKind = Literal["board_surface", "expression_surface", "graph_surface"]
 EngineKind = Literal["chess", "math_symbolic", "graphing"]
+SurfaceRole = Literal["primary", "supporting"]
+SubmissionMode = Literal["immediate", "explicit_submit"]
+SelectionMode = Literal["click_click", "drag_drop", "either"]
+FeedbackMode = Literal["none", "immediate", "explicit_submit"]
+FeedbackDisplayMode = Literal["inline", "banner"]
+ResetPolicy = Literal["not_allowed", "reset_to_initial"]
+AttemptPolicy = Literal["single_attempt", "allow_retry"]
 
 _BOARD_SQUARE_PATTERN = re.compile(r"^[a-h][1-8]$")
 
@@ -32,6 +39,13 @@ class BoardSurfaceConfig(StrictModel):
     orientation: Literal["white", "black"] = "white"
 
 
+class BoardSurfaceDisplay(StrictModel):
+    showSideToMove: bool = True
+    showCoordinates: bool = True
+    showMoveHint: bool = True
+    boardRole: SurfaceRole = "primary"
+
+
 class BoardSurfaceState(StrictModel):
     fen: str
 
@@ -46,6 +60,17 @@ class BoardSurfaceState(StrictModel):
 
 class BoardSurfaceInteraction(StrictModel):
     mode: Literal["view_only", "move_input"] = "view_only"
+    submissionMode: SubmissionMode = "immediate"
+    selectionMode: SelectionMode = "either"
+    showLegalTargets: bool = True
+    allowReset: bool = True
+    resetPolicy: ResetPolicy = "reset_to_initial"
+    attemptPolicy: AttemptPolicy = "allow_retry"
+
+
+class BoardSurfaceFeedback(StrictModel):
+    mode: FeedbackMode = "immediate"
+    displayMode: FeedbackDisplayMode = "inline"
 
 
 class ChessEvaluationConfig(StrictModel):
@@ -73,8 +98,10 @@ class ChessBoardWidget(StrictModel):
     engineKind: Literal["chess"]
     version: Literal["1"] = "1"
     surface: BoardSurfaceConfig = Field(default_factory=BoardSurfaceConfig)
+    display: BoardSurfaceDisplay = Field(default_factory=BoardSurfaceDisplay)
     state: BoardSurfaceState
     interaction: BoardSurfaceInteraction = Field(default_factory=BoardSurfaceInteraction)
+    feedback: BoardSurfaceFeedback = Field(default_factory=BoardSurfaceFeedback)
     evaluation: ChessEvaluationConfig = Field(default_factory=ChessEvaluationConfig)
     annotations: BoardSurfaceAnnotations = Field(default_factory=BoardSurfaceAnnotations)
 
@@ -84,6 +111,10 @@ class ExpressionSurfaceConfig(StrictModel):
     mathKeyboard: bool = False
 
 
+class ExpressionSurfaceDisplay(StrictModel):
+    surfaceRole: SurfaceRole = "primary"
+
+
 class ExpressionSurfaceState(StrictModel):
     promptLatex: str | None = None
     initialValue: str | None = None
@@ -91,6 +122,14 @@ class ExpressionSurfaceState(StrictModel):
 
 class ExpressionSurfaceInteraction(StrictModel):
     mode: Literal["expression_entry", "equation_entry", "step_entry"] = "expression_entry"
+    submissionMode: SubmissionMode = "explicit_submit"
+    resetPolicy: ResetPolicy = "reset_to_initial"
+    attemptPolicy: AttemptPolicy = "allow_retry"
+
+
+class ExpressionSurfaceFeedback(StrictModel):
+    mode: FeedbackMode = "explicit_submit"
+    displayMode: FeedbackDisplayMode = "inline"
 
 
 class MathSymbolicEvaluationConfig(StrictModel):
@@ -107,8 +146,10 @@ class MathSymbolicWidget(StrictModel):
     engineKind: Literal["math_symbolic"]
     version: Literal["1"] = "1"
     surface: ExpressionSurfaceConfig = Field(default_factory=ExpressionSurfaceConfig)
+    display: ExpressionSurfaceDisplay = Field(default_factory=ExpressionSurfaceDisplay)
     state: ExpressionSurfaceState = Field(default_factory=ExpressionSurfaceState)
     interaction: ExpressionSurfaceInteraction = Field(default_factory=ExpressionSurfaceInteraction)
+    feedback: ExpressionSurfaceFeedback = Field(default_factory=ExpressionSurfaceFeedback)
     evaluation: MathSymbolicEvaluationConfig = Field(default_factory=MathSymbolicEvaluationConfig)
     annotations: ExpressionSurfaceAnnotations = Field(default_factory=ExpressionSurfaceAnnotations)
 
@@ -119,6 +160,10 @@ class GraphSurfaceConfig(StrictModel):
     grid: bool = True
 
 
+class GraphSurfaceDisplay(StrictModel):
+    surfaceRole: SurfaceRole = "primary"
+
+
 class GraphSurfaceState(StrictModel):
     prompt: str | None = None
     initialExpression: str | None = None
@@ -126,6 +171,14 @@ class GraphSurfaceState(StrictModel):
 
 class GraphSurfaceInteraction(StrictModel):
     mode: Literal["plot_point", "plot_curve", "analyze_graph"] = "plot_point"
+    submissionMode: SubmissionMode = "explicit_submit"
+    resetPolicy: ResetPolicy = "reset_to_initial"
+    attemptPolicy: AttemptPolicy = "allow_retry"
+
+
+class GraphSurfaceFeedback(StrictModel):
+    mode: FeedbackMode = "explicit_submit"
+    displayMode: FeedbackDisplayMode = "inline"
 
 
 class GraphingEvaluationConfig(StrictModel):
@@ -141,8 +194,10 @@ class GraphingWidget(StrictModel):
     engineKind: Literal["graphing"]
     version: Literal["1"] = "1"
     surface: GraphSurfaceConfig = Field(default_factory=GraphSurfaceConfig)
+    display: GraphSurfaceDisplay = Field(default_factory=GraphSurfaceDisplay)
     state: GraphSurfaceState = Field(default_factory=GraphSurfaceState)
     interaction: GraphSurfaceInteraction = Field(default_factory=GraphSurfaceInteraction)
+    feedback: GraphSurfaceFeedback = Field(default_factory=GraphSurfaceFeedback)
     evaluation: GraphingEvaluationConfig = Field(default_factory=GraphingEvaluationConfig)
     annotations: GraphSurfaceAnnotations = Field(default_factory=GraphSurfaceAnnotations)
 
@@ -157,4 +212,3 @@ def widget_accepts_input(widget: InteractiveWidgetPayload) -> bool:
     if widget.engineKind == "chess":
         return widget.interaction.mode == "move_input"
     return True
-
