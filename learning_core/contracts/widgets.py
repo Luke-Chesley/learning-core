@@ -43,9 +43,32 @@ def _validate_feedback_semantics(*, submission_mode: SubmissionMode, feedback_mo
         raise ValueError("feedback.mode='explicit_submit' requires interaction.submissionMode='explicit_submit'.")
 
 
-def _validate_view_only_feedback_semantics(*, mode: str, feedback_mode: FeedbackMode) -> None:
+def _coerce_view_only_feedback(*, mode: str, feedback_mode: FeedbackMode) -> FeedbackMode:
     if mode == "view_only" and feedback_mode != "none":
-        raise ValueError("view_only widgets must use feedback.mode='none'.")
+        return "none"
+    return feedback_mode
+
+
+_BOARD_INTERACTION_MODE_ALIASES: dict[str, str] = {
+    "inspect": "view_only",
+    "observe": "view_only",
+    "readonly": "view_only",
+    "read_only": "view_only",
+}
+
+_EXPRESSION_INTERACTION_MODE_ALIASES: dict[str, str] = {
+    "inspect": "view_only",
+    "observe": "view_only",
+    "readonly": "view_only",
+    "read_only": "view_only",
+}
+
+_GRAPH_INTERACTION_MODE_ALIASES: dict[str, str] = {
+    "inspect": "view_only",
+    "observe": "view_only",
+    "readonly": "view_only",
+    "read_only": "view_only",
+}
 
 
 class BoardArrow(StrictModel):
@@ -102,6 +125,13 @@ class BoardSurfaceInteraction(StrictModel):
     allowReset: bool = True
     resetPolicy: ResetPolicy = "reset_to_initial"
     attemptPolicy: AttemptPolicy = "allow_retry"
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def normalize_mode_alias(cls, value: str) -> str:
+        if isinstance(value, str):
+            return _BOARD_INTERACTION_MODE_ALIASES.get(value.strip().lower(), value)
+        return value
 
     @model_validator(mode="after")
     def validate_reset_policy(self) -> "BoardSurfaceInteraction":
@@ -161,7 +191,7 @@ class ChessBoardWidget(StrictModel):
             submission_mode=self.interaction.submissionMode,
             feedback_mode=self.feedback.mode,
         )
-        _validate_view_only_feedback_semantics(
+        self.feedback.mode = _coerce_view_only_feedback(
             mode=self.interaction.mode,
             feedback_mode=self.feedback.mode,
         )
@@ -189,6 +219,13 @@ class ExpressionSurfaceInteraction(StrictModel):
     allowReset: bool = True
     resetPolicy: ResetPolicy = "reset_to_initial"
     attemptPolicy: AttemptPolicy = "allow_retry"
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def normalize_mode_alias(cls, value: str) -> str:
+        if isinstance(value, str):
+            return _EXPRESSION_INTERACTION_MODE_ALIASES.get(value.strip().lower(), value)
+        return value
 
     @model_validator(mode="after")
     def validate_reset_policy(self) -> "ExpressionSurfaceInteraction":
@@ -237,7 +274,7 @@ class MathSymbolicWidget(StrictModel):
             submission_mode=self.interaction.submissionMode,
             feedback_mode=self.feedback.mode,
         )
-        _validate_view_only_feedback_semantics(
+        self.feedback.mode = _coerce_view_only_feedback(
             mode=self.interaction.mode,
             feedback_mode=self.feedback.mode,
         )
@@ -266,6 +303,13 @@ class GraphSurfaceInteraction(StrictModel):
     allowReset: bool = True
     resetPolicy: ResetPolicy = "reset_to_initial"
     attemptPolicy: AttemptPolicy = "allow_retry"
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def normalize_mode_alias(cls, value: str) -> str:
+        if isinstance(value, str):
+            return _GRAPH_INTERACTION_MODE_ALIASES.get(value.strip().lower(), value)
+        return value
 
     @model_validator(mode="after")
     def validate_reset_policy(self) -> "GraphSurfaceInteraction":
@@ -313,7 +357,7 @@ class GraphingWidget(StrictModel):
             submission_mode=self.interaction.submissionMode,
             feedback_mode=self.feedback.mode,
         )
-        _validate_view_only_feedback_semantics(
+        self.feedback.mode = _coerce_view_only_feedback(
             mode=self.interaction.mode,
             feedback_mode=self.feedback.mode,
         )

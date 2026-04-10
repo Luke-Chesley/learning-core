@@ -53,11 +53,6 @@ def _validate_widget_runtime_semantics(
             f'Interactive widget "{component.id}" uses explicit_submit feedback without an explicit_submit interaction mode.'
         )
 
-    if not accepts_input and widget.feedback.mode != "none":
-        errors.append(
-            f'Interactive widget "{component.id}" is view_only and must use feedback.mode="none".'
-        )
-
     if role == "primary" and first_interactive_index is not None and component_index != first_interactive_index:
         errors.append(
             f'Interactive widget "{component.id}" is marked primary but is not the first interactive component in the activity.'

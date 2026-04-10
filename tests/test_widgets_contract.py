@@ -68,6 +68,44 @@ def test_graph_widget_view_only_is_not_treated_as_input():
     assert widget_accepts_input(widget) is False
 
 
+def test_board_widget_coerces_inspect_to_view_only():
+    widget = ChessBoardWidget.model_validate(
+        {
+            "surfaceKind": "board_surface",
+            "engineKind": "chess",
+            "version": "1",
+            "surface": {"orientation": "white"},
+            "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+            "interaction": {"mode": "inspect"},
+            "feedback": {"mode": "immediate", "displayMode": "inline"},
+            "evaluation": {"expectedMoves": []},
+            "annotations": {"highlightSquares": [], "arrows": []},
+        }
+    )
+
+    assert widget.interaction.mode == "view_only"
+    assert widget.feedback.mode == "none"
+
+
+def test_view_only_board_coerces_feedback_to_none():
+    widget = ChessBoardWidget.model_validate(
+        {
+            "surfaceKind": "board_surface",
+            "engineKind": "chess",
+            "version": "1",
+            "surface": {"orientation": "white"},
+            "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+            "interaction": {"mode": "view_only"},
+            "feedback": {"mode": "immediate", "displayMode": "inline"},
+            "evaluation": {"expectedMoves": []},
+            "annotations": {"highlightSquares": [], "arrows": []},
+        }
+    )
+
+    assert widget.interaction.mode == "view_only"
+    assert widget.feedback.mode == "none"
+
+
 def test_widget_contract_rejects_single_attempt_with_reset_enabled():
     with pytest.raises(Exception):
         ChessBoardWidget.model_validate(
