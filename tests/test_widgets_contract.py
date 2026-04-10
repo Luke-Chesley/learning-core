@@ -1,7 +1,7 @@
 import pytest
 
 from learning_core.contracts.activity import ActivityArtifact
-from learning_core.contracts.widgets import ChessBoardWidget, MathSymbolicWidget
+from learning_core.contracts.widgets import ChessBoardWidget, GraphingWidget, MathSymbolicWidget, widget_accepts_input
 
 
 def test_chess_widget_payload_validates():
@@ -10,6 +10,8 @@ def test_chess_widget_payload_validates():
             "surfaceKind": "board_surface",
             "engineKind": "chess",
             "version": "1",
+            "instructionText": "Play the move directly on the board.",
+            "caption": "Board work first, explanation second.",
             "surface": {"orientation": "white"},
             "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
             "interaction": {"mode": "move_input"},
@@ -23,8 +25,10 @@ def test_chess_widget_payload_validates():
 
     assert widget.engineKind == "chess"
     assert widget.state.fen.startswith("4k3")
+    assert widget.state.initialFen == widget.state.fen
     assert widget.display.boardRole == "primary"
     assert widget.feedback.displayMode == "inline"
+    assert widget.instructionText == "Play the move directly on the board."
 
 
 def test_math_widget_payload_validates():
@@ -42,6 +46,64 @@ def test_math_widget_payload_validates():
     )
 
     assert widget.engineKind == "math_symbolic"
+
+
+def test_graph_widget_view_only_is_not_treated_as_input():
+    widget = GraphingWidget.model_validate(
+        {
+            "surfaceKind": "graph_surface",
+            "engineKind": "graphing",
+            "version": "1",
+            "surface": {"xLabel": "x", "yLabel": "y", "grid": True},
+            "state": {"prompt": "Inspect the graph only.", "initialExpression": "y=x"},
+            "interaction": {"mode": "view_only", "allowReset": False, "resetPolicy": "not_allowed"},
+            "feedback": {"mode": "none", "displayMode": "inline"},
+            "evaluation": {"expectedGraphDescription": "line with slope 1"},
+            "annotations": {"overlayText": "Reference graph"},
+        }
+    )
+
+    assert widget.display.surfaceRole == "primary"
+    assert widget.interaction.allowReset is False
+    assert widget_accepts_input(widget) is False
+
+
+def test_widget_contract_rejects_single_attempt_with_reset_enabled():
+    with pytest.raises(Exception):
+        ChessBoardWidget.model_validate(
+            {
+                "surfaceKind": "board_surface",
+                "engineKind": "chess",
+                "version": "1",
+                "surface": {"orientation": "white"},
+                "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+                "interaction": {
+                    "mode": "move_input",
+                    "allowReset": True,
+                    "resetPolicy": "reset_to_initial",
+                    "attemptPolicy": "single_attempt",
+                },
+                "evaluation": {"expectedMoves": ["Qb5+"]},
+                "annotations": {"highlightSquares": [], "arrows": []},
+            }
+        )
+
+
+def test_widget_contract_rejects_explicit_submit_feedback_without_explicit_submit_interaction():
+    with pytest.raises(Exception):
+        MathSymbolicWidget.model_validate(
+            {
+                "surfaceKind": "expression_surface",
+                "engineKind": "math_symbolic",
+                "version": "1",
+                "surface": {"placeholder": "x = ?", "mathKeyboard": True},
+                "state": {"promptLatex": "2x + 3 = 11", "initialValue": ""},
+                "interaction": {"mode": "expression_entry", "submissionMode": "immediate"},
+                "feedback": {"mode": "explicit_submit", "displayMode": "inline"},
+                "evaluation": {"expectedExpression": "x=4", "equivalenceMode": "equivalent"},
+                "annotations": {"helperText": "Enter the solved equation."},
+            }
+        )
 
 
 def test_activity_artifact_accepts_interactive_widget_component():

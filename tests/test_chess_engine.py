@@ -1,6 +1,14 @@
 import pytest
 
-from learning_core.domain.chess_engine import apply_move, describe_position, evaluate_move, legal_moves, validate_fen
+from learning_core.domain.chess_engine import (
+    apply_move,
+    describe_position,
+    evaluate_move,
+    legal_moves,
+    legal_targets,
+    normalize_expected_moves,
+    validate_fen,
+)
 
 
 def test_validate_fen_accepts_valid_position():
@@ -17,6 +25,20 @@ def test_legal_moves_returns_normalized_moves():
     moves = legal_moves("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1")
     assert any(move["uci"] == "e2b5" for move in moves)
     assert any(move["san"] == "Qb5+" for move in moves)
+
+
+def test_legal_targets_returns_targets_for_a_source_square():
+    targets = legal_targets("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1", "e2")
+    assert "b5" in targets
+    assert "e8" in targets
+
+
+def test_normalize_expected_moves_dedupes_equivalent_inputs():
+    normalized = normalize_expected_moves(
+        "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1",
+        ["Qb5+", "e2b5"],
+    )
+    assert [move["uci"] for move in normalized] == ["e2b5"]
 
 
 def test_apply_move_returns_next_position():

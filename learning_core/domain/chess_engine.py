@@ -80,9 +80,34 @@ def legal_moves(fen: str) -> list[dict[str, Any]]:
     return [_move_dict(board, move) for move in board.legal_moves]
 
 
+def legal_targets(fen: str, from_square: str) -> list[str]:
+    normalized_from_square = from_square.strip().lower()
+    board = _board(fen)
+    targets = {
+        chess.square_name(move.to_square)
+        for move in board.legal_moves
+        if chess.square_name(move.from_square) == normalized_from_square
+    }
+    return sorted(targets)
+
+
 def normalize_move(fen: str, move: Any) -> dict[str, Any]:
     board = _board(fen)
     return _move_dict(board, _parse_move(board, move))
+
+
+def normalize_expected_moves(fen: str, expected_moves: list[str]) -> list[dict[str, Any]]:
+    normalized_moves: list[dict[str, Any]] = []
+    seen_uci: set[str] = set()
+
+    for expected_move in expected_moves:
+        normalized_move = normalize_move(fen, expected_move)
+        if normalized_move["uci"] in seen_uci:
+            continue
+        seen_uci.add(normalized_move["uci"])
+        normalized_moves.append(normalized_move)
+
+    return normalized_moves
 
 
 def apply_move(fen: str, move: Any) -> dict[str, Any]:
@@ -104,10 +129,7 @@ def apply_move(fen: str, move: Any) -> dict[str, Any]:
 def evaluate_move(fen: str, move: Any, expected_moves: list[str]) -> dict[str, Any]:
     board = _board(fen)
     normalized_learner_move = _move_dict(board, _parse_move(board, move))
-    normalized_expected_moves = []
-    for expected_move in expected_moves:
-        expected_board = _board(fen)
-        normalized_expected_moves.append(_move_dict(expected_board, _parse_move(expected_board, expected_move)))
+    normalized_expected_moves = normalize_expected_moves(fen, expected_moves)
 
     expected_uci = {item["uci"] for item in normalized_expected_moves}
     is_correct = normalized_learner_move["uci"] in expected_uci

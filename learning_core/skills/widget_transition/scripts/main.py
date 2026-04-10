@@ -9,7 +9,7 @@ from learning_core.observability.traces import ExecutionLineage, ExecutionTrace,
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.domain.chess_engine import apply_move, evaluate_move, legal_moves
+from learning_core.domain.chess_engine import apply_move, evaluate_move, legal_targets
 
 
 def _prompt_preview(payload: WidgetTransitionRequest) -> PromptPreview:
@@ -49,7 +49,7 @@ def _feedback_from_chess_result(
         nextStep=(
             None
             if is_correct
-            else "Reset the board and try the move that best addresses the prompt."
+            else "Try another move from the same position."
         ),
         confidence=0.99,
         allowRetry=not is_correct,
@@ -62,11 +62,52 @@ def _feedback_from_chess_result(
     )
 
 
+def _initial_chess_widget(widget):
+    reset_widget = widget.model_copy(deep=True)
+    reset_widget.state.fen = widget.state.initialFen or widget.state.fen
+    return reset_widget
+
+
+def _move_response_payload(move_result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **move_result["normalizedMove"],
+        "fenAfter": move_result["fenAfter"],
+    }
+
+
 def _transition_chess_widget(payload: WidgetTransitionRequest) -> WidgetTransitionArtifact:
     widget = payload.widget
     action = payload.learnerAction
 
+    if widget.interaction.mode != "move_input" and action.type != "reset":
+        return WidgetTransitionArtifact(
+            schemaVersion="1",
+            componentId=payload.componentId,
+            componentType=payload.componentType,
+            widgetEngineKind=widget.engineKind,
+            accepted=False,
+            normalizedLearnerAction=action.model_dump(mode="json", exclude_none=True),
+            nextResponse=payload.currentResponse,
+            canonicalWidget=widget,
+            legalTargets=[],
+            errorMessage="This board is view-only and does not accept move input.",
+        )
+
     if action.type == "reset":
+        if not widget.interaction.allowReset or widget.interaction.resetPolicy == "not_allowed":
+            return WidgetTransitionArtifact(
+                schemaVersion="1",
+                componentId=payload.componentId,
+                componentType=payload.componentType,
+                widgetEngineKind=widget.engineKind,
+                accepted=False,
+                normalizedLearnerAction=action.model_dump(mode="json"),
+                nextResponse=payload.currentResponse,
+                canonicalWidget=widget,
+                legalTargets=[],
+                errorMessage="Reset is not allowed for this widget.",
+            )
+
         return WidgetTransitionArtifact(
             schemaVersion="1",
             componentId=payload.componentId,
@@ -75,18 +116,12 @@ def _transition_chess_widget(payload: WidgetTransitionRequest) -> WidgetTransiti
             accepted=True,
             normalizedLearnerAction=action.model_dump(mode="json"),
             nextResponse=None,
-            canonicalWidget=widget,
+            canonicalWidget=_initial_chess_widget(widget),
             legalTargets=[],
         )
 
     if action.type == "select_square":
-        targets = sorted(
-            {
-                move["to"]
-                for move in legal_moves(widget.state.fen)
-                if move["from"] == action.square
-            }
-        )
+        targets = legal_targets(widget.state.fen, action.square)
         if not targets:
             return WidgetTransitionArtifact(
                 schemaVersion="1",
@@ -132,6 +167,15 @@ def _transition_chess_widget(payload: WidgetTransitionRequest) -> WidgetTransiti
         fallback.pop("promotion", None)
         return fallback
 
+    def _candidate_from_square(candidate: Any) -> str | None:
+        if not isinstance(candidate, dict):
+            return None
+        for key in ("from", "fromSquare"):
+            value = candidate.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip().lower()
+        return None
+
     try:
         move_result = apply_move(widget.state.fen, move_input)
     except ValueError as error:
@@ -145,6 +189,10 @@ def _transition_chess_widget(payload: WidgetTransitionRequest) -> WidgetTransiti
             else:
                 error = None
         if error is not None:
+            hinted_legal_targets = []
+            from_square = _candidate_from_square(move_input)
+            if from_square:
+                hinted_legal_targets = legal_targets(widget.state.fen, from_square)
             return WidgetTransitionArtifact(
                 schemaVersion="1",
                 componentId=payload.componentId,
@@ -154,23 +202,35 @@ def _transition_chess_widget(payload: WidgetTransitionRequest) -> WidgetTransiti
                 normalizedLearnerAction=action.model_dump(mode="json", exclude_none=True),
                 nextResponse=payload.currentResponse,
                 canonicalWidget=widget,
-                legalTargets=[],
+                legalTargets=hinted_legal_targets,
                 errorMessage=str(error),
             )
 
     next_widget = widget.model_copy(deep=True)
     next_widget.state.fen = move_result["fenAfter"]
-    next_response = {
-        **move_result["normalizedMove"],
-        "fenAfter": move_result["fenAfter"],
-    }
+    next_response = _move_response_payload(move_result)
 
     immediate_feedback = None
     if widget.feedback.mode == "immediate" and widget.evaluation.expectedMoves:
+        evaluated_move = evaluate_move(widget.state.fen, move_input, widget.evaluation.expectedMoves)
         immediate_feedback = _feedback_from_chess_result(
             payload=payload,
-            result=evaluate_move(widget.state.fen, move_input, widget.evaluation.expectedMoves),
+            result=evaluated_move,
         )
+
+        if evaluated_move["status"] != "correct" and widget.interaction.attemptPolicy == "allow_retry":
+            return WidgetTransitionArtifact(
+                schemaVersion="1",
+                componentId=payload.componentId,
+                componentType=payload.componentType,
+                widgetEngineKind=widget.engineKind,
+                accepted=True,
+                normalizedLearnerAction=move_result["normalizedMove"],
+                nextResponse=None,
+                canonicalWidget=_initial_chess_widget(widget),
+                legalTargets=[],
+                immediateFeedback=immediate_feedback,
+            )
 
     return WidgetTransitionArtifact(
         schemaVersion="1",

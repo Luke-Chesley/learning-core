@@ -420,6 +420,8 @@ class ActivityGenerateSkill(SkillDefinition):
                     "The JSON you produced failed validation.\n\n"
                     f"Error: {validation_error_text}\n\n"
                     f"Invalid JSON:\n```json\n{json_text}\n```\n\n"
+                    "Make the smallest set of corrections needed to satisfy the contract. "
+                    "Keep IDs, overall composition, and intent stable unless the contract failure makes that impossible.\n\n"
                     "Return only the corrected JSON object. No text outside the JSON."
                 )
                 repair_response = model_runtime.client.invoke(
@@ -466,11 +468,13 @@ class ActivityGenerateSkill(SkillDefinition):
             try:
                 repair_prompt = (
                     "The JSON you produced passed schema validation but failed semantic widget validation.\n\n"
-                    "Issues:\n"
+                    "Exact validation failures:\n"
                     + "\n".join(f"- {error}" for error in semantic_validation_errors)
                     + "\n\nCurrent JSON:\n```json\n"
                     + artifact.model_dump_json(indent=2)
                     + "\n```\n\n"
+                    "Make the smallest set of corrections needed to resolve every listed failure. "
+                    "Do not add arbitrary new components or fields. Keep IDs, structure, and lesson intent stable unless a listed failure requires a change.\n\n"
                     "Return only the corrected JSON object. No text outside the JSON."
                 )
                 repair_response = model_runtime.client.invoke(

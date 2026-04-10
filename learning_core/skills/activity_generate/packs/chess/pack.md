@@ -10,6 +10,10 @@ Use this pack when the request is clearly about chess.
 - Use text-only chess sparingly and only when the board is not the main evidence.
 - Make side to move obvious in the widget display or the prompt.
 - Keep claims about the current position aligned with real board facts.
+- Treat the board as the primary widget when the lesson depends on what move to play or what the position means.
+- Use supporting components to capture explanation, confidence, or reflection after the board action, not instead of it.
+- Avoid one-question board usage that only glances at the position unless the lesson objective is genuinely that narrow.
+- Never describe tactical or positional facts that the current FEN does not support.
 
 ## Stay simple when the board is not central
 
@@ -35,3 +39,4 @@ Do not escalate when the task is really a vocabulary or history question.
 The board widget should usually do one bounded job well. Put explanation, confidence, and reflection in normal components around it instead of overloading the widget.
 
 If the lesson is position-centered, the board should be the primary evidence instead of a decorative supporting component.
+If the learner must play a move, configure the widget so the board actually accepts move input and the acceptable moves are bounded.
