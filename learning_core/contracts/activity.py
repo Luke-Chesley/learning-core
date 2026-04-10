@@ -130,21 +130,23 @@ class HeadingComponent(StrictModel):
     type: Literal["heading"]
     id: str
     level: int = Field(default=2, ge=1, le=4)
-    text: str
+    text: str = Field(validation_alias=AliasChoices("text", "content"))
 
 
 class ParagraphComponent(StrictModel):
     type: Literal["paragraph"]
     id: str
-    text: str
+    text: str = Field(validation_alias=AliasChoices("text", "content"))
     markdown: str | None = None
 
 
 class CalloutComponent(StrictModel):
     type: Literal["callout"]
     id: str
-    variant: Literal["info", "tip", "warning", "note"] = "info"
-    text: str
+    variant: Literal["info", "tip", "warning", "note"] = Field(
+        default="info", validation_alias=AliasChoices("variant", "style")
+    )
+    text: str = Field(validation_alias=AliasChoices("text", "content"))
 
 
 class ImageComponent(StrictModel):
@@ -189,7 +191,7 @@ class RichTextResponseComponent(StrictModel):
 
 
 class SingleSelectChoice(StrictModel):
-    id: str
+    id: str = Field(validation_alias=AliasChoices("id", "value"))
     text: str = Field(validation_alias=AliasChoices("text", "label"))
     correct: bool | None = None
     explanation: str | None = None
@@ -201,12 +203,14 @@ class SingleSelectComponent(StrictModel):
     prompt: str
     choices: list[SingleSelectChoice] = Field(min_length=2, validation_alias=AliasChoices("choices", "options"))
     immediateCorrectness: bool = False
+    shuffleOptions: bool | None = None
+    correctValue: str | None = None
     hint: str | None = None
     required: bool = True
 
 
 class MultiSelectChoice(StrictModel):
-    id: str
+    id: str = Field(validation_alias=AliasChoices("id", "value"))
     text: str = Field(validation_alias=AliasChoices("text", "label"))
     correct: bool | None = None
 
@@ -405,14 +409,15 @@ class DragArrangeComponent(StrictModel):
 class InteractiveWidgetComponent(StrictModel):
     type: Literal["interactive_widget"]
     id: str
-    prompt: str
+    prompt: str | None = None
     required: bool = True
     widget: InteractiveWidgetPayload
 
 
 class ReflectionSubPrompt(StrictModel):
     id: str
-    text: str
+    text: str = Field(validation_alias=AliasChoices("text", "prompt"))
+    label: str | None = None
     responseKind: Literal["text", "rating"] = "text"
 
 
@@ -420,8 +425,21 @@ class ReflectionPromptComponent(StrictModel):
     type: Literal["reflection_prompt"]
     id: str
     prompt: str
-    subPrompts: list[ReflectionSubPrompt] = Field(min_length=1)
+    subPrompts: list[ReflectionSubPrompt] = Field(
+        min_length=1, validation_alias=AliasChoices("subPrompts", "prompts")
+    )
     required: bool = True
+
+    @field_validator("subPrompts", mode="before")
+    @classmethod
+    def coerce_string_sub_prompts(cls, v: list) -> list:
+        coerced: list = []
+        for i, item in enumerate(v):
+            if isinstance(item, str):
+                coerced.append({"id": f"sp-{i + 1}", "text": item})
+            else:
+                coerced.append(item)
+        return coerced
 
 
 class RubricCriterion(StrictModel):
@@ -505,8 +523,8 @@ class CompareAndExplainComponent(StrictModel):
     type: Literal["compare_and_explain"]
     id: str
     prompt: str
-    itemA: str
-    itemB: str
+    itemA: str = Field(validation_alias=AliasChoices("itemA", "leftLabel"))
+    itemB: str = Field(validation_alias=AliasChoices("itemB", "rightLabel"))
     responsePrompt: str | None = None
     required: bool = True
 
@@ -586,6 +604,13 @@ class CompletionRules(StrictModel):
     minimumComponents: int | None = Field(default=None, gt=0)
     incompleteMessage: str | None = None
 
+    @field_validator("minimumComponents", mode="before")
+    @classmethod
+    def coerce_zero_to_none(cls, v: int | None) -> int | None:
+        if v == 0:
+            return None
+        return v
+
     @model_validator(mode="after")
     def validate_minimum_components(self) -> "CompletionRules":
         if self.strategy == "minimum_components" and self.minimumComponents is None:
@@ -631,7 +656,11 @@ class OfflineMode(StrictModel):
 
 
 class ActivityMetadata(StrictModel):
-    pass
+    sessionScope: str | None = None
+    sessionTitle: str | None = None
+    lessonShape: str | None = None
+    workflowMode: str | None = None
+    subject: str | None = None
 
 
 class ActivityArtifact(StrictModel):

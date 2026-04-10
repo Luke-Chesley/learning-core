@@ -43,14 +43,81 @@ Output a single JSON object that exactly matches the ActivitySpec schema (schema
   "metadata": {}
 }
 
-## Component types
+## Component field reference
 
-Only use component types from this exact list:
-heading, paragraph, callout, image, divider, short_answer, text_response, rich_text_response, single_select, multi_select, rating, confidence_check, checklist, ordered_sequence, matching_pairs, categorization, sort_into_groups, label_map, hotspot_select, build_steps, drag_arrange, interactive_widget, reflection_prompt, rubric_self_check, file_upload, image_capture, audio_capture, observation_record, teacher_checkoff, compare_and_explain, choose_next_step, construction_space
+Every component requires `id` (short kebab-case, unique) and `type`. Fields marked `?` are optional.
 
-Every component requires an `id` (short kebab-case, unique within the activity) and `type`.
+### Presentation
 
-A compressed base UI registry is already included in your context. Relevant subject packs may also be included. If you need the exact field contract, examples, or usage guidance for a component or widget, call `read_ui_spec` with the explicit doc path from the registry. Use good judgment. Read docs only when doing so materially helps you choose or configure a component, widget, or pack well. Many requests need no doc reads. Specialized requests may justify a few.
+```
+heading:              { id, type, text, level?: 1-4 }
+paragraph:            { id, type, text, markdown? }
+callout:              { id, type, text, variant?: "info"|"tip"|"warning"|"note" }
+image:                { id, type, src, alt, caption? }
+divider:              { id, type }
+```
+
+### Text input
+
+```
+short_answer:         { id, type, prompt, placeholder?, hint?, expectedAnswer?, required? }
+text_response:        { id, type, prompt, placeholder?, hint?, minWords?, required? }
+rich_text_response:   { id, type, prompt, hint?, required? }
+```
+
+### Selection / choice
+
+```
+single_select:        { id, type, prompt, choices: [{id, text, correct?, explanation?}], immediateCorrectness?, hint?, required? }
+multi_select:         { id, type, prompt, choices: [{id, text, correct?}], minSelections?, maxSelections?, hint?, required? }
+rating:               { id, type, prompt, min?, max?, lowLabel?, highLabel?, required? }
+confidence_check:     { id, type, prompt?, labels?: string[5] }
+```
+
+### Structured interaction
+
+```
+checklist:            { id, type, prompt?, items: [{id, label, description?, required?}], allowPartialSubmit? }
+ordered_sequence:     { id, type, prompt, items: [{id, text, correctIndex}], hint? }
+matching_pairs:       { id, type, prompt?, pairs: [{id, left, right}], hint? }
+categorization:       { id, type, prompt, categories: [{id, label}], items: [{id, text, correctCategoryIds}], hint? }
+sort_into_groups:     { id, type, prompt, groups: [{id, label, description?}], items: [{id, text, correctGroupId}], hint? }
+label_map:            { id, type, prompt, imageUrl, imageAlt, labels: [{id, x, y, correctText, hint?}] }
+hotspot_select:       { id, type, prompt, imageUrl, imageAlt, hotspots: [{id, x, y, radius?, label, correct?}], requiredSelections?, hint? }
+build_steps:          { id, type, prompt?, workedExample?, steps: [{id, instruction, hint?, expectedValue?}] }
+drag_arrange:         { id, type, prompt, items: [{id, text}], hint? }
+interactive_widget:   { id, type, prompt?, required?, widget: <WidgetPayload> }
+```
+
+### Reflection / self-assessment
+
+```
+reflection_prompt:    { id, type, prompt, subPrompts: [{id, text, responseKind?: "text"|"rating"}], required? }
+rubric_self_check:    { id, type, prompt?, criteria: [{id, label, description?}], levels: [{value, label, description?}], notePrompt? }
+compare_and_explain:  { id, type, prompt, itemA, itemB, responsePrompt?, required? }
+choose_next_step:     { id, type, prompt, choices: [{id, label, description?}] }
+```
+
+### Evidence capture (offline / hybrid)
+
+```
+file_upload:          { id, type, prompt, accept?, maxFiles?, notePrompt?, required? }
+image_capture:        { id, type, prompt, instructions?, maxImages?, required? }
+audio_capture:        { id, type, prompt, maxDurationSeconds?, required? }
+observation_record:   { id, type, prompt, fields: [{id, label, inputKind?: "text"|"rating"|"checkbox"}], filledBy?: "teacher"|"parent"|"learner" }
+teacher_checkoff:     { id, type, prompt, items: [{id, label, description?}], acknowledgmentLabel?, notePrompt? }
+construction_space:   { id, type, prompt, scaffoldText?, hint?, required? }
+```
+
+### Widget payloads (for interactive_widget.widget)
+
+```
+board_surface/chess:          { surfaceKind: "board_surface", engineKind: "chess", version: "1", surface: {orientation}, state: {fen}, interaction: {mode}, evaluation: {expectedMoves}, annotations: {highlightSquares, arrows} }
+expression_surface/math:      { surfaceKind: "expression_surface", engineKind: "math_symbolic", version: "1", surface: {notation}, state: {expression?}, interaction: {mode}, evaluation: {expectedExpression?} }
+graph_surface/graphing:       { surfaceKind: "graph_surface", engineKind: "graphing", version: "1", surface: {xRange, yRange, gridVisible?}, state: {functions?}, interaction: {mode}, evaluation: {expectedFunction?} }
+```
+
+A compressed UI registry is included in your context. If you need full field contracts, examples, or usage guidance, call `read_ui_spec` with the doc path from the registry. Use good judgment — many requests need no doc reads.
 
 ## Evidence capture kinds
 
