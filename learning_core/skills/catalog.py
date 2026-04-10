@@ -12,6 +12,7 @@ from learning_core.skills.progression_generate.scripts.main import ProgressionGe
 from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
 from learning_core.skills.session_evaluate.scripts.main import SessionEvaluateSkill
 from learning_core.skills.session_generate.scripts.main import SessionGenerateSkill
+from learning_core.skills.widget_transition.scripts.main import WidgetTransitionSkill
 
 
 def build_skill_registry() -> SkillRegistry:
@@ -23,6 +24,10 @@ def build_skill_registry() -> SkillRegistry:
     registry.register(
         "activity_feedback",
         ActivityFeedbackSkill(),
+    )
+    registry.register(
+        "widget_transition",
+        WidgetTransitionSkill(),
     )
     registry.register(
         "session_generate",

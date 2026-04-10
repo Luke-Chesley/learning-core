@@ -16,6 +16,7 @@ def test_list_operations_returns_metadata():
     assert "operations" in payload
     assert any(operation["operation_name"] == "activity_generate" for operation in payload["operations"])
     assert any(operation["operation_name"] == "activity_feedback" for operation in payload["operations"])
+    assert any(operation["operation_name"] == "widget_transition" for operation in payload["operations"])
 
 
 def test_list_operations_includes_required_cutover_operations():
@@ -28,6 +29,7 @@ def test_list_operations_includes_required_cutover_operations():
     assert {
         "activity_generate",
         "activity_feedback",
+        "widget_transition",
         "session_generate",
         "curriculum_generate",
         "curriculum_revise",

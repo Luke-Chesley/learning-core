@@ -1,5 +1,6 @@
 from learning_core.contracts.activity import ActivityArtifact, ActivityGenerationInput
 from learning_core.contracts.activity_feedback import ActivityFeedbackArtifact, ActivityFeedbackRequest
+from learning_core.contracts.widget_transition import WidgetTransitionArtifact, WidgetTransitionRequest
 from learning_core.contracts.copilot import CopilotChatArtifact, CopilotChatContext, CopilotChatRequest
 from learning_core.contracts.operation import (
     AppContext,
@@ -70,4 +71,6 @@ __all__ = [
     "InteractiveWidgetPayload",
     "SurfaceKind",
     "UserAuthoredContext",
+    "WidgetTransitionArtifact",
+    "WidgetTransitionRequest",
 ]

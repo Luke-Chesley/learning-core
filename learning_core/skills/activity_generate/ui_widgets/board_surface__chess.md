@@ -28,11 +28,27 @@ Render a board from canonical backend state and capture learner move input in a 
   "surface": {
     "orientation": "white"
   },
+  "display": {
+    "showSideToMove": true,
+    "showCoordinates": true,
+    "showMoveHint": true,
+    "boardRole": "primary"
+  },
   "state": {
     "fen": "string"
   },
   "interaction": {
-    "mode": "view_only | move_input"
+    "mode": "view_only | move_input",
+    "submissionMode": "immediate | explicit_submit",
+    "selectionMode": "click_click | drag_drop | either",
+    "showLegalTargets": true,
+    "allowReset": true,
+    "resetPolicy": "not_allowed | reset_to_initial",
+    "attemptPolicy": "single_attempt | allow_retry"
+  },
+  "feedback": {
+    "mode": "none | immediate | explicit_submit",
+    "displayMode": "inline | banner"
   },
   "evaluation": {
     "expectedMoves": ["SAN or UCI"]
@@ -56,8 +72,23 @@ Render a board from canonical backend state and capture learner move input in a 
   "engineKind": "chess",
   "version": "1",
   "surface": { "orientation": "white" },
+  "display": {
+    "showSideToMove": true,
+    "showCoordinates": true,
+    "showMoveHint": true,
+    "boardRole": "primary"
+  },
   "state": { "fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1" },
-  "interaction": { "mode": "move_input" },
+  "interaction": {
+    "mode": "move_input",
+    "submissionMode": "immediate",
+    "selectionMode": "click_click",
+    "showLegalTargets": true,
+    "allowReset": true,
+    "resetPolicy": "reset_to_initial",
+    "attemptPolicy": "allow_retry"
+  },
+  "feedback": { "mode": "immediate", "displayMode": "inline" },
   "evaluation": { "expectedMoves": ["Qb5+", "e2b5"] },
   "annotations": { "highlightSquares": [], "arrows": [] }
 }
@@ -72,6 +103,7 @@ Use a board widget plus nearby `compare_and_explain` or `text_response`. The wid
 - Include `evaluation.expectedMoves` only when the activity has bounded target moves.
 - Prefer SAN plus UCI when that makes authoring clearer.
 - If multiple moves are acceptable, include all of them.
+- If `interaction.mode` is `move_input`, make the board the primary evidence and keep side to move obvious in display or prompt.
 
 ## Evidence implications
 
@@ -81,6 +113,7 @@ Use a board widget plus nearby `compare_and_explain` or `text_response`. The wid
 ## Runtime feedback implications
 
 - Bounded move evaluation should happen through the separate runtime feedback path.
+- Legal targets and move normalization should come from the backend transition path, not the frontend.
 - Backend chess logic should normalize SAN and UCI.
 - Do not rely on frontend chess libraries as the canonical evaluator.
 
@@ -88,6 +121,6 @@ Use a board widget plus nearby `compare_and_explain` or `text_response`. The wid
 
 - Using the board for trivia that does not depend on the position.
 - Omitting the FEN.
+- Hiding side to move in both display and prompt.
 - Using view-only mode when the learner should submit a move.
 - Packing explanation, move entry, and reflection into one widget instead of combining the widget with normal components.
-
