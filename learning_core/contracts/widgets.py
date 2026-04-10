@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+import re
+from typing import Annotated, Literal
+
+from pydantic import Field, field_validator
+
+from learning_core.contracts.base import StrictModel
+
+
+SurfaceKind = Literal["board_surface", "expression_surface", "graph_surface"]
+EngineKind = Literal["chess", "math_symbolic", "graphing"]
+
+_BOARD_SQUARE_PATTERN = re.compile(r"^[a-h][1-8]$")
+
+
+class BoardArrow(StrictModel):
+    fromSquare: str
+    toSquare: str
+    color: Literal["green", "blue", "yellow", "red"] = "green"
+
+    @field_validator("fromSquare", "toSquare")
+    @classmethod
+    def validate_square(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not _BOARD_SQUARE_PATTERN.fullmatch(normalized):
+            raise ValueError("Board squares must use algebraic notation like 'e4'.")
+        return normalized
+
+
+class BoardSurfaceConfig(StrictModel):
+    orientation: Literal["white", "black"] = "white"
+
+
+class BoardSurfaceState(StrictModel):
+    fen: str
+
+    @field_validator("fen")
+    @classmethod
+    def validate_fen(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("state.fen is required.")
+        return normalized
+
+
+class BoardSurfaceInteraction(StrictModel):
+    mode: Literal["view_only", "move_input"] = "view_only"
+
+
+class ChessEvaluationConfig(StrictModel):
+    expectedMoves: list[str] = Field(default_factory=list)
+
+
+class BoardSurfaceAnnotations(StrictModel):
+    highlightSquares: list[str] = Field(default_factory=list)
+    arrows: list[BoardArrow] = Field(default_factory=list)
+
+    @field_validator("highlightSquares")
+    @classmethod
+    def validate_highlight_squares(cls, values: list[str]) -> list[str]:
+        normalized_values: list[str] = []
+        for value in values:
+            normalized = value.strip().lower()
+            if not _BOARD_SQUARE_PATTERN.fullmatch(normalized):
+                raise ValueError("highlightSquares must use algebraic notation like 'e4'.")
+            normalized_values.append(normalized)
+        return normalized_values
+
+
+class ChessBoardWidget(StrictModel):
+    surfaceKind: Literal["board_surface"]
+    engineKind: Literal["chess"]
+    version: Literal["1"] = "1"
+    surface: BoardSurfaceConfig = Field(default_factory=BoardSurfaceConfig)
+    state: BoardSurfaceState
+    interaction: BoardSurfaceInteraction = Field(default_factory=BoardSurfaceInteraction)
+    evaluation: ChessEvaluationConfig = Field(default_factory=ChessEvaluationConfig)
+    annotations: BoardSurfaceAnnotations = Field(default_factory=BoardSurfaceAnnotations)
+
+
+class ExpressionSurfaceConfig(StrictModel):
+    placeholder: str | None = None
+    mathKeyboard: bool = False
+
+
+class ExpressionSurfaceState(StrictModel):
+    promptLatex: str | None = None
+    initialValue: str | None = None
+
+
+class ExpressionSurfaceInteraction(StrictModel):
+    mode: Literal["expression_entry", "equation_entry", "step_entry"] = "expression_entry"
+
+
+class MathSymbolicEvaluationConfig(StrictModel):
+    expectedExpression: str | None = None
+    equivalenceMode: Literal["exact", "simplified", "equivalent"] = "equivalent"
+
+
+class ExpressionSurfaceAnnotations(StrictModel):
+    helperText: str | None = None
+
+
+class MathSymbolicWidget(StrictModel):
+    surfaceKind: Literal["expression_surface"]
+    engineKind: Literal["math_symbolic"]
+    version: Literal["1"] = "1"
+    surface: ExpressionSurfaceConfig = Field(default_factory=ExpressionSurfaceConfig)
+    state: ExpressionSurfaceState = Field(default_factory=ExpressionSurfaceState)
+    interaction: ExpressionSurfaceInteraction = Field(default_factory=ExpressionSurfaceInteraction)
+    evaluation: MathSymbolicEvaluationConfig = Field(default_factory=MathSymbolicEvaluationConfig)
+    annotations: ExpressionSurfaceAnnotations = Field(default_factory=ExpressionSurfaceAnnotations)
+
+
+class GraphSurfaceConfig(StrictModel):
+    xLabel: str | None = None
+    yLabel: str | None = None
+    grid: bool = True
+
+
+class GraphSurfaceState(StrictModel):
+    prompt: str | None = None
+    initialExpression: str | None = None
+
+
+class GraphSurfaceInteraction(StrictModel):
+    mode: Literal["plot_point", "plot_curve", "analyze_graph"] = "plot_point"
+
+
+class GraphingEvaluationConfig(StrictModel):
+    expectedGraphDescription: str | None = None
+
+
+class GraphSurfaceAnnotations(StrictModel):
+    overlayText: str | None = None
+
+
+class GraphingWidget(StrictModel):
+    surfaceKind: Literal["graph_surface"]
+    engineKind: Literal["graphing"]
+    version: Literal["1"] = "1"
+    surface: GraphSurfaceConfig = Field(default_factory=GraphSurfaceConfig)
+    state: GraphSurfaceState = Field(default_factory=GraphSurfaceState)
+    interaction: GraphSurfaceInteraction = Field(default_factory=GraphSurfaceInteraction)
+    evaluation: GraphingEvaluationConfig = Field(default_factory=GraphingEvaluationConfig)
+    annotations: GraphSurfaceAnnotations = Field(default_factory=GraphSurfaceAnnotations)
+
+
+InteractiveWidgetPayload = Annotated[
+    ChessBoardWidget | MathSymbolicWidget | GraphingWidget,
+    Field(discriminator="engineKind"),
+]
+
+
+def widget_accepts_input(widget: InteractiveWidgetPayload) -> bool:
+    if widget.engineKind == "chess":
+        return widget.interaction.mode == "move_input"
+    return True
+

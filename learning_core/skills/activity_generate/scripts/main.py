@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from learning_core.agent import run_agent_loop
+from learning_core.agent import ToolCallEvent, run_agent_loop
 from learning_core.contracts.operation import OperationEnvelope
 from learning_core.observability.provider_logs import write_provider_exchange_log
 from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
@@ -16,10 +19,79 @@ from learning_core.runtime.providers import build_model_runtime
 from learning_core.runtime.skill import SkillDefinition, SkillExecutionResult
 from learning_core.skills.activity_generate.scripts.policy import ACTIVITY_GENERATE_POLICY
 from learning_core.skills.activity_generate.scripts.schemas import ActivityArtifact, ActivityGenerationInput
-from learning_core.skills.activity_generate.scripts.tooling import read_ui_component
+from learning_core.skills.activity_generate.scripts.tooling import (
+    chess_apply_move,
+    chess_describe_position,
+    chess_legal_moves,
+    chess_normalize_move,
+    read_ui_spec,
+)
 
 _SKILL_DIR = Path(__file__).resolve().parent.parent
 _REGISTRY_INDEX_PATH = _SKILL_DIR / "ui_registry_index.md"
+_PACKS_DIR = _SKILL_DIR / "packs"
+_PACK_INDEX_PATH = _PACKS_DIR / "index.md"
+_PACK_DOC_FILENAMES = ("pack.md", "patterns.md", "examples.md")
+_TOOL_OUTPUT_PREVIEW_CHARS = 320
+
+_PACK_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "math": (
+        "math",
+        "arithmetic",
+        "fraction",
+        "fractions",
+        "division",
+        "long division",
+        "multiply",
+        "multiplication",
+        "addition",
+        "subtraction",
+        "algebra",
+        "equation",
+        "geometry",
+        "decimal",
+        "decimals",
+        "percent",
+        "ratio",
+        "measurement",
+        "word problem",
+        "place value",
+        "number line",
+    ),
+    "chess": (
+        "chess",
+        "checkmate",
+        "check",
+        "opening",
+        "middlegame",
+        "endgame",
+        "fork",
+        "pin",
+        "skewer",
+        "tactic",
+        "tactics",
+        "candidate move",
+        "best move",
+        "threat",
+        "blunder",
+        "zugzwang",
+        "mate",
+        "rook",
+        "bishop",
+        "knight",
+        "queen",
+        "king",
+        "pawn",
+        "fen",
+    ),
+}
+
+
+@dataclass(frozen=True)
+class PackSelection:
+    included_packs: tuple[str, ...]
+    pack_selection_reason: dict[str, list[str]]
+    subject_inference: dict[str, Any]
 
 
 def _read_skill_markdown() -> str:
@@ -30,7 +102,89 @@ def _read_registry_index() -> str:
     return _REGISTRY_INDEX_PATH.read_text(encoding="utf-8").strip()
 
 
-def _build_user_prompt(payload: ActivityGenerationInput, context: RuntimeContext) -> str:
+def _read_pack_index() -> str:
+    return _PACK_INDEX_PATH.read_text(encoding="utf-8").strip()
+
+
+def _read_pack_docs(pack_name: str) -> list[str]:
+    pack_dir = _PACKS_DIR / pack_name
+    sections: list[str] = []
+    for filename in _PACK_DOC_FILENAMES:
+        sections.append((pack_dir / filename).read_text(encoding="utf-8").strip())
+    return sections
+
+
+def _contains_keyword(text: str, keyword: str) -> bool:
+    normalized_keyword = keyword.strip().lower()
+    if not normalized_keyword:
+        return False
+    if " " in normalized_keyword:
+        return normalized_keyword in text
+    return re.search(rf"(?<![a-z]){re.escape(normalized_keyword)}(?![a-z])", text) is not None
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value not in seen:
+            deduped.append(value)
+            seen.add(value)
+    return deduped
+
+
+def _select_packs(payload: ActivityGenerationInput) -> PackSelection:
+    lesson = payload.lesson_draft
+    sources = {
+        "subject": (payload.subject or "").strip(),
+        "lesson_title": lesson.title.strip(),
+        "lesson_focus": lesson.lesson_focus.strip(),
+        "linked_skill_titles": " ".join(payload.linked_skill_titles).strip(),
+    }
+    lowered_sources = {key: value.lower() for key, value in sources.items() if value}
+
+    matched_keywords: dict[str, dict[str, list[str]]] = {}
+    pack_selection_reason: dict[str, list[str]] = {}
+    included_packs: list[str] = []
+
+    for pack_name, keywords in _PACK_KEYWORDS.items():
+        pack_matches: dict[str, list[str]] = {}
+        pack_reasons: list[str] = []
+
+        for source_name, source_value in lowered_sources.items():
+            hits = [keyword for keyword in keywords if _contains_keyword(source_value, keyword)]
+            if not hits:
+                continue
+            deduped_hits = _dedupe_preserve_order(hits)
+            pack_matches[source_name] = deduped_hits
+            label = source_name.replace("_", " ")
+            pack_reasons.append(f"{label} matched: {', '.join(deduped_hits)}")
+
+        matched_keywords[pack_name] = pack_matches
+        pack_selection_reason[pack_name] = pack_reasons
+        if pack_reasons:
+            included_packs.append(pack_name)
+
+    subject_inference = {
+        "provided_subject": payload.subject,
+        "lesson_title": lesson.title,
+        "lesson_focus": lesson.lesson_focus,
+        "linked_skill_titles": list(payload.linked_skill_titles),
+        "matched_keywords": matched_keywords,
+    }
+
+    return PackSelection(
+        included_packs=tuple(included_packs),
+        pack_selection_reason=pack_selection_reason,
+        subject_inference=subject_inference,
+    )
+
+
+def _build_user_prompt(
+    payload: ActivityGenerationInput,
+    context: RuntimeContext,
+    pack_selection: PackSelection,
+) -> str:
     lesson = payload.lesson_draft
     lines: list[str] = []
 
@@ -136,32 +290,93 @@ def _build_user_prompt(payload: ActivityGenerationInput, context: RuntimeContext
         lines.append("")
         lines.append(f"Custom instruction: {context.user_authored_context.custom_instruction}")
 
-    # Append the registry index so the model can see available components.
     lines.append("")
     lines.append("---")
     lines.append("")
     lines.append(_read_registry_index())
+
+    if pack_selection.included_packs:
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        lines.append(_read_pack_index())
+
+        for pack_name in pack_selection.included_packs:
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+            for section in _read_pack_docs(pack_name):
+                lines.append(section)
+                lines.append("")
+            if lines[-1] == "":
+                lines.pop()
 
     lines.append("")
     lines.append("---")
     lines.append("")
     lines.append(
         "Generate a single ActivitySpec JSON object. "
-        "You may call `read_ui_component` to read full docs for components you are considering (typically 0-2). "
-        "Your final output must be exactly one JSON object — no text outside the JSON."
+        "You already have the base UI registry, and relevant subject packs may also be included. "
+        "If a rich interactive surface is needed, consider `interactive_widget`. "
+        "Read UI specs with `read_ui_spec` only when that materially helps you choose or configure a component or widget well. "
+        "Many requests need no doc reads. Specialized requests may justify a few. "
+        "Use good taste when selecting components. Prefer a coherent, pedagogically strong activity over a crowded one. "
+        "Prefer the smallest set of components that creates a strong activity. "
+        "Use as many components as the activity genuinely needs and no more. "
+        "Do not use components or widgets just because they exist. "
+        "Escalate to interactive widgets only when they materially improve the learning interaction. "
+        "Your final output must be exactly one JSON object matching the strict ActivityArtifact contract. "
+        "Do not include any text outside the JSON."
     )
 
     return "\n".join(lines)
 
 
+def _build_prompt_preview(
+    payload: ActivityGenerationInput,
+    context: RuntimeContext,
+) -> tuple[PromptPreview, PackSelection]:
+    pack_selection = _select_packs(payload)
+    preview = PromptPreview(
+        system_prompt=_read_skill_markdown(),
+        user_prompt=_build_user_prompt(payload, context, pack_selection),
+    )
+    return preview, pack_selection
+
+
+def _build_tool_call_log(tool_calls: list[ToolCallEvent]) -> list[dict[str, Any]]:
+    log: list[dict[str, Any]] = []
+    for tool_call in tool_calls:
+        output_text = str(tool_call.tool_output)
+        log.append(
+            {
+                "tool": tool_call.tool_name,
+                "args": tool_call.tool_args,
+                "output_length": len(output_text),
+                "output_preview": output_text[:_TOOL_OUTPUT_PREVIEW_CHARS],
+                "output_hash": hashlib.sha256(output_text.encode("utf-8")).hexdigest()[:16],
+            }
+        )
+    return log
+
+
+def _extract_ui_specs_read(tool_calls: list[ToolCallEvent]) -> list[str]:
+    specs_read: list[str] = []
+    for tool_call in tool_calls:
+        if tool_call.tool_name != "read_ui_spec":
+            continue
+        path = tool_call.tool_args.get("path")
+        if isinstance(path, str) and path not in specs_read:
+            specs_read.append(path)
+    return specs_read
+
+
 def _extract_json(text: str) -> str:
     """Extract JSON from text that may include markdown fences or surrounding prose."""
-    # Try to find a JSON code block first.
     match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
     if match:
         return match.group(1).strip()
 
-    # Fall back to finding the outermost { ... } pair.
     start = text.find("{")
     if start == -1:
         return text.strip()
@@ -186,16 +401,15 @@ class ActivityGenerateSkill(SkillDefinition):
     policy = ACTIVITY_GENERATE_POLICY
 
     def build_user_prompt(self, payload: ActivityGenerationInput, context: RuntimeContext) -> str:
-        return _build_user_prompt(payload, context)
+        pack_selection = _select_packs(payload)
+        return _build_user_prompt(payload, context, pack_selection)
 
     def build_prompt_preview(self, payload, context) -> PromptPreview:
-        return PromptPreview(
-            system_prompt=_read_skill_markdown(),
-            user_prompt=self.build_user_prompt(payload, context),
-        )
+        preview, _ = _build_prompt_preview(payload, context)
+        return preview
 
     def execute(self, engine, payload: ActivityGenerationInput, context: RuntimeContext) -> SkillExecutionResult:
-        preview = self.build_prompt_preview(payload, context)
+        preview, pack_selection = _build_prompt_preview(payload, context)
 
         model_runtime = build_model_runtime(
             task_name=context.operation_name,
@@ -213,13 +427,16 @@ class ActivityGenerateSkill(SkillDefinition):
             response_mode="agent",
         )
 
-        # --- Run the ReAct agent loop ---
+        tools = [read_ui_spec]
+        if "chess" in pack_selection.included_packs:
+            tools.extend([chess_legal_moves, chess_describe_position, chess_apply_move, chess_normalize_move])
+
         try:
             agent_result = run_agent_loop(
                 llm=model_runtime.client,
                 system_prompt=preview.system_prompt,
                 user_prompt=preview.user_prompt,
-                tools=[read_ui_component],
+                tools=tools,
                 max_steps=5,
             )
         except Exception as error:
@@ -229,17 +446,17 @@ class ActivityGenerateSkill(SkillDefinition):
                     "status": "error",
                     "error_type": error.__class__.__name__,
                     "error": str(error),
+                    "included_packs": list(pack_selection.included_packs),
+                    "pack_selection_reason": pack_selection.pack_selection_reason,
+                    "subject_inference": pack_selection.subject_inference,
                 },
             )
             raise ProviderExecutionError(str(error)) from error
 
         raw_text = agent_result.final_text
-        tool_call_log = [
-            {"tool": tc.tool_name, "args": tc.tool_args, "output_length": len(tc.tool_output)}
-            for tc in agent_result.tool_calls
-        ]
+        tool_call_log = _build_tool_call_log(agent_result.tool_calls)
+        ui_specs_read = _extract_ui_specs_read(agent_result.tool_calls)
 
-        # --- Parse and validate ---
         json_text = _extract_json(raw_text)
         repair_attempted = False
         repair_succeeded = False
@@ -252,7 +469,6 @@ class ActivityGenerateSkill(SkillDefinition):
             validation_error_text = str(first_error)
             repair_attempted = True
 
-            # --- One repair pass ---
             try:
                 repair_prompt = (
                     "The JSON you produced failed validation.\n\n"
@@ -287,13 +503,16 @@ class ActivityGenerateSkill(SkillDefinition):
                         "repair_error": str(repair_error),
                         "raw_agent_response": agent_result.final_text,
                         "tool_calls": tool_call_log,
+                        "ui_specs_read": ui_specs_read,
+                        "included_packs": list(pack_selection.included_packs),
+                        "pack_selection_reason": pack_selection.pack_selection_reason,
+                        "subject_inference": pack_selection.subject_inference,
                     },
                 )
                 raise ContractValidationError(
                     f"Validation failed after repair. Initial: {validation_error_text}. Repair: {repair_error}"
                 ) from repair_error
 
-        # --- Log and return ---
         write_provider_exchange_log(
             request=provider_request,
             response={
@@ -301,8 +520,12 @@ class ActivityGenerateSkill(SkillDefinition):
                 "raw_agent_response": agent_result.final_text,
                 "validated_artifact": artifact.model_dump(mode="json", exclude_none=True),
                 "tool_calls": tool_call_log,
+                "ui_specs_read": ui_specs_read,
                 "repair_attempted": repair_attempted,
                 "repair_succeeded": repair_succeeded,
+                "included_packs": list(pack_selection.included_packs),
+                "pack_selection_reason": pack_selection.pack_selection_reason,
+                "subject_inference": pack_selection.subject_inference,
             },
         )
 
@@ -327,7 +550,10 @@ class ActivityGenerateSkill(SkillDefinition):
             ),
             agent_trace={
                 "tool_calls": tool_call_log,
-                "component_docs_read": [tc.tool_args.get("path", "") for tc in agent_result.tool_calls],
+                "ui_specs_read": ui_specs_read,
+                "included_packs": list(pack_selection.included_packs),
+                "pack_selection_reason": pack_selection.pack_selection_reason,
+                "subject_inference": pack_selection.subject_inference,
                 "repair_attempted": repair_attempted,
                 "repair_succeeded": repair_succeeded,
                 "validation_error": validation_error_text,

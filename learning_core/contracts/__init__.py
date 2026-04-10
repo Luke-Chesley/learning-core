@@ -1,4 +1,5 @@
 from learning_core.contracts.activity import ActivityArtifact, ActivityGenerationInput
+from learning_core.contracts.activity_feedback import ActivityFeedbackArtifact, ActivityFeedbackRequest
 from learning_core.contracts.copilot import CopilotChatArtifact, CopilotChatContext, CopilotChatRequest
 from learning_core.contracts.operation import (
     AppContext,
@@ -28,9 +29,16 @@ from learning_core.contracts.progression import (
     ProgressionRevisionRequest,
 )
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
+from learning_core.contracts.widgets import (
+    EngineKind,
+    InteractiveWidgetPayload,
+    SurfaceKind,
+)
 
 __all__ = [
     "ActivityArtifact",
+    "ActivityFeedbackArtifact",
+    "ActivityFeedbackRequest",
     "ActivityGenerationInput",
     "AppContext",
     "CopilotChatArtifact",
@@ -58,5 +66,8 @@ __all__ = [
     "SessionPlanArtifact",
     "SessionPlanGenerationRequest",
     "StructuredLessonDraft",
+    "EngineKind",
+    "InteractiveWidgetPayload",
+    "SurfaceKind",
     "UserAuthoredContext",
 ]

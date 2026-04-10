@@ -2,13 +2,15 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from learning_core.agent import AgentResult, ToolCallEvent
 from learning_core.contracts.activity import ActivityArtifact, ActivityGenerationInput
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.engine import AgentEngine
 from learning_core.runtime.providers import ModelRuntime
-from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
+from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill, _select_packs
 from learning_core.skills.catalog import build_skill_registry
 
 # -- Shared test fixtures --
@@ -133,6 +135,46 @@ _VALID_ARTIFACT_WITH_NULLS = {
     },
 }
 
+_VALID_CHESS_ARTIFACT = {
+    "schemaVersion": "2",
+    "title": "Find the tactical move",
+    "purpose": "Choose the best move from the board position.",
+    "activityKind": "guided_practice",
+    "linkedObjectiveIds": [],
+    "linkedSkillTitles": ["best move"],
+    "estimatedMinutes": 10,
+    "interactionMode": "digital",
+    "components": [
+        {
+            "type": "interactive_widget",
+            "id": "best-move",
+            "prompt": "White to move. Find the queen move that gives check.",
+            "required": True,
+            "widget": {
+                "surfaceKind": "board_surface",
+                "engineKind": "chess",
+                "version": "1",
+                "surface": {"orientation": "white"},
+                "state": {"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+                "interaction": {"mode": "move_input"},
+                "evaluation": {"expectedMoves": ["Qb5+", "e2b5"]},
+                "annotations": {"highlightSquares": [], "arrows": []},
+            },
+        }
+    ],
+    "completionRules": {"strategy": "all_interactive_components"},
+    "evidenceSchema": {
+        "captureKinds": ["answer_response"],
+        "requiresReview": False,
+        "autoScorable": True,
+    },
+    "scoringModel": {
+        "mode": "correctness_based",
+        "masteryThreshold": 0.8,
+        "reviewThreshold": 0.6,
+    },
+}
+
 _ENVELOPE_DATA = {
     "input": {
         "learner_name": "Alex",
@@ -148,8 +190,10 @@ _ENVELOPE_DATA = {
 }
 
 
-def _make_payload():
-    return ActivityGenerationInput.model_validate(_ENVELOPE_DATA["input"])
+def _make_payload(**overrides):
+    data = dict(_ENVELOPE_DATA["input"])
+    data.update(overrides)
+    return ActivityGenerationInput.model_validate(data)
 
 
 def _make_context():
@@ -202,14 +246,63 @@ def test_activity_generate_preview_includes_lesson_title():
 
 def test_activity_generate_preview_includes_registry_index():
     preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
-    assert "UI Component Registry" in preview.user_prompt
-    assert "read_ui_component" in preview.user_prompt
+    assert "UI Registry" in preview.user_prompt
+    assert "read_ui_spec" in preview.user_prompt
+    assert "ui_components/short_answer.md" in preview.user_prompt
 
 
-def test_activity_generate_preview_includes_tool_usage_instruction():
+def test_activity_generate_preview_uses_pack_aware_tool_guidance():
     preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
-    assert "read_ui_component" in preview.user_prompt
-    assert "typically 0-2" in preview.user_prompt
+    assert "read_ui_spec" in preview.user_prompt
+    assert "Many requests need no doc reads" in preview.user_prompt
+    assert "typically 0-2" not in preview.user_prompt
+    assert "Math Pack" in preview.user_prompt
+    assert "interactive_widget" in preview.user_prompt
+
+
+def test_registry_index_rows_include_explicit_paths():
+    registry_text = Path("learning_core/skills/activity_generate/ui_registry_index.md").read_text(encoding="utf-8")
+    assert "| type | use when | avoid when | cost | path |" in registry_text
+    assert "ui_components/build_steps.md" in registry_text
+    assert "ui_components/interactive_widget.md" in registry_text
+    assert "ui_widgets/board_surface__chess.md" in registry_text
+
+
+def test_pack_selection_detects_math():
+    selection = _select_packs(_make_payload())
+    assert selection.included_packs == ("math",)
+    assert selection.pack_selection_reason["math"]
+
+
+def test_pack_selection_detects_chess():
+    selection = _select_packs(
+        _make_payload(
+            subject="Chess",
+            linked_skill_titles=["Find the best move"],
+            lesson_draft={
+                **_LESSON_DRAFT,
+                "title": "Find the best move",
+                "lesson_focus": "Practice candidate moves from one chess position.",
+            },
+        )
+    )
+    assert selection.included_packs == ("chess",)
+    assert selection.pack_selection_reason["chess"]
+
+
+def test_pack_selection_can_return_no_pack():
+    selection = _select_packs(
+        _make_payload(
+            subject="History",
+            linked_skill_titles=["Ancient Egypt"],
+            lesson_draft={
+                **_LESSON_DRAFT,
+                "title": "Daily life in Ancient Egypt",
+                "lesson_focus": "Describe one feature of daily life.",
+            },
+        )
+    )
+    assert selection.included_packs == ()
 
 
 # -- Artifact validation tests --
@@ -219,6 +312,33 @@ def test_activity_artifact_accepts_canonical_minimal_spec():
     artifact = ActivityArtifact.model_validate(_VALID_ARTIFACT)
     assert artifact.schemaVersion == "2"
     assert artifact.components[1].type == "short_answer"
+
+
+def test_activity_artifact_accepts_interactive_widget_component():
+    artifact = ActivityArtifact.model_validate(_VALID_CHESS_ARTIFACT)
+    assert artifact.components[0].type == "interactive_widget"
+    assert artifact.components[0].widget.engineKind == "chess"
+
+
+def test_activity_artifact_rejects_top_level_chess_board_component():
+    invalid = {
+        **_VALID_CHESS_ARTIFACT,
+        "components": [
+            {
+                "type": "chess_board",
+                "id": "legacy-chess",
+                "prompt": "Legacy board",
+                "fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1",
+                "orientation": "white",
+                "allowMoveInput": True,
+                "expectedMoves": ["Qb5+"],
+                "required": True,
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        ActivityArtifact.model_validate(invalid)
 
 
 def test_activity_artifact_json_schema_has_no_open_objects():
@@ -280,7 +400,7 @@ def test_activity_execute_with_tool_calls(mock_build_runtime, mock_agent_loop, t
         _VALID_ARTIFACT,
         tool_calls=[
             ToolCallEvent(
-                tool_name="read_ui_component",
+                tool_name="read_ui_spec",
                 tool_args={"path": "ui_components/short_answer.md"},
                 tool_output="# short_answer\n...",
             ),
@@ -291,8 +411,11 @@ def test_activity_execute_with_tool_calls(mock_build_runtime, mock_agent_loop, t
     result = engine.execute("activity_generate", _ENVELOPE_DATA)
 
     assert result.artifact["schemaVersion"] == "2"
-    assert result.trace.agent_trace["component_docs_read"] == ["ui_components/short_answer.md"]
+    assert result.trace.agent_trace["ui_specs_read"] == ["ui_components/short_answer.md"]
+    assert result.trace.agent_trace["included_packs"] == ["math"]
     assert len(result.trace.agent_trace["tool_calls"]) == 1
+    assert result.trace.agent_trace["tool_calls"][0]["output_preview"] == "# short_answer\n..."
+    assert result.trace.agent_trace["tool_calls"][0]["output_hash"]
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)
 
 

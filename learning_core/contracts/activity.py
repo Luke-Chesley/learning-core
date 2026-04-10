@@ -1,11 +1,11 @@
 from __future__ import annotations
-
 from typing import Annotated, Literal
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
 from learning_core.contracts.base import StrictModel
 from learning_core.contracts.lesson_draft import StructuredLessonDraft
+from learning_core.contracts.widgets import InteractiveWidgetPayload, widget_accepts_input
 
 
 ActivityKind = Literal[
@@ -83,6 +83,7 @@ ComponentType = Literal[
     "hotspot_select",
     "build_steps",
     "drag_arrange",
+    "interactive_widget",
     "reflection_prompt",
     "rubric_self_check",
     "file_upload",
@@ -401,6 +402,14 @@ class DragArrangeComponent(StrictModel):
     hint: str | None = None
 
 
+class InteractiveWidgetComponent(StrictModel):
+    type: Literal["interactive_widget"]
+    id: str
+    prompt: str
+    required: bool = True
+    widget: InteractiveWidgetPayload
+
+
 class ReflectionSubPrompt(StrictModel):
     id: str
     text: str
@@ -546,6 +555,7 @@ ActivityComponent = Annotated[
     | HotspotSelectComponent
     | BuildStepsComponent
     | DragArrangeComponent
+    | InteractiveWidgetComponent
     | ReflectionPromptComponent
     | RubricSelfCheckComponent
     | FileUploadComponent
@@ -558,6 +568,12 @@ ActivityComponent = Annotated[
     | ConstructionSpaceComponent,
     Field(discriminator="type"),
 ]
+
+
+def is_interactive_component(component: ActivityComponent) -> bool:
+    if component.type in INTERACTIVE_COMPONENT_TYPES:
+        return True
+    return component.type == "interactive_widget" and widget_accepts_input(component.widget)
 
 
 class CompletionRules(StrictModel):
@@ -643,7 +659,7 @@ class ActivityArtifact(StrictModel):
         ids = [component.id for component in value]
         if len(ids) != len(set(ids)):
             raise ValueError("Activity artifact component ids must be unique.")
-        if not any(component.type in INTERACTIVE_COMPONENT_TYPES for component in value):
+        if not any(is_interactive_component(component) for component in value):
             raise ValueError("Activity artifact must include at least one interactive component.")
         return value
 

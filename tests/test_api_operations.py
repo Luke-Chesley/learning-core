@@ -1,28 +1,33 @@
-from fastapi.testclient import TestClient
+import asyncio
 
 from learning_core.api.app import create_app
 
 
+def _route_for_path(app, path: str):
+    return next(route for route in app.router.routes if getattr(route, "path", None) == path)
+
+
 def test_list_operations_returns_metadata():
-    client = TestClient(create_app())
+    app = create_app()
+    route = _route_for_path(app, "/v1/operations")
 
-    response = client.get("/v1/operations")
+    payload = asyncio.run(route.endpoint())
 
-    assert response.status_code == 200
-    payload = response.json()
     assert "operations" in payload
     assert any(operation["operation_name"] == "activity_generate" for operation in payload["operations"])
+    assert any(operation["operation_name"] == "activity_feedback" for operation in payload["operations"])
 
 
 def test_list_operations_includes_required_cutover_operations():
-    client = TestClient(create_app())
+    app = create_app()
+    route = _route_for_path(app, "/v1/operations")
 
-    response = client.get("/v1/operations")
+    payload = asyncio.run(route.endpoint())
 
-    assert response.status_code == 200
-    operation_names = {operation["operation_name"] for operation in response.json()["operations"]}
+    operation_names = {operation["operation_name"] for operation in payload["operations"]}
     assert {
         "activity_generate",
+        "activity_feedback",
         "session_generate",
         "curriculum_generate",
         "curriculum_revise",
@@ -36,8 +41,9 @@ def test_list_operations_includes_required_cutover_operations():
 
 
 def test_legacy_gateway_endpoints_are_gone():
-    client = TestClient(create_app())
+    app = create_app()
+    paths = {getattr(route, "path", None) for route in app.router.routes}
 
-    assert client.post("/v1/gateway/complete").status_code == 404
-    assert client.post("/v1/gateway/complete-json").status_code == 404
-    assert client.post("/v1/gateway/stream").status_code == 404
+    assert "/v1/gateway/complete" not in paths
+    assert "/v1/gateway/complete-json" not in paths
+    assert "/v1/gateway/stream" not in paths

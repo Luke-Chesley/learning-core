@@ -1,56 +1,62 @@
 from learning_core.skills.activity_generate.scripts.tooling import (
-    ALLOWED_COMPONENT_DOCS,
-    read_ui_component,
+    ALLOWED_UI_SPEC_PATHS,
+    read_ui_spec,
 )
 
 
 def test_read_valid_component_path():
-    result = read_ui_component.invoke({"path": "ui_components/short_answer.md"})
+    result = read_ui_spec.invoke({"path": "ui_components/short_answer.md"})
     assert "# short_answer" in result
     assert "prompt" in result
 
 
-def test_read_valid_component_without_prefix():
-    result = read_ui_component.invoke({"path": "short_answer.md"})
+def test_read_valid_widget_path():
+    result = read_ui_spec.invoke({"path": "ui_widgets/board_surface__chess.md"})
+    assert "# board_surface + chess" in result
+    assert "expectedMoves" in result
+
+
+def test_read_valid_spec_without_prefix_when_unique():
+    result = read_ui_spec.invoke({"path": "short_answer.md"})
     assert "# short_answer" in result
 
 
-def test_read_all_indexed_components():
-    for filename in ALLOWED_COMPONENT_DOCS:
-        result = read_ui_component.invoke({"path": f"ui_components/{filename}"})
-        assert not result.startswith("Error"), f"Failed to read {filename}: {result}"
+def test_read_all_allowlisted_specs():
+    for path in ALLOWED_UI_SPEC_PATHS:
+        result = read_ui_spec.invoke({"path": path})
+        assert not result.startswith("Error"), f"Failed to read {path}: {result}"
 
 
 def test_path_traversal_rejected():
-    result = read_ui_component.invoke({"path": "ui_components/../../../etc/passwd"})
+    result = read_ui_spec.invoke({"path": "ui_components/../../../etc/passwd"})
     assert result.startswith("Error")
     assert "invalid path" in result
 
 
 def test_path_traversal_without_prefix_rejected():
-    result = read_ui_component.invoke({"path": "../secrets.md"})
+    result = read_ui_spec.invoke({"path": "../secrets.md"})
     assert result.startswith("Error")
     assert "invalid path" in result
 
 
 def test_unknown_path_rejected():
-    result = read_ui_component.invoke({"path": "ui_components/nonexistent_widget.md"})
+    result = read_ui_spec.invoke({"path": "ui_widgets/nonexistent_widget.md"})
     assert result.startswith("Error")
-    assert "not a recognized component" in result
+    assert "not a recognized UI spec" in result
 
 
 def test_non_indexed_path_rejected():
-    result = read_ui_component.invoke({"path": "ui_components/../../pyproject.toml"})
+    result = read_ui_spec.invoke({"path": "ui_components/../../pyproject.toml"})
     assert result.startswith("Error")
 
 
 def test_arbitrary_file_rejected():
-    result = read_ui_component.invoke({"path": "main.py"})
+    result = read_ui_spec.invoke({"path": "main.py"})
     assert result.startswith("Error")
-    assert "not a recognized component" in result
+    assert "not a recognized UI spec" in result
 
 
 def test_subdirectory_traversal_rejected():
-    result = read_ui_component.invoke({"path": "ui_components/subdir/short_answer.md"})
+    result = read_ui_spec.invoke({"path": "ui_components/subdir/short_answer.md"})
     assert result.startswith("Error")
-    assert "invalid path" in result
+    assert "not a recognized UI spec" in result or "invalid path" in result

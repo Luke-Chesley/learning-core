@@ -2,6 +2,8 @@
 
 `learning-core` is the headless Python service that owns AI runtime concerns for learning products.
 
+Current interactive activity generation stays bounded by the `ActivityArtifact` contract. Rich engine-backed interaction now flows through the top-level `interactive_widget` component, with backend domain engines owning canonical state and runtime evaluation.
+
 ## Scope
 
 - Owns: agent runtime, skill registry, prompt/`SKILL.md` loading, contracts, workflow semantics, validation, and observability.
@@ -61,11 +63,22 @@ The service defaults to `http://127.0.0.1:8000`.
 learning_core/
   api/
   contracts/
+  domain/
   observability/
   runtime/
   skills/
+    activity_feedback/
+      SKILL.md
+      scripts/
+        main.py
     activity_generate/
       SKILL.md
+      packs/
+        index.md
+        math/
+        chess/
+      ui_components/
+      ui_widgets/
       scripts/
         main.py
         policy.py
@@ -118,6 +131,7 @@ learning_core/
 
 Current first-class operations:
 
+- `activity_feedback`
 - `activity_generate`
 - `session_generate`
 - `curriculum_intake`
@@ -139,3 +153,4 @@ Current first-class operations:
 - Product repos persist artifacts; `learning-core` returns typed artifacts, lineage, and traces.
 - Product repos send structured request envelopes only. They do not send prompt fragments or raw system prompts.
 - The legacy generic gateway surface is deleted. Apps call named operations only.
+- Backend domain logic is canonical for engine-backed widgets. Frontend libraries are rendering helpers, not the source of truth.

@@ -14,6 +14,7 @@ def test_other_skills_are_structured_output_skills():
     """All non-activity skills should still inherit from StructuredOutputSkill."""
     registry = build_skill_registry()
     deterministic_operations = {
+        "activity_feedback",
         "session_generate",
         "curriculum_intake",
         "curriculum_generate",
@@ -37,7 +38,7 @@ def test_activity_generate_response_has_standard_shape():
     assert "activity_generate" in descriptors
     desc = descriptors["activity_generate"]
     assert desc.skill_name == "activity_generate"
-    assert "read_ui_component" in desc.allowed_tools
+    assert "read_ui_spec" in desc.allowed_tools
 
 
 def test_execution_trace_accepts_agent_trace_field():
@@ -71,7 +72,7 @@ def test_execution_trace_accepts_agent_trace_field():
     trace_with_agent = ExecutionTrace(
         request_id="def",
         operation_name="activity_generate",
-        allowed_tools=["read_ui_component"],
+        allowed_tools=["read_ui_spec"],
         prompt_preview=PromptPreview(system_prompt="sys", user_prompt="usr"),
         request_envelope=OperationEnvelope(
             input={},
@@ -80,8 +81,8 @@ def test_execution_trace_accepts_agent_trace_field():
             user_authored_context=UserAuthoredContext(),
         ),
         agent_trace={
-            "tool_calls": [{"tool": "read_ui_component", "args": {"path": "x.md"}, "output_length": 100}],
-            "component_docs_read": ["x.md"],
+            "tool_calls": [{"tool": "read_ui_spec", "args": {"path": "x.md"}, "output_length": 100}],
+            "ui_specs_read": ["x.md"],
             "repair_attempted": False,
             "repair_succeeded": False,
         },

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from learning_core.runtime.registry import SkillRegistry
+from learning_core.skills.activity_feedback.scripts.main import ActivityFeedbackSkill
 from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
 from learning_core.skills.copilot_chat.scripts.main import CopilotChatSkill
 from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
@@ -18,6 +19,10 @@ def build_skill_registry() -> SkillRegistry:
     registry.register(
         "activity_generate",
         ActivityGenerateSkill(),
+    )
+    registry.register(
+        "activity_feedback",
+        ActivityFeedbackSkill(),
     )
     registry.register(
         "session_generate",
