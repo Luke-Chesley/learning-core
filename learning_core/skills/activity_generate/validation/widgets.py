@@ -9,10 +9,7 @@ from learning_core.contracts.widgets import (
     widget_instruction_text,
     widget_surface_role,
 )
-from learning_core.skills.activity_generate.validation.chess import (
-    normalize_chess_widget,
-    validate_chess_widget,
-)
+from learning_core.skills.activity_generate.packs.base import Pack
 
 
 def _validate_widget_runtime_semantics(
@@ -23,8 +20,10 @@ def _validate_widget_runtime_semantics(
     widget: InteractiveWidgetPayload,
     first_interactive_index: int | None,
     total_interactive_count: int,
-) -> list[str]:
-    errors: list[str] = []
+) -> tuple[list[str], list[str]]:
+    """Validate widget runtime semantics. Returns (hard_errors, soft_warnings)."""
+    hard_errors: list[str] = []
+    soft_warnings: list[str] = []
     prompt = (component.prompt or "").strip()
     instruction_text = (widget_instruction_text(widget) or "").strip()
     caption = (widget_caption(widget) or "").strip()
@@ -38,52 +37,64 @@ def _validate_widget_runtime_semantics(
         and widget_surface_role(candidate.widget) == "primary"
     ]
 
+    # --- Hard errors: true semantic invalidity ---
+
     if not prompt and not instruction_text:
-        errors.append(
+        hard_errors.append(
             f'Interactive widget "{component.id}" must include learner-facing instructions in prompt or widget.instructionText.'
         )
 
     if accepts_input and component.required is False:
-        errors.append(
+        hard_errors.append(
             f'Interactive widget "{component.id}" accepts input and should remain required for coherent runtime behavior.'
         )
 
     if widget.feedback.mode == "explicit_submit" and widget.interaction.submissionMode == "immediate":
-        errors.append(
+        hard_errors.append(
             f'Interactive widget "{component.id}" uses explicit_submit feedback without an explicit_submit interaction mode.'
         )
 
-    if role == "primary" and first_interactive_index is not None and component_index != first_interactive_index:
-        errors.append(
-            f'Interactive widget "{component.id}" is marked primary but is not the first interactive component in the activity.'
-        )
-
-    if accepts_input and not primary_input_widgets:
-        errors.append("At least one learner-input widget must be marked primary in the activity composition.")
-
-    if role == "supporting" and accepts_input and total_interactive_count <= 1:
-        errors.append(
-            f'Interactive widget "{component.id}" is marked supporting but is the only interactive evidence in the activity.'
-        )
-
     if not widget_allows_reset(widget) and getattr(widget.interaction, "allowReset", False):
-        errors.append(
+        hard_errors.append(
             f'Interactive widget "{component.id}" leaves allowReset enabled while resetPolicy disallows reset.'
         )
 
     if caption and caption == prompt:
-        errors.append(
+        hard_errors.append(
             f'Interactive widget "{component.id}" should not duplicate the prompt verbatim in widget.caption.'
         )
 
-    return errors
+    # --- Soft warnings: composition/layout preferences ---
+
+    if role == "primary" and first_interactive_index is not None and component_index != first_interactive_index:
+        soft_warnings.append(
+            f'Interactive widget "{component.id}" is marked primary but is not the first interactive component in the activity.'
+        )
+
+    if accepts_input and not primary_input_widgets:
+        soft_warnings.append("At least one learner-input widget should be marked primary in the activity composition.")
+
+    if role == "supporting" and accepts_input and total_interactive_count <= 1:
+        soft_warnings.append(
+            f'Interactive widget "{component.id}" is marked supporting but is the only interactive evidence in the activity.'
+        )
+
+    return hard_errors, soft_warnings
 
 
 def normalize_and_validate_widget_activity(
     artifact: ActivityArtifact,
-) -> tuple[ActivityArtifact, list[str]]:
+    active_packs: list[Pack] | None = None,
+) -> tuple[ActivityArtifact, list[str], list[str]]:
+    """Validate and normalize widget activity.
+
+    Returns (normalized_artifact, hard_errors, soft_warnings).
+    Hard errors must be fixed. Soft warnings are included in repair prompts
+    but do not cause hard failure on their own.
+    """
     normalized = artifact.model_copy(deep=True)
-    errors: list[str] = []
+    hard_errors: list[str] = []
+    soft_warnings: list[str] = []
     interactive_indexes: list[int] = []
     for index, component in enumerate(normalized.components):
         if component.type == "interactive_widget":
@@ -98,23 +109,22 @@ def normalize_and_validate_widget_activity(
         if component.type != "interactive_widget":
             continue
 
-        errors.extend(
-            _validate_widget_runtime_semantics(
-                artifact=normalized,
-                component_index=index,
-                component=component,
-                widget=component.widget,
-                first_interactive_index=first_interactive_index,
-                total_interactive_count=len(interactive_indexes),
-            )
+        widget_hard, widget_soft = _validate_widget_runtime_semantics(
+            artifact=normalized,
+            component_index=index,
+            component=component,
+            widget=component.widget,
+            first_interactive_index=first_interactive_index,
+            total_interactive_count=len(interactive_indexes),
         )
+        hard_errors.extend(widget_hard)
+        soft_warnings.extend(widget_soft)
 
-        if component.widget.engineKind == "chess":
-            try:
-                component.widget = normalize_chess_widget(component.widget)
-            except ValueError as error:
-                errors.append(f'Interactive widget "{component.id}" has invalid chess state: {error}')
-                continue
-            errors.extend(validate_chess_widget(normalized, component, component.widget))
+    # Run pack-specific validators
+    for pack in (active_packs or []):
+        for validator in pack.validators():
+            normalized, pack_hard, pack_soft = validator.normalize_and_validate(normalized)
+            hard_errors.extend(pack_hard)
+            soft_warnings.extend(pack_soft)
 
-    return normalized, errors
+    return normalized, hard_errors, soft_warnings

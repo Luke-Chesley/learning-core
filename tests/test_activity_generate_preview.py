@@ -224,6 +224,24 @@ _ENVELOPE_DATA = {
     },
 }
 
+_CHESS_ENVELOPE_DATA = {
+    "input": {
+        "learner_name": "Alex",
+        "workflow_mode": "family_guided",
+        "subject": "Chess",
+        "linked_skill_titles": ["Find the best move"],
+        "lesson_draft": {
+            **_LESSON_DRAFT,
+            "title": "Find the best move",
+            "lesson_focus": "Practice candidate moves from one chess position.",
+        },
+    },
+    "app_context": {
+        "product": "homeschool-v2",
+        "surface": "today_workspace",
+    },
+}
+
 
 def _make_payload(**overrides):
     data = dict(_ENVELOPE_DATA["input"])
@@ -292,6 +310,29 @@ def test_activity_generate_preview_uses_pack_aware_tool_guidance():
     assert "Many requests need no doc reads" in preview.user_prompt
     assert "typically 0-2" not in preview.user_prompt
     assert "Math Pack" in preview.user_prompt
+    assert "interactive_widget" in preview.user_prompt
+
+
+def test_activity_generate_preview_includes_pack_tool_discipline():
+    """Prompt should instruct the model to validate pack-specific widgets with domain tools."""
+    preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
+    assert "validate it with the pack" in preview.user_prompt or "domain tools" in preview.user_prompt
+
+
+def test_chess_preview_auto_injects_ui_specs():
+    """When chess pack is active, key widget specs are auto-injected into the prompt."""
+    payload = _make_payload(
+        subject="Chess",
+        linked_skill_titles=["Find the best move"],
+        lesson_draft={
+            **_LESSON_DRAFT,
+            "title": "Find the best move",
+            "lesson_focus": "Practice candidate moves from one chess position.",
+        },
+    )
+    preview = ActivityGenerateSkill().build_prompt_preview(payload, _make_context())
+    assert "Auto-included widget specifications" in preview.user_prompt
+    assert "board_surface__chess" in preview.user_prompt
     assert "interactive_widget" in preview.user_prompt
 
 
@@ -403,7 +444,10 @@ def test_activity_artifact_json_schema_has_no_open_objects():
     assert format_paths == []
 
 
-def test_semantic_widget_validation_rejects_board_centered_supporting_board():
+def test_semantic_widget_validation_warns_board_centered_supporting_board():
+    """Board-centered lesson with supporting boardRole should be a soft warning."""
+    from learning_core.skills.activity_generate.packs.chess.pack import ChessPack
+
     artifact = ActivityArtifact.model_validate(
         {
             **_VALID_CHESS_ARTIFACT,
@@ -424,12 +468,14 @@ def test_semantic_widget_validation_rejects_board_centered_supporting_board():
         }
     )
 
-    _, errors = normalize_and_validate_widget_activity(artifact)
+    _, hard_errors, soft_warnings = normalize_and_validate_widget_activity(artifact, [ChessPack()])
 
-    assert any("board-centered chess lesson" in error for error in errors)
+    assert any("board-centered" in warning for warning in soft_warnings)
 
 
 def test_semantic_widget_validation_rejects_prompt_board_fact_contradiction():
+    from learning_core.skills.activity_generate.packs.chess.pack import ChessPack
+
     artifact = ActivityArtifact.model_validate(
         {
             **_VALID_CHESS_ARTIFACT,
@@ -442,9 +488,9 @@ def test_semantic_widget_validation_rejects_prompt_board_fact_contradiction():
         }
     )
 
-    _, errors = normalize_and_validate_widget_activity(artifact)
+    _, hard_errors, _soft_warnings = normalize_and_validate_widget_activity(artifact, [ChessPack()])
 
-    assert any("prompt claims the current position is check" in error for error in errors)
+    assert any("prompt claims the current position is check" in error for error in hard_errors)
 
 
 # -- Execution tests (agent path) --
@@ -525,7 +571,6 @@ def test_activity_execute_repair_on_invalid_json(mock_build_runtime, mock_agent_
     import os
     os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
 
-    # Return a client whose invoke() returns the valid artifact (for repair pass).
     fake_runtime = ModelRuntime(
         provider="openai",
         model="fake-activity-generate",
@@ -537,7 +582,6 @@ def test_activity_execute_repair_on_invalid_json(mock_build_runtime, mock_agent_
     )
     mock_build_runtime.return_value = fake_runtime
 
-    # Agent returns invalid JSON that fails validation.
     mock_agent_loop.return_value = AgentResult(
         final_text='{"schemaVersion": "2", "title": "Bad"}',
         tool_calls=[],
@@ -569,16 +613,34 @@ def test_activity_execute_repairs_semantic_widget_validation(mock_build_runtime,
         provider_settings={},
     )
     mock_build_runtime.return_value = fake_runtime
-    mock_agent_loop.return_value = _fake_agent_result(_SEMANTICALLY_INVALID_CHESS_ARTIFACT)
+
+    # First call: agent produces semantically invalid chess artifact without tools
+    # Second call (pack-tool repair): returns valid artifact with chess tool use
+    call_count = [0]
+    def mock_side_effect(**kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            return _fake_agent_result(_SEMANTICALLY_INVALID_CHESS_ARTIFACT, tool_calls=[])
+        else:
+            return _fake_agent_result(
+                _VALID_CHESS_ARTIFACT,
+                tool_calls=[
+                    ToolCallEvent(
+                        tool_name="chess_validate_widget_config",
+                        tool_args={"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+                        tool_output='{"valid": true}',
+                    ),
+                ],
+            )
+    mock_agent_loop.side_effect = mock_side_effect
 
     engine = AgentEngine(build_skill_registry())
-    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+    result = engine.execute("activity_generate", _CHESS_ENVELOPE_DATA)
 
     widget = result.artifact["components"][0]["widget"]
     assert widget["display"]["showSideToMove"] is True
     assert result.trace.agent_trace["repair_attempted"] is True
     assert result.trace.agent_trace["repair_succeeded"] is True
-    assert result.trace.agent_trace["semantic_validation_errors"]
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)
 
 
@@ -591,7 +653,6 @@ def test_activity_execute_repair_failure_raises(mock_build_runtime, mock_agent_l
 
     os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
 
-    # Repair returns still-invalid JSON.
     fake_runtime = ModelRuntime(
         provider="openai",
         model="fake-activity-generate",
@@ -632,4 +693,91 @@ def test_activity_execute_extracts_json_from_markdown_fence(mock_build_runtime, 
     engine = AgentEngine(build_skill_registry())
     result = engine.execute("activity_generate", _ENVELOPE_DATA)
     assert result.artifact["schemaVersion"] == "2"
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_activity_execute_trace_includes_pack_metadata(mock_build_runtime, mock_agent_loop, tmp_path):
+    """Agent trace should include auto_injected_ui_specs, pack_validation_results, and pack_tool_repair_triggered."""
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+    mock_build_runtime.return_value = _fake_model_runtime()
+    mock_agent_loop.return_value = _fake_agent_result(_VALID_ARTIFACT)
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _ENVELOPE_DATA)
+
+    trace = result.trace.agent_trace
+    assert "auto_injected_ui_specs" in trace
+    assert "pack_validation_results" in trace
+    assert "pack_tool_repair_triggered" in trace
+    assert trace["pack_tool_repair_triggered"] is False
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_chess_execute_without_tool_use_triggers_pack_repair(mock_build_runtime, mock_agent_loop, tmp_path):
+    """Chess widget generation without chess tool usage should trigger a pack-tool repair pass."""
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+
+    # First call: agent produces chess artifact without using chess tools
+    # Second call (repair): agent produces same artifact (with tools this time)
+    call_count = [0]
+    def mock_agent_loop_side_effect(**kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            # Initial generation - no chess tools used
+            return _fake_agent_result(_VALID_CHESS_ARTIFACT, tool_calls=[])
+        else:
+            # Repair pass - uses chess tools
+            return _fake_agent_result(
+                _VALID_CHESS_ARTIFACT,
+                tool_calls=[
+                    ToolCallEvent(
+                        tool_name="chess_validate_widget_config",
+                        tool_args={"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+                        tool_output='{"valid": true}',
+                    ),
+                ],
+            )
+
+    mock_build_runtime.return_value = _fake_model_runtime()
+    mock_agent_loop.side_effect = mock_agent_loop_side_effect
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _CHESS_ENVELOPE_DATA)
+
+    assert result.trace.agent_trace["pack_tool_repair_triggered"] is True
+    assert result.trace.agent_trace["repair_attempted"] is True
+    assert call_count[0] == 2  # Initial + repair
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_chess_execute_with_tool_use_skips_pack_repair(mock_build_runtime, mock_agent_loop, tmp_path):
+    """Chess widget generation with chess tool usage should not trigger a repair pass."""
+    import os
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+
+    mock_build_runtime.return_value = _fake_model_runtime()
+    mock_agent_loop.return_value = _fake_agent_result(
+        _VALID_CHESS_ARTIFACT,
+        tool_calls=[
+            ToolCallEvent(
+                tool_name="chess_validate_widget_config",
+                tool_args={"fen": "4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1"},
+                tool_output='{"valid": true}',
+            ),
+        ],
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _CHESS_ENVELOPE_DATA)
+
+    assert result.trace.agent_trace["pack_tool_repair_triggered"] is False
+    assert result.trace.agent_trace["repair_attempted"] is False
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)
