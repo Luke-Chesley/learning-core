@@ -1,10 +1,30 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Protocol, runtime_checkable
 
 from langchain_core.tools import BaseTool
 
 from learning_core.contracts.activity import ActivityArtifact
+from learning_core.runtime.context import RuntimeContext
+from learning_core.runtime.providers import ModelRuntime
+from learning_core.skills.activity_generate.scripts.schemas import ActivityGenerationInput
+
+
+@dataclass(frozen=True)
+class PackPlanningResult:
+    """Pack-local planning output that can feed final composition and validation."""
+
+    pack_name: str
+    prompt_sections: tuple[str, ...] = ()
+    structured_data: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PackValidationContext:
+    """Runtime validation context, including any pack planning outputs."""
+
+    planning_result: PackPlanningResult | None = None
 
 
 @runtime_checkable
@@ -19,6 +39,19 @@ class Pack(Protocol):
 
     def prompt_sections(self) -> list[str]:
         """Return markdown doc sections to append to the user prompt when this pack is active."""
+        ...
+
+    def needs_planning(self, payload: ActivityGenerationInput, context: RuntimeContext) -> bool:
+        """Return whether this pack should run a pack-local planning phase for the request."""
+        ...
+
+    def run_planning_phase(
+        self,
+        payload: ActivityGenerationInput,
+        context: RuntimeContext,
+        model_runtime: ModelRuntime,
+    ) -> PackPlanningResult | None:
+        """Run an optional pack-local planning phase before final artifact composition."""
         ...
 
     def tools(self) -> list[BaseTool]:
@@ -60,6 +93,7 @@ class PackValidator:
     def normalize_and_validate(
         self,
         artifact: ActivityArtifact,
+        validation_context: PackValidationContext | None = None,
     ) -> tuple[ActivityArtifact, list[str], list[str]]:
         """Validate and normalize an artifact.
 

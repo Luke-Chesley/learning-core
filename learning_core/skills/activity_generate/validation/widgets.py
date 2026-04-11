@@ -9,7 +9,7 @@ from learning_core.contracts.widgets import (
     widget_instruction_text,
     widget_surface_role,
 )
-from learning_core.skills.activity_generate.packs.base import Pack
+from learning_core.skills.activity_generate.packs.base import Pack, PackValidationContext
 
 
 def _validate_widget_runtime_semantics(
@@ -85,6 +85,7 @@ def _validate_widget_runtime_semantics(
 def normalize_and_validate_widget_activity(
     artifact: ActivityArtifact,
     active_packs: list[Pack] | None = None,
+    pack_validation_contexts: dict[str, PackValidationContext] | None = None,
 ) -> tuple[ActivityArtifact, list[str], list[str]]:
     """Validate and normalize widget activity.
 
@@ -122,8 +123,9 @@ def normalize_and_validate_widget_activity(
 
     # Run pack-specific validators
     for pack in (active_packs or []):
+        validation_context = (pack_validation_contexts or {}).get(pack.name)
         for validator in pack.validators():
-            normalized, pack_hard, pack_soft = validator.normalize_and_validate(normalized)
+            normalized, pack_hard, pack_soft = validator.normalize_and_validate(normalized, validation_context)
             hard_errors.extend(pack_hard)
             soft_warnings.extend(pack_soft)
 

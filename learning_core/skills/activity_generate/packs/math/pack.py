@@ -5,8 +5,11 @@ from pathlib import Path
 from langchain_core.tools import BaseTool
 
 from learning_core.contracts.activity import ActivityArtifact
-from learning_core.skills.activity_generate.packs.base import PackValidator
+from learning_core.runtime.context import RuntimeContext
+from learning_core.runtime.providers import ModelRuntime
+from learning_core.skills.activity_generate.packs.base import PackPlanningResult, PackValidator
 from learning_core.skills.activity_generate.packs.math.tools import MATH_TOOLS
+from learning_core.skills.activity_generate.scripts.schemas import ActivityGenerationInput
 
 _PACK_DIR = Path(__file__).resolve().parent
 _DOC_FILENAMES = ("pack.md", "patterns.md", "examples.md")
@@ -50,6 +53,17 @@ class MathPack:
         for filename in _DOC_FILENAMES:
             sections.append((_PACK_DIR / filename).read_text(encoding="utf-8").strip())
         return sections
+
+    def needs_planning(self, payload: ActivityGenerationInput, context: RuntimeContext) -> bool:
+        return False
+
+    def run_planning_phase(
+        self,
+        payload: ActivityGenerationInput,
+        context: RuntimeContext,
+        model_runtime: ModelRuntime,
+    ) -> PackPlanningResult | None:
+        return None
 
     def tools(self) -> list[BaseTool]:
         return list(MATH_TOOLS)

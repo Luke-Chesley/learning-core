@@ -103,6 +103,7 @@ def test_all_packs_satisfy_protocol():
         assert isinstance(pack.name, str)
         assert isinstance(pack.keywords, tuple)
         assert isinstance(pack.prompt_sections(), list)
+        assert isinstance(pack.needs_planning(_make_payload(), _make_context()), bool)
         assert isinstance(pack.tools(), list)
 
 
@@ -114,6 +115,9 @@ def test_chess_pack_exposes_tools():
         "chess_describe_position",
         "chess_apply_move",
         "chess_normalize_move",
+        "chess_build_example_set",
+        "chess_validate_example_set",
+        "chess_validate_final_activity",
         "chess_validate_widget_config",
     }
 
@@ -164,6 +168,7 @@ def test_chess_request_gets_chess_tools(mock_build_runtime, mock_agent_loop, tmp
     assert "read_ui_spec" in active
     assert "chess_legal_moves" in active
     assert "chess_apply_move" in active
+    assert "chess_build_example_set" in active
     assert result.trace.agent_trace["included_packs"] == ["chess"]
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)
 

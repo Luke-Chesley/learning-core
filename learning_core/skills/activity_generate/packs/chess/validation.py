@@ -7,7 +7,8 @@ import chess
 from learning_core.contracts.activity import ActivityArtifact, InteractiveWidgetComponent
 from learning_core.contracts.widgets import ChessBoardWidget
 from learning_core.domain.chess_engine import describe_position, normalize_move, validate_fen
-from learning_core.skills.activity_generate.packs.base import PackValidator
+from learning_core.skills.activity_generate.packs.base import PackValidationContext, PackValidator
+from learning_core.skills.activity_generate.packs.chess.contracts import ChessBuiltExampleSet
 
 _WHITE_TO_MOVE_PATTERN = re.compile(r"\bwhite\s+to\s+move\b", re.IGNORECASE)
 _BLACK_TO_MOVE_PATTERN = re.compile(r"\bblack\s+to\s+move\b", re.IGNORECASE)
@@ -82,7 +83,6 @@ def validate_chess_widget(
     component: InteractiveWidgetComponent,
     widget: ChessBoardWidget,
 ) -> tuple[list[str], list[str]]:
-    """Validate a chess widget. Returns (hard_errors, soft_warnings)."""
     hard_errors: list[str] = []
     soft_warnings: list[str] = []
     prompt = _all_visible_text(component, widget)
@@ -91,12 +91,8 @@ def validate_chess_widget(
     occupied_squares = _occupied_squares(widget.state.fen)
     legal_targets_by_source = _legal_targets_by_source(widget.state.fen)
     side_to_move = position["sideToMove"]
-    expected_move_sources = {normalized_move[:2] for normalized_move in widget.evaluation.expectedMoves}
-    expected_move_targets = {
-        normalized_move[2:4] for normalized_move in widget.evaluation.expectedMoves if len(normalized_move) >= 4
-    }
-
-    # --- Hard semantic errors ---
+    expected_move_sources = {move[:2] for move in widget.evaluation.expectedMoves}
+    expected_move_targets = {move[2:4] for move in widget.evaluation.expectedMoves if len(move) >= 4}
 
     if widget.state.initialFen != widget.state.fen:
         hard_errors.append(
@@ -140,8 +136,6 @@ def validate_chess_widget(
                 f'Interactive widget "{component.id}" has an arrow starting from empty square "{arrow.fromSquare}".'
             )
 
-    # --- Soft warnings (composition/layout preferences) ---
-
     if widget.interaction.mode == "move_input" and widget.display.boardRole != "primary":
         soft_warnings.append(
             f'Interactive widget "{component.id}" has move input but display.boardRole is not "primary".'
@@ -171,7 +165,11 @@ def validate_chess_widget(
     for arrow in widget.annotations.arrows:
         if arrow.fromSquare in occupied_squares:
             legal_targets = legal_targets_by_source.get(arrow.fromSquare, set())
-            if arrow.toSquare not in legal_targets and arrow.toSquare not in expected_move_targets and arrow.toSquare not in occupied_squares:
+            if (
+                arrow.toSquare not in legal_targets
+                and arrow.toSquare not in expected_move_targets
+                and arrow.toSquare not in occupied_squares
+            ):
                 soft_warnings.append(
                     f'Interactive widget "{component.id}" has an arrow to "{arrow.toSquare}" that is not a legal target, occupied square, or expected-move target.'
                 )
@@ -180,30 +178,92 @@ def validate_chess_widget(
 
 
 class ChessValidator(PackValidator):
-    """Chess-specific semantic validation for activity artifacts."""
+    def _validate_planned_examples(
+        self,
+        artifact: ActivityArtifact,
+        validation_context: PackValidationContext | None,
+    ) -> tuple[list[str], list[str]]:
+        if validation_context is None or validation_context.planning_result is None:
+            return [], []
+
+        structured_data = validation_context.planning_result.structured_data
+        raw_example_set = structured_data.get("validated_examples") if isinstance(structured_data, dict) else None
+        if raw_example_set is None:
+            return [], []
+
+        try:
+            example_set = ChessBuiltExampleSet.model_validate(raw_example_set)
+        except Exception as error:
+            return [f"Validated chess planning context is invalid: {error}"], []
+
+        actual_components = {
+            component.id: component
+            for component in artifact.components
+            if component.type == "interactive_widget" and component.widget.engineKind == "chess"
+        }
+        hard_errors: list[str] = []
+        soft_warnings: list[str] = []
+
+        expected_component_ids = {example.componentId for example in example_set.examples}
+        for example in example_set.examples:
+            component = actual_components.get(example.componentId)
+            if component is None:
+                hard_errors.append(
+                    f'Validated chess example "{example.componentId}" is missing from the final activity.'
+                )
+                continue
+
+            widget = component.widget.model_dump(mode="json", exclude_none=True)
+            expected_widget = example.widget
+            if widget["state"]["fen"] != expected_widget["state"]["fen"]:
+                hard_errors.append(
+                    f'Interactive widget "{component.id}" changed FEN after chess example validation.'
+                )
+            if widget["state"]["initialFen"] != expected_widget["state"]["initialFen"]:
+                hard_errors.append(
+                    f'Interactive widget "{component.id}" changed initialFen after chess example validation.'
+                )
+            if widget["interaction"]["mode"] != expected_widget["interaction"]["mode"]:
+                hard_errors.append(
+                    f'Interactive widget "{component.id}" changed interaction.mode after chess example validation.'
+                )
+            if widget["evaluation"]["expectedMoves"] != expected_widget["evaluation"]["expectedMoves"]:
+                hard_errors.append(
+                    f'Interactive widget "{component.id}" changed engine-derived expectedMoves after validation.'
+                )
+
+        extra_widget_ids = sorted(set(actual_components) - expected_component_ids)
+        if extra_widget_ids:
+            hard_errors.append(
+                "Final activity introduced extra chess widgets outside the validated example set: "
+                + ", ".join(extra_widget_ids)
+            )
+
+        return hard_errors, soft_warnings
 
     def normalize_and_validate(
         self,
         artifact: ActivityArtifact,
+        validation_context: PackValidationContext | None = None,
     ) -> tuple[ActivityArtifact, list[str], list[str]]:
         normalized = artifact.model_copy(deep=True)
         hard_errors: list[str] = []
         soft_warnings: list[str] = []
 
         for component in normalized.components:
-            if component.type != "interactive_widget":
+            if component.type != "interactive_widget" or component.widget.engineKind != "chess":
                 continue
-            if component.widget.engineKind != "chess":
-                continue
-
             try:
                 component.widget = normalize_chess_widget(component.widget)
             except ValueError as error:
                 hard_errors.append(f'Interactive widget "{component.id}" has invalid chess state: {error}')
                 continue
-
             widget_hard, widget_soft = validate_chess_widget(normalized, component, component.widget)
             hard_errors.extend(widget_hard)
             soft_warnings.extend(widget_soft)
+
+        planned_hard, planned_soft = self._validate_planned_examples(normalized, validation_context)
+        hard_errors.extend(planned_hard)
+        soft_warnings.extend(planned_soft)
 
         return normalized, hard_errors, soft_warnings

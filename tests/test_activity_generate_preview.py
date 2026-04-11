@@ -242,6 +242,24 @@ _CHESS_ENVELOPE_DATA = {
     },
 }
 
+_CHESS_ESCAPE_ENVELOPE_DATA = {
+    "input": {
+        "learner_name": "Alex",
+        "workflow_mode": "family_guided",
+        "subject": "Chess",
+        "linked_skill_titles": ["Escape check"],
+        "lesson_draft": {
+            **_LESSON_DRAFT,
+            "title": "Escape check with move, block, or capture",
+            "lesson_focus": "Practice how to get out of check by move, block, or capture from the board.",
+        },
+    },
+    "app_context": {
+        "product": "homeschool-v2",
+        "surface": "today_workspace",
+    },
+}
+
 
 def _make_payload(**overrides):
     data = dict(_ENVELOPE_DATA["input"])
@@ -258,11 +276,11 @@ def _make_context():
     )
 
 
-def _fake_model_runtime():
+def _fake_model_runtime(repair_content: str = "{}"):
     return ModelRuntime(
         provider="openai",
         model="fake-activity-generate",
-        client=_FakeClient(),
+        client=_FakeClient(repair_content),
         temperature=0.2,
         max_tokens=4096,
         max_tokens_source="test",
@@ -286,6 +304,45 @@ def _fake_agent_result(artifact_dict: dict, tool_calls: list[ToolCallEvent] | No
         tool_calls=tool_calls or [],
         messages=[],
     )
+
+
+def _artifact_from_validated_examples(example_set: dict) -> dict:
+    components = []
+    for index, example in enumerate(example_set["examples"]):
+        widget = json.loads(json.dumps(example["widget"]))
+        if index > 0:
+            widget["display"]["boardRole"] = "supporting"
+        components.append(
+            {
+                "type": "interactive_widget",
+                "id": example["componentId"],
+                "prompt": f"{example['sideToMove'].title()} to move. Use the board to practice the {example['conceptTarget']} response.",
+                "required": True,
+                "widget": widget,
+            }
+        )
+    return {
+        "schemaVersion": "2",
+        "title": "Escape check practice",
+        "purpose": "Compose around validated chess examples.",
+        "activityKind": "guided_practice",
+        "linkedObjectiveIds": [],
+        "linkedSkillTitles": ["escape check"],
+        "estimatedMinutes": 15,
+        "interactionMode": "digital",
+        "components": components,
+        "completionRules": {"strategy": "all_interactive_components"},
+        "evidenceSchema": {
+            "captureKinds": ["answer_response"],
+            "requiresReview": False,
+            "autoScorable": True,
+        },
+        "scoringModel": {
+            "mode": "correctness_based",
+            "masteryThreshold": 0.8,
+            "reviewThreshold": 0.6,
+        },
+    }
 
 
 # -- Preview tests --
@@ -780,4 +837,29 @@ def test_chess_execute_with_tool_use_skips_pack_repair(mock_build_runtime, mock_
 
     assert result.trace.agent_trace["pack_tool_repair_triggered"] is False
     assert result.trace.agent_trace["repair_attempted"] is False
+    os.environ.pop("LEARNING_CORE_LOG_DIR", None)
+
+
+@patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
+@patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
+def test_escape_check_execution_uses_pack_planning_context(mock_build_runtime, mock_agent_loop, tmp_path):
+    import os
+    from learning_core.skills.activity_generate.packs.chess.pack import ChessPack
+
+    os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
+    payload = ActivityGenerationInput.model_validate(_CHESS_ESCAPE_ENVELOPE_DATA["input"])
+    seed_runtime = _fake_model_runtime()
+    planning_result = ChessPack().run_planning_phase(payload, _make_context(), seed_runtime)
+    assert planning_result is not None
+
+    artifact = _artifact_from_validated_examples(planning_result.structured_data["validated_examples"])
+    mock_build_runtime.return_value = _fake_model_runtime(json.dumps(artifact))
+    mock_agent_loop.return_value = _fake_agent_result(artifact, tool_calls=[])
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("activity_generate", _CHESS_ESCAPE_ENVELOPE_DATA)
+
+    assert result.trace.agent_trace["pack_planning_results"]["chess"]["validated_examples"]["examples"]
+    assert result.trace.agent_trace["pack_tool_repair_triggered"] is False
+    assert result.trace.agent_trace["pack_validation_results"]["chess"]["planning_applied"] is True
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)

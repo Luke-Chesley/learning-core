@@ -18,6 +18,7 @@ from learning_core.runtime.errors import ContractValidationError, ProviderExecut
 from learning_core.runtime.providers import build_model_runtime
 from learning_core.runtime.skill import SkillDefinition, SkillExecutionResult
 from learning_core.skills.activity_generate.packs import ALL_PACKS, Pack
+from learning_core.skills.activity_generate.packs.base import PackPlanningResult, PackValidationContext
 from learning_core.skills.activity_generate.scripts.policy import ACTIVITY_GENERATE_POLICY
 from learning_core.skills.activity_generate.scripts.schemas import ActivityArtifact, ActivityGenerationInput
 from learning_core.skills.activity_generate.scripts.tooling import read_ui_spec
@@ -136,6 +137,7 @@ def _build_user_prompt(
     payload: ActivityGenerationInput,
     context: RuntimeContext,
     pack_selection: PackSelection,
+    planning_results: dict[str, PackPlanningResult] | None = None,
 ) -> str:
     lesson = payload.lesson_draft
     lines: list[str] = []
@@ -279,10 +281,31 @@ def _build_user_prompt(
             lines.append("")
             lines.append(_read_ui_spec_file(spec_path))
 
+    if planning_results:
+        planning_sections = [
+            section
+            for result in planning_results.values()
+            for section in result.prompt_sections
+            if section.strip()
+        ]
+        if planning_sections:
+            lines.append("")
+            lines.append("---")
+            lines.append("")
+            lines.append("## Pre-built pack planning context")
+            lines.append("")
+            lines.append(
+                "Some active packs have already planned and validated domain examples before final composition. "
+                "Treat those examples as fixed inputs."
+            )
+            for section in planning_sections:
+                lines.append("")
+                lines.append(section)
+
     lines.append("")
     lines.append("---")
     lines.append("")
-    lines.append(
+    generation_instruction = (
         "Generate a single ActivitySpec JSON object. "
         "You already have the base UI registry, and relevant subject packs may also be included. "
         "Active subject packs may already include core widget docs above. "
@@ -296,9 +319,18 @@ def _build_user_prompt(
         "Use as many components as the activity genuinely needs and no more. "
         "Do not use components or widgets just because they exist. "
         "Escalate to interactive widgets only when they materially improve the learning interaction. "
+    )
+    if planning_results:
+        generation_instruction += (
+            "When pre-built pack examples are provided, compose the activity around those validated examples. "
+            "Preserve the provided example ids and validated engine-backed fields exactly. "
+            "Do not invent new raw domain states or mutate validated engine facts unless the planning context explicitly allows it. "
+        )
+    generation_instruction += (
         "Your final output must be exactly one JSON object matching the strict ActivityArtifact contract. "
         "Do not include any text outside the JSON."
     )
+    lines.append(generation_instruction)
 
     return "\n".join(lines)
 
@@ -306,11 +338,12 @@ def _build_user_prompt(
 def _build_prompt_preview(
     payload: ActivityGenerationInput,
     context: RuntimeContext,
+    planning_results: dict[str, PackPlanningResult] | None = None,
 ) -> tuple[PromptPreview, PackSelection]:
     pack_selection = _select_packs(payload)
     preview = PromptPreview(
         system_prompt=_read_skill_markdown(),
-        user_prompt=_build_user_prompt(payload, context, pack_selection),
+        user_prompt=_build_user_prompt(payload, context, pack_selection, planning_results),
     )
     return preview, pack_selection
 
@@ -357,10 +390,28 @@ def _get_active_packs(pack_selection: PackSelection) -> list[Pack]:
     return [_PACKS_BY_NAME[name] for name in pack_selection.included_packs]
 
 
+def _run_pack_planning_phases(
+    *,
+    payload: ActivityGenerationInput,
+    context: RuntimeContext,
+    active_packs: list[Pack],
+    model_runtime,
+) -> dict[str, PackPlanningResult]:
+    planning_results: dict[str, PackPlanningResult] = {}
+    for pack in active_packs:
+        if not pack.needs_planning(payload, context):
+            continue
+        result = pack.run_planning_phase(payload, context, model_runtime)
+        if result is not None:
+            planning_results[pack.name] = result
+    return planning_results
+
+
 def _check_pack_tool_usage(
     artifact: ActivityArtifact,
     pack_selection: PackSelection,
     tool_names_used: set[str],
+    planning_results: dict[str, PackPlanningResult] | None = None,
 ) -> list[tuple[Pack, list[str]]]:
     """Check if pack-specific widgets were generated without required pack tool usage.
 
@@ -368,6 +419,8 @@ def _check_pack_tool_usage(
     """
     missing: list[tuple[Pack, list[str]]] = []
     for pack_name in pack_selection.included_packs:
+        if planning_results and pack_name in planning_results:
+            continue
         pack = _PACKS_BY_NAME[pack_name]
         pack_widget_ids = pack.detect_pack_widgets(artifact)
         if not pack_widget_ids:
@@ -418,7 +471,7 @@ class ActivityGenerateSkill(SkillDefinition):
         return preview
 
     def execute(self, engine, payload: ActivityGenerationInput, context: RuntimeContext) -> SkillExecutionResult:
-        preview, pack_selection = _build_prompt_preview(payload, context)
+        pack_selection = _select_packs(payload)
         active_packs = _get_active_packs(pack_selection)
         auto_injected_specs = _collect_auto_injected_ui_specs(pack_selection)
 
@@ -427,6 +480,36 @@ class ActivityGenerateSkill(SkillDefinition):
             task_kind=self.policy.task_kind,
             temperature=self.policy.temperature,
             max_tokens=self.policy.max_tokens,
+        )
+
+        try:
+            planning_results = _run_pack_planning_phases(
+                payload=payload,
+                context=context,
+                active_packs=active_packs,
+                model_runtime=model_runtime,
+            )
+        except Exception as error:
+            write_provider_exchange_log(
+                request={
+                    "request_id": context.request_id,
+                    "operation_name": context.operation_name,
+                    "status": "pack_planning_error",
+                    "included_packs": list(pack_selection.included_packs),
+                    "pack_selection_reason": pack_selection.pack_selection_reason,
+                    "subject_inference": pack_selection.subject_inference,
+                },
+                response={
+                    "status": "pack_planning_error",
+                    "error_type": error.__class__.__name__,
+                    "error": str(error),
+                },
+            )
+            raise ProviderExecutionError(str(error)) from error
+
+        preview = PromptPreview(
+            system_prompt=_read_skill_markdown(),
+            user_prompt=_build_user_prompt(payload, context, pack_selection, planning_results),
         )
 
         provider_request = engine._provider_request_payload(
@@ -456,6 +539,9 @@ class ActivityGenerateSkill(SkillDefinition):
                     "status": "error",
                     "error_type": error.__class__.__name__,
                     "error": str(error),
+                    "pack_planning_results": {
+                        name: result.structured_data for name, result in planning_results.items()
+                    },
                     "included_packs": list(pack_selection.included_packs),
                     "pack_selection_reason": pack_selection.pack_selection_reason,
                     "subject_inference": pack_selection.subject_inference,
@@ -530,7 +616,12 @@ class ActivityGenerateSkill(SkillDefinition):
                 ) from repair_error
 
         # Check if pack-specific widgets were emitted without required tool usage
-        missing_pack_tool_usage = _check_pack_tool_usage(artifact, pack_selection, tool_names_used)
+        missing_pack_tool_usage = _check_pack_tool_usage(
+            artifact,
+            pack_selection,
+            tool_names_used,
+            planning_results,
+        )
         if missing_pack_tool_usage:
             pack_tool_repair_triggered = True
             repair_attempted = True
@@ -588,7 +679,15 @@ class ActivityGenerateSkill(SkillDefinition):
                 pass
 
         # Run semantic validation (base + pack validators)
-        artifact, hard_errors, soft_warnings = normalize_and_validate_widget_activity(artifact, active_packs)
+        validation_contexts = {
+            pack_name: PackValidationContext(planning_result=result)
+            for pack_name, result in planning_results.items()
+        }
+        artifact, hard_errors, soft_warnings = normalize_and_validate_widget_activity(
+            artifact,
+            active_packs,
+            validation_contexts,
+        )
         semantic_validation_hard_errors = list(hard_errors)
         semantic_validation_soft_warnings = list(soft_warnings)
 
@@ -631,7 +730,11 @@ class ActivityGenerateSkill(SkillDefinition):
                 repair_json = _extract_json(str(repair_text))
                 repaired = json.loads(repair_json)
                 artifact = ActivityArtifact.model_validate(repaired)
-                artifact, hard_errors, soft_warnings = normalize_and_validate_widget_activity(artifact, active_packs)
+                artifact, hard_errors, soft_warnings = normalize_and_validate_widget_activity(
+                    artifact,
+                    active_packs,
+                    validation_contexts,
+                )
                 if hard_errors:
                     raise ContractValidationError("; ".join(hard_errors))
                 # Soft warnings after repair are acceptable
@@ -665,11 +768,15 @@ class ActivityGenerateSkill(SkillDefinition):
             pack_widget_ids = pack.detect_pack_widgets(artifact)
             required_tools = pack.required_tool_names()
             used_required = tool_names_used.intersection(required_tools) if required_tools else set()
+            planning_applied = pack.name in planning_results
             pack_validation_results[pack.name] = {
                 "widget_ids": pack_widget_ids,
                 "required_tools": required_tools,
                 "tools_used": sorted(used_required),
-                "tool_use_satisfied": bool(used_required) if pack_widget_ids and required_tools else True,
+                "planning_applied": planning_applied,
+                "tool_use_satisfied": True
+                if planning_applied
+                else bool(used_required) if pack_widget_ids and required_tools else True,
             }
 
         write_provider_exchange_log(
@@ -687,6 +794,9 @@ class ActivityGenerateSkill(SkillDefinition):
                 "semantic_validation_hard_errors": semantic_validation_hard_errors,
                 "semantic_validation_soft_warnings": semantic_validation_soft_warnings,
                 "included_packs": list(pack_selection.included_packs),
+                "pack_planning_results": {
+                    name: result.structured_data for name, result in planning_results.items()
+                },
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,
                 "pack_validation_results": pack_validation_results,
@@ -718,6 +828,9 @@ class ActivityGenerateSkill(SkillDefinition):
                 "auto_injected_ui_specs": auto_injected_specs,
                 "active_tools": active_tool_names,
                 "included_packs": list(pack_selection.included_packs),
+                "pack_planning_results": {
+                    name: result.structured_data for name, result in planning_results.items()
+                },
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,
                 "repair_attempted": repair_attempted,

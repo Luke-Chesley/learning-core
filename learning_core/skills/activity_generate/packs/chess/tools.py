@@ -2,11 +2,20 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Optional
+from typing import Any, Optional
 
+import chess as chess_lib
 from langchain_core.tools import tool
 
+from learning_core.contracts.activity import ActivityArtifact
 from learning_core.domain.chess_engine import apply_move, describe_position, legal_moves, normalize_move, validate_fen
+from learning_core.skills.activity_generate.packs.chess.contracts import ChessBuiltExampleSet, ChessExamplePlan
+from learning_core.skills.activity_generate.packs.chess.planning import (
+    build_chess_example_set as build_engine_backed_example_set,
+    render_chess_example_summary,
+    validate_chess_artifact_against_example_set as validate_engine_backed_artifact,
+    validate_chess_example_set as validate_engine_backed_example_set,
+)
 
 _WHITE_TO_MOVE = re.compile(r"\bwhite\s+to\s+move\b", re.IGNORECASE)
 _BLACK_TO_MOVE = re.compile(r"\bblack\s+to\s+move\b", re.IGNORECASE)
@@ -20,7 +29,7 @@ def _serialize(payload: object) -> str:
 
 @tool
 def chess_legal_moves(fen: str) -> str:
-    """Return normalized legal chess moves for a FEN position."""
+    """Return normalized legal moves for a chess position."""
     try:
         return _serialize({"legalMoves": legal_moves(fen)})
     except ValueError as error:
@@ -29,7 +38,7 @@ def chess_legal_moves(fen: str) -> str:
 
 @tool
 def chess_describe_position(fen: str) -> str:
-    """Return a compact chess position summary for a FEN position."""
+    """Return engine facts for a chess position."""
     try:
         return _serialize(describe_position(fen))
     except ValueError as error:
@@ -38,7 +47,7 @@ def chess_describe_position(fen: str) -> str:
 
 @tool
 def chess_apply_move(fen: str, move: str) -> str:
-    """Apply a legal move to a FEN position and return the resulting state."""
+    """Apply a legal move to a chess position and return the resulting state."""
     try:
         return _serialize(apply_move(fen, move))
     except ValueError as error:
@@ -47,7 +56,7 @@ def chess_apply_move(fen: str, move: str) -> str:
 
 @tool
 def chess_normalize_move(fen: str, move: str) -> str:
-    """Normalize a SAN or UCI move against a FEN position."""
+    """Normalize a SAN or UCI move against a chess position."""
     try:
         return _serialize(normalize_move(fen, move))
     except ValueError as error:
@@ -62,17 +71,8 @@ def chess_validate_widget_config(
     arrows: Optional[list[dict]] = None,
     prompt_text: Optional[str] = None,
 ) -> str:
-    """Validate a chess widget configuration and return structured validation results.
-
-    Use this tool before finalizing any chess board widget to catch semantic issues.
-    Pass the widget's FEN, expectedMoves, annotations, and any prompt text that makes
-    claims about the position (e.g. "White to move", "the king is in check").
-
-    Returns normalized FEN, side to move, position status, normalized expected moves,
-    illegal moves, annotation issues, and any contradictions between prompt claims and
-    engine facts.
-    """
-    result: dict = {"valid": True, "errors": [], "warnings": []}
+    """Validate a chess board widget configuration against engine facts."""
+    result: dict[str, Any] = {"valid": True, "errors": [], "warnings": []}
 
     try:
         normalized_fen = validate_fen(fen)
@@ -90,12 +90,11 @@ def chess_validate_widget_config(
     result["legalMoveCount"] = position["legalMoveCount"]
 
     if expected_moves:
-        normalized_expected: list[dict] = []
+        normalized_expected: list[dict[str, Any]] = []
         illegal_moves: list[str] = []
         for move_str in expected_moves:
             try:
-                normalized = normalize_move(normalized_fen, move_str)
-                normalized_expected.append(normalized)
+                normalized_expected.append(normalize_move(normalized_fen, move_str))
             except ValueError:
                 illegal_moves.append(move_str)
         result["normalizedExpectedMoves"] = normalized_expected
@@ -105,28 +104,25 @@ def chess_validate_widget_config(
             result["errors"].append(f"Illegal expected moves: {', '.join(illegal_moves)}")
 
     if highlight_squares:
-        import chess as chess_lib
         board = chess_lib.Board(normalized_fen)
-        occupied = {chess_lib.square_name(sq) for sq in board.piece_map()}
+        occupied = {chess_lib.square_name(square) for square in board.piece_map()}
         move_squares = set()
-        if expected_moves:
-            for m in result.get("normalizedExpectedMoves", []):
-                uci = m.get("uci", "")
-                if len(uci) >= 4:
-                    move_squares.add(uci[:2])
-                    move_squares.add(uci[2:4])
-        for sq in highlight_squares:
-            if sq not in occupied and sq not in move_squares:
-                result["warnings"].append(f"Highlight '{sq}' is not tied to a piece or expected move.")
+        for move in result.get("normalizedExpectedMoves", []):
+            uci = move.get("uci", "")
+            if len(uci) >= 4:
+                move_squares.add(uci[:2])
+                move_squares.add(uci[2:4])
+        for square in highlight_squares:
+            if square not in occupied and square not in move_squares:
+                result["warnings"].append(f"Highlight '{square}' is not tied to a piece or expected move.")
 
     if arrows:
-        import chess as chess_lib
         board = chess_lib.Board(normalized_fen)
-        occupied = {chess_lib.square_name(sq) for sq in board.piece_map()}
+        occupied = {chess_lib.square_name(square) for square in board.piece_map()}
         for arrow in arrows:
-            from_sq = arrow.get("fromSquare", "")
-            if from_sq not in occupied:
-                result["warnings"].append(f"Arrow from '{from_sq}' starts on an empty square.")
+            from_square = arrow.get("fromSquare", "")
+            if from_square not in occupied:
+                result["warnings"].append(f"Arrow from '{from_square}' starts on an empty square.")
 
     if prompt_text:
         side = position["sideToMove"]
@@ -146,4 +142,51 @@ def chess_validate_widget_config(
     return _serialize(result)
 
 
-CHESS_TOOLS = [chess_legal_moves, chess_describe_position, chess_apply_move, chess_normalize_move, chess_validate_widget_config]
+@tool
+def chess_build_example_set(plan_json: str) -> str:
+    """Build a validated chess example set from a structured plan JSON payload."""
+    try:
+        raw = json.loads(plan_json)
+        plan = ChessExamplePlan.model_validate(raw.get("plan", raw))
+        example_set = build_engine_backed_example_set(plan)
+        return _serialize(example_set.model_dump(mode="json", exclude_none=True))
+    except Exception as error:
+        return f"Error: {error}"
+
+
+@tool
+def chess_validate_example_set(example_set_json: str) -> str:
+    """Validate a chess example set for distinctness and concept coverage."""
+    try:
+        example_set = ChessBuiltExampleSet.model_validate(json.loads(example_set_json))
+        return _serialize(validate_engine_backed_example_set(example_set).model_dump(mode="json", exclude_none=True))
+    except Exception as error:
+        return f"Error: {error}"
+
+
+@tool
+def chess_validate_final_activity(artifact_json: str, example_set_json: str) -> str:
+    """Validate a final chess activity against a validated example set."""
+    try:
+        artifact = ActivityArtifact.model_validate(json.loads(artifact_json))
+        example_set = ChessBuiltExampleSet.model_validate(json.loads(example_set_json))
+        return _serialize(
+            validate_engine_backed_artifact(artifact, example_set).model_dump(mode="json", exclude_none=True)
+        )
+    except Exception as error:
+        return f"Error: {error}"
+
+
+CHESS_TOOLS = [
+    chess_legal_moves,
+    chess_describe_position,
+    chess_apply_move,
+    chess_normalize_move,
+    chess_validate_widget_config,
+]
+
+CHESS_PLANNING_TOOLS = [
+    chess_build_example_set,
+    chess_validate_example_set,
+    chess_validate_final_activity,
+]
