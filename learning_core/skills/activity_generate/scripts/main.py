@@ -691,9 +691,8 @@ class ActivityGenerateSkill(SkillDefinition):
         semantic_validation_hard_errors = list(hard_errors)
         semantic_validation_soft_warnings = list(soft_warnings)
 
-        # Repair if hard errors or soft warnings exist
-        all_validation_issues = hard_errors + soft_warnings
-        if all_validation_issues:
+        # Repair only if hard errors exist — soft warnings alone are acceptable
+        if hard_errors:
             repair_attempted = True
             try:
                 issue_lines = []
@@ -704,10 +703,27 @@ class ActivityGenerateSkill(SkillDefinition):
                     issue_lines.append("Soft warnings (fix if possible, but not required):")
                     issue_lines.extend(f"- {warning}" for warning in soft_warnings)
 
+                planning_context_lines: list[str] = []
+                if planning_results:
+                    for result in planning_results.values():
+                        for section in result.prompt_sections:
+                            if section.strip():
+                                planning_context_lines.append(section)
+
                 repair_prompt = (
                     "The JSON you produced passed schema validation but has semantic issues.\n\n"
                     + "\n".join(issue_lines)
-                    + "\n\nCurrent JSON:\n```json\n"
+                )
+                if planning_context_lines:
+                    repair_prompt += (
+                        "\n\n## Validated planning context\n\n"
+                        "The following validated examples were provided during generation. "
+                        "All validated examples MUST appear in the final activity with their original "
+                        "componentId, widget.state, widget.interaction, and widget.evaluation preserved exactly.\n\n"
+                        + "\n\n".join(planning_context_lines)
+                    )
+                repair_prompt += (
+                    "\n\nCurrent JSON:\n```json\n"
                     + artifact.model_dump_json(indent=2)
                     + "\n```\n\n"
                     "Make the smallest set of corrections needed to resolve the hard errors. "
