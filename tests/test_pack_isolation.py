@@ -122,9 +122,12 @@ def test_chess_pack_exposes_tools():
     }
 
 
-def test_math_pack_has_no_tools_yet():
+def test_math_pack_exposes_tools():
     pack = MathPack()
-    assert pack.tools() == []
+    tool_names = [t.name for t in pack.tools()]
+    assert set(tool_names) == {
+        "math_validate_widget_config",
+    }
 
 
 def test_chess_pack_prompt_sections_are_nonempty():
@@ -207,8 +210,8 @@ def test_history_request_gets_base_tools_only(mock_build_runtime, mock_agent_loo
 
 @patch("learning_core.skills.activity_generate.scripts.main.run_agent_loop")
 @patch("learning_core.skills.activity_generate.scripts.main.build_model_runtime")
-def test_math_request_gets_base_tools_only(mock_build_runtime, mock_agent_loop, tmp_path):
-    """Math pack is active but contributes no tools yet — only base tools exposed."""
+def test_math_request_gets_math_tools(mock_build_runtime, mock_agent_loop, tmp_path):
+    """Math pack is active and contributes its validation tool."""
     import os
     os.environ["LEARNING_CORE_LOG_DIR"] = str(tmp_path / "logs")
     mock_build_runtime.return_value = _fake_runtime()
@@ -229,7 +232,8 @@ def test_math_request_gets_base_tools_only(mock_build_runtime, mock_agent_loop, 
     result = engine.execute("activity_generate", envelope)
 
     active = result.trace.agent_trace["active_tools"]
-    assert active == ["read_ui_spec"]
+    assert "read_ui_spec" in active
+    assert "math_validate_widget_config" in active
     assert result.trace.agent_trace["included_packs"] == ["math"]
     os.environ.pop("LEARNING_CORE_LOG_DIR", None)
 
