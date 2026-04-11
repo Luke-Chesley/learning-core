@@ -51,6 +51,10 @@ def _read_pack_index() -> str:
     return _PACK_INDEX_PATH.read_text(encoding="utf-8").strip()
 
 
+def _read_ui_spec_file(path: str) -> str:
+    return (_SKILL_DIR / path).read_text(encoding="utf-8").strip()
+
+
 def _contains_keyword(text: str, keyword: str) -> bool:
     normalized_keyword = keyword.strip().lower()
     if not normalized_keyword:
@@ -115,6 +119,17 @@ def _select_packs(payload: ActivityGenerationInput) -> PackSelection:
         pack_selection_reason=pack_selection_reason,
         subject_inference=subject_inference,
     )
+
+
+def _collect_auto_injected_ui_specs(pack_selection: PackSelection) -> list[str]:
+    specs: list[str] = []
+    seen: set[str] = set()
+    for pack_name in pack_selection.included_packs:
+        for spec_path in _PACKS_BY_NAME[pack_name].auto_injected_ui_specs():
+            if spec_path not in seen:
+                specs.append(spec_path)
+                seen.add(spec_path)
+    return specs
 
 
 def _build_user_prompt(
@@ -249,15 +264,33 @@ def _build_user_prompt(
             if lines[-1] == "":
                 lines.pop()
 
+    # Auto-inject key UI/widget spec docs for active packs
+    auto_injected_specs = _collect_auto_injected_ui_specs(pack_selection)
+    if auto_injected_specs:
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        lines.append("## Auto-included widget specifications")
+        lines.append("")
+        lines.append("The following widget/component specs are included automatically because an active subject pack uses them. You do not need to read these via tools.")
+        for spec_path in auto_injected_specs:
+            lines.append("")
+            lines.append(f"### {spec_path}")
+            lines.append("")
+            lines.append(_read_ui_spec_file(spec_path))
+
     lines.append("")
     lines.append("---")
     lines.append("")
     lines.append(
         "Generate a single ActivitySpec JSON object. "
         "You already have the base UI registry, and relevant subject packs may also be included. "
+        "Active subject packs may already include core widget docs above. "
         "If a rich interactive surface is needed, consider `interactive_widget`. "
         "Read UI specs with `read_ui_spec` only when that materially helps you choose or configure a component or widget well. "
         "Many requests need no doc reads. Specialized requests may justify a few. "
+        "If you emit a pack-specific widget (e.g. a chess board), validate it with the pack's domain tools before finalizing. "
+        "Do not make factual claims about a domain state (e.g. check, checkmate, side to move) that you have not validated with a domain tool. "
         "Use good taste when selecting components. Prefer a coherent, pedagogically strong activity over a crowded one. "
         "Prefer the smallest set of components that creates a strong activity. "
         "Use as many components as the activity genuinely needs and no more. "
@@ -309,11 +342,42 @@ def _extract_ui_specs_read(tool_calls: list[ToolCallEvent]) -> list[str]:
     return specs_read
 
 
+def _extract_tool_names_used(tool_calls: list[ToolCallEvent]) -> set[str]:
+    return {tool_call.tool_name for tool_call in tool_calls}
+
+
 def _build_active_tools(pack_selection: PackSelection) -> list[Any]:
     tools: list[Any] = [read_ui_spec]
     for pack_name in pack_selection.included_packs:
         tools.extend(_PACKS_BY_NAME[pack_name].tools())
     return tools
+
+
+def _get_active_packs(pack_selection: PackSelection) -> list[Pack]:
+    return [_PACKS_BY_NAME[name] for name in pack_selection.included_packs]
+
+
+def _check_pack_tool_usage(
+    artifact: ActivityArtifact,
+    pack_selection: PackSelection,
+    tool_names_used: set[str],
+) -> list[tuple[Pack, list[str]]]:
+    """Check if pack-specific widgets were generated without required pack tool usage.
+
+    Returns list of (pack, widget_component_ids) for packs needing repair.
+    """
+    missing: list[tuple[Pack, list[str]]] = []
+    for pack_name in pack_selection.included_packs:
+        pack = _PACKS_BY_NAME[pack_name]
+        pack_widget_ids = pack.detect_pack_widgets(artifact)
+        if not pack_widget_ids:
+            continue
+        required_tools = pack.required_tool_names()
+        if not required_tools:
+            continue
+        if not tool_names_used.intersection(required_tools):
+            missing.append((pack, pack_widget_ids))
+    return missing
 
 
 def _extract_json(text: str) -> str:
@@ -355,6 +419,8 @@ class ActivityGenerateSkill(SkillDefinition):
 
     def execute(self, engine, payload: ActivityGenerationInput, context: RuntimeContext) -> SkillExecutionResult:
         preview, pack_selection = _build_prompt_preview(payload, context)
+        active_packs = _get_active_packs(pack_selection)
+        auto_injected_specs = _collect_auto_injected_ui_specs(pack_selection)
 
         model_runtime = build_model_runtime(
             task_name=context.operation_name,
@@ -400,13 +466,15 @@ class ActivityGenerateSkill(SkillDefinition):
         raw_text = agent_result.final_text
         tool_call_log = _build_tool_call_log(agent_result.tool_calls)
         ui_specs_read = _extract_ui_specs_read(agent_result.tool_calls)
+        tool_names_used = _extract_tool_names_used(agent_result.tool_calls)
 
         json_text = _extract_json(raw_text)
         repair_attempted = False
         repair_succeeded = False
+        pack_tool_repair_triggered = False
         validation_error_text = None
-        semantic_validation_errors: list[str] = []
-        semantic_validation_failures: list[str] = []
+        semantic_validation_hard_errors: list[str] = []
+        semantic_validation_soft_warnings: list[str] = []
 
         try:
             parsed = json.loads(json_text)
@@ -461,19 +529,90 @@ class ActivityGenerateSkill(SkillDefinition):
                     f"Validation failed after repair. Initial: {validation_error_text}. Repair: {repair_error}"
                 ) from repair_error
 
-        artifact, semantic_validation_errors = normalize_and_validate_widget_activity(artifact)
-        if semantic_validation_errors:
-            semantic_validation_failures = list(semantic_validation_errors)
+        # Check if pack-specific widgets were emitted without required tool usage
+        missing_pack_tool_usage = _check_pack_tool_usage(artifact, pack_selection, tool_names_used)
+        if missing_pack_tool_usage:
+            pack_tool_repair_triggered = True
+            repair_attempted = True
+            repair_lines = [
+                "The JSON you produced contains pack-specific widgets that were not validated with the available domain tools.\n"
+            ]
+            for pack, widget_ids in missing_pack_tool_usage:
+                guidance = pack.repair_guidance()
+                if guidance:
+                    repair_lines.append(f"Pack '{pack.name}' (widgets: {', '.join(widget_ids)}): {guidance}")
+            repair_lines.append(f"\nCurrent JSON:\n```json\n{artifact.model_dump_json(indent=2)}\n```\n")
+            repair_lines.append(
+                "Validate each pack-specific widget using the appropriate domain tools, "
+                "fix any issues found, and return the corrected JSON. No text outside the JSON."
+            )
+
+            try:
+                repair_result = run_agent_loop(
+                    llm=model_runtime.client,
+                    system_prompt=preview.system_prompt,
+                    user_prompt="\n".join(repair_lines),
+                    tools=tools,
+                    max_steps=5,
+                )
+                repair_json = _extract_json(repair_result.final_text)
+                repaired = json.loads(repair_json)
+                artifact = ActivityArtifact.model_validate(repaired)
+
+                # Merge repair tool calls into the log
+                repair_tool_log = _build_tool_call_log(repair_result.tool_calls)
+                tool_call_log.extend(repair_tool_log)
+                tool_names_used.update(_extract_tool_names_used(repair_result.tool_calls))
+                repair_succeeded = True
+                raw_text = repair_result.final_text
+                json_text = repair_json
+            except Exception as repair_error:
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "pack_tool_repair_error",
+                        "repair_error": str(repair_error),
+                        "missing_pack_tools": [
+                            {"pack": pack.name, "widgets": ids} for pack, ids in missing_pack_tool_usage
+                        ],
+                        "raw_agent_response": agent_result.final_text,
+                        "tool_calls": tool_call_log,
+                        "ui_specs_read": ui_specs_read,
+                        "active_tools": active_tool_names,
+                        "included_packs": list(pack_selection.included_packs),
+                        "pack_selection_reason": pack_selection.pack_selection_reason,
+                        "subject_inference": pack_selection.subject_inference,
+                    },
+                )
+                # Don't hard fail on pack tool repair failure — continue with semantic validation
+                pass
+
+        # Run semantic validation (base + pack validators)
+        artifact, hard_errors, soft_warnings = normalize_and_validate_widget_activity(artifact, active_packs)
+        semantic_validation_hard_errors = list(hard_errors)
+        semantic_validation_soft_warnings = list(soft_warnings)
+
+        # Repair if hard errors or soft warnings exist
+        all_validation_issues = hard_errors + soft_warnings
+        if all_validation_issues:
             repair_attempted = True
             try:
+                issue_lines = []
+                if hard_errors:
+                    issue_lines.append("Hard validation errors (must fix):")
+                    issue_lines.extend(f"- {error}" for error in hard_errors)
+                if soft_warnings:
+                    issue_lines.append("Soft warnings (fix if possible, but not required):")
+                    issue_lines.extend(f"- {warning}" for warning in soft_warnings)
+
                 repair_prompt = (
-                    "The JSON you produced passed schema validation but failed semantic widget validation.\n\n"
-                    "Exact validation failures:\n"
-                    + "\n".join(f"- {error}" for error in semantic_validation_errors)
+                    "The JSON you produced passed schema validation but has semantic issues.\n\n"
+                    + "\n".join(issue_lines)
                     + "\n\nCurrent JSON:\n```json\n"
                     + artifact.model_dump_json(indent=2)
                     + "\n```\n\n"
-                    "Make the smallest set of corrections needed to resolve every listed failure. "
+                    "Make the smallest set of corrections needed to resolve the hard errors. "
+                    "Fix soft warnings where possible without disrupting the activity. "
                     "Do not add arbitrary new components or fields. Keep IDs, structure, and lesson intent stable unless a listed failure requires a change.\n\n"
                     "Return only the corrected JSON object. No text outside the JSON."
                 )
@@ -492,9 +631,10 @@ class ActivityGenerateSkill(SkillDefinition):
                 repair_json = _extract_json(str(repair_text))
                 repaired = json.loads(repair_json)
                 artifact = ActivityArtifact.model_validate(repaired)
-                artifact, semantic_validation_errors = normalize_and_validate_widget_activity(artifact)
-                if semantic_validation_errors:
-                    raise ContractValidationError("; ".join(semantic_validation_errors))
+                artifact, hard_errors, soft_warnings = normalize_and_validate_widget_activity(artifact, active_packs)
+                if hard_errors:
+                    raise ContractValidationError("; ".join(hard_errors))
+                # Soft warnings after repair are acceptable
                 repair_succeeded = True
                 raw_text = str(repair_text)
                 json_text = repair_json
@@ -503,7 +643,8 @@ class ActivityGenerateSkill(SkillDefinition):
                     request=provider_request,
                     response={
                         "status": "semantic_validation_error",
-                        "errors": semantic_validation_failures,
+                        "hard_errors": semantic_validation_hard_errors,
+                        "soft_warnings": semantic_validation_soft_warnings,
                         "repair_error": str(repair_error),
                         "raw_agent_response": agent_result.final_text,
                         "tool_calls": tool_call_log,
@@ -518,6 +659,19 @@ class ActivityGenerateSkill(SkillDefinition):
                     f"Semantic validation failed after repair: {repair_error}"
                 ) from repair_error
 
+        # Build pack validation results for trace
+        pack_validation_results: dict[str, Any] = {}
+        for pack in active_packs:
+            pack_widget_ids = pack.detect_pack_widgets(artifact)
+            required_tools = pack.required_tool_names()
+            used_required = tool_names_used.intersection(required_tools) if required_tools else set()
+            pack_validation_results[pack.name] = {
+                "widget_ids": pack_widget_ids,
+                "required_tools": required_tools,
+                "tools_used": sorted(used_required),
+                "tool_use_satisfied": bool(used_required) if pack_widget_ids and required_tools else True,
+            }
+
         write_provider_exchange_log(
             request=provider_request,
             response={
@@ -529,10 +683,13 @@ class ActivityGenerateSkill(SkillDefinition):
                 "active_tools": active_tool_names,
                 "repair_attempted": repair_attempted,
                 "repair_succeeded": repair_succeeded,
-                "semantic_validation_errors": semantic_validation_failures,
+                "pack_tool_repair_triggered": pack_tool_repair_triggered,
+                "semantic_validation_hard_errors": semantic_validation_hard_errors,
+                "semantic_validation_soft_warnings": semantic_validation_soft_warnings,
                 "included_packs": list(pack_selection.included_packs),
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,
+                "pack_validation_results": pack_validation_results,
             },
         )
 
@@ -558,14 +715,18 @@ class ActivityGenerateSkill(SkillDefinition):
             agent_trace={
                 "tool_calls": tool_call_log,
                 "ui_specs_read": ui_specs_read,
+                "auto_injected_ui_specs": auto_injected_specs,
                 "active_tools": active_tool_names,
                 "included_packs": list(pack_selection.included_packs),
                 "pack_selection_reason": pack_selection.pack_selection_reason,
                 "subject_inference": pack_selection.subject_inference,
                 "repair_attempted": repair_attempted,
                 "repair_succeeded": repair_succeeded,
+                "pack_tool_repair_triggered": pack_tool_repair_triggered,
                 "validation_error": validation_error_text,
-                "semantic_validation_errors": semantic_validation_failures,
+                "semantic_validation_hard_errors": semantic_validation_hard_errors,
+                "semantic_validation_soft_warnings": semantic_validation_soft_warnings,
+                "pack_validation_results": pack_validation_results,
             },
         )
 

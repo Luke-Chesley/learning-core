@@ -106,7 +106,7 @@ def test_all_packs_satisfy_protocol():
         assert isinstance(pack.tools(), list)
 
 
-def test_chess_pack_exposes_four_tools():
+def test_chess_pack_exposes_tools():
     pack = ChessPack()
     tool_names = [t.name for t in pack.tools()]
     assert set(tool_names) == {
@@ -114,6 +114,7 @@ def test_chess_pack_exposes_four_tools():
         "chess_describe_position",
         "chess_apply_move",
         "chess_normalize_move",
+        "chess_validate_widget_config",
     }
 
 

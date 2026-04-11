@@ -4,6 +4,8 @@ from pathlib import Path
 
 from langchain_core.tools import BaseTool
 
+from learning_core.contracts.activity import ActivityArtifact
+from learning_core.skills.activity_generate.packs.base import PackValidator
 from learning_core.skills.activity_generate.packs.math.tools import MATH_TOOLS
 
 _PACK_DIR = Path(__file__).resolve().parent
@@ -51,3 +53,18 @@ class MathPack:
 
     def tools(self) -> list[BaseTool]:
         return list(MATH_TOOLS)
+
+    def auto_injected_ui_specs(self) -> list[str]:
+        return []
+
+    def validators(self) -> list[PackValidator]:
+        return []
+
+    def required_tool_names(self) -> list[str]:
+        return []
+
+    def repair_guidance(self) -> str | None:
+        return None
+
+    def detect_pack_widgets(self, artifact: ActivityArtifact) -> list[str]:
+        return []
