@@ -8,8 +8,8 @@ from pydantic import Field, field_validator, model_validator
 from learning_core.contracts.base import StrictModel
 
 
-SurfaceKind = Literal["board_surface", "expression_surface", "graph_surface"]
-EngineKind = Literal["chess", "math_symbolic", "graphing"]
+SurfaceKind = Literal["board_surface", "expression_surface", "graph_surface", "map_surface"]
+EngineKind = Literal["chess", "math_symbolic", "graphing", "map_geojson"]
 SurfaceRole = Literal["primary", "supporting"]
 SubmissionMode = Literal["immediate", "explicit_submit"]
 SelectionMode = Literal["click_click", "drag_drop", "either"]
@@ -68,6 +68,14 @@ _GRAPH_INTERACTION_MODE_ALIASES: dict[str, str] = {
     "observe": "view_only",
     "readonly": "view_only",
     "read_only": "view_only",
+}
+
+_MAP_INTERACTION_MODE_ALIASES: dict[str, str] = {
+    "inspect": "view_only",
+    "observe": "view_only",
+    "readonly": "view_only",
+    "read_only": "view_only",
+    "explore": "guided_explore",
 }
 
 
@@ -364,8 +372,195 @@ class GraphingWidget(StrictModel):
         return self
 
 
+class MapCoordinate(StrictModel):
+    lon: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-90, le=90)
+
+
+class MapBounds(StrictModel):
+    west: float = Field(ge=-180, le=180)
+    south: float = Field(ge=-90, le=90)
+    east: float = Field(ge=-180, le=180)
+    north: float = Field(ge=-90, le=90)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "MapBounds":
+        if self.west >= self.east:
+            raise ValueError("Map bounds must satisfy west < east.")
+        if self.south >= self.north:
+            raise ValueError("Map bounds must satisfy south < north.")
+        return self
+
+
+class MapSurfaceConfig(StrictModel):
+    projection: Literal["web_mercator", "equal_earth", "equirectangular", "albers_usa"] = "equal_earth"
+    basemapStyle: Literal["none", "light", "terrain", "satellite"] = "none"
+    center: MapCoordinate = Field(default_factory=lambda: MapCoordinate(lon=0.0, lat=20.0))
+    zoom: float = Field(default=2.0, ge=0.5, le=18.0)
+    bounds: MapBounds | None = None
+
+
+class MapSurfaceDisplay(StrictModel):
+    surfaceRole: SurfaceRole = "primary"
+    showLegend: bool = True
+    showLabels: bool = True
+    showInstructionsPanel: bool = True
+    allowLayerToggle: bool = True
+
+
+class MapLayerConfig(StrictModel):
+    id: str
+    sourceId: str
+    featureIds: list[str] = Field(default_factory=list)
+    labelField: str | None = None
+    visible: bool = True
+    stylePreset: Literal["political", "physical", "historical", "climate", "route", "custom"] = "political"
+
+
+class MapSurfaceState(StrictModel):
+    sourceId: str
+    activeLayerIds: list[str] = Field(default_factory=list)
+    selectedFeatureIds: list[str] = Field(default_factory=list)
+    markerCoordinate: MapCoordinate | None = None
+    drawnPath: list[MapCoordinate] = Field(default_factory=list)
+    labelAssignments: dict[str, str] = Field(default_factory=dict)
+    timelineYear: int | None = None
+
+
+class MapSurfaceInteraction(StrictModel):
+    mode: Literal[
+        "view_only",
+        "guided_explore",
+        "select_region",
+        "multi_select_regions",
+        "place_marker",
+        "trace_path",
+        "label_regions",
+        "compare_layers",
+        "timeline_scrub",
+    ] = "guided_explore"
+    submissionMode: SubmissionMode = "explicit_submit"
+    allowReset: bool = True
+    resetPolicy: ResetPolicy = "reset_to_initial"
+    attemptPolicy: AttemptPolicy = "allow_retry"
+    selectionBehavior: Literal["single", "multiple"] = "single"
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def normalize_mode_alias(cls, value: str) -> str:
+        if isinstance(value, str):
+            return _MAP_INTERACTION_MODE_ALIASES.get(value.strip().lower(), value)
+        return value
+
+    @model_validator(mode="after")
+    def validate_reset_policy(self) -> "MapSurfaceInteraction":
+        self.allowReset = _validate_reset_semantics(
+            allow_reset=self.allowReset,
+            reset_policy=self.resetPolicy,
+            attempt_policy=self.attemptPolicy,
+        )
+        if self.mode in {"view_only", "guided_explore", "compare_layers", "timeline_scrub"} and self.submissionMode == "explicit_submit":
+            self.submissionMode = "immediate"
+        if self.mode == "select_region":
+            self.selectionBehavior = "single"
+        if self.mode == "multi_select_regions":
+            self.selectionBehavior = "multiple"
+        return self
+
+
+class MapSurfaceFeedback(StrictModel):
+    mode: FeedbackMode = "explicit_submit"
+    displayMode: FeedbackDisplayMode = "inline"
+
+
+class MapMarkerTarget(StrictModel):
+    coordinate: MapCoordinate
+    toleranceKm: float = Field(default=50.0, gt=0)
+
+
+class MapPathTarget(StrictModel):
+    coordinates: list[MapCoordinate] = Field(min_length=2)
+    toleranceKm: float = Field(default=100.0, gt=0)
+
+
+class MapLabelTarget(StrictModel):
+    featureId: str
+    correctLabel: str
+
+
+class MapGeoJsonEvaluationConfig(StrictModel):
+    acceptedFeatureIds: list[str] = Field(default_factory=list)
+    featureSelectionMode: Literal["exact", "superset_ok"] = "exact"
+    requiredCount: int | None = Field(default=None, ge=1)
+    markerTarget: MapMarkerTarget | None = None
+    expectedPath: MapPathTarget | None = None
+    labelTargets: list[MapLabelTarget] = Field(default_factory=list)
+    minimumCoverage: float = Field(default=1.0, ge=0, le=1)
+
+
+class MapCallout(StrictModel):
+    id: str
+    text: str
+    coordinate: MapCoordinate | None = None
+    featureId: str | None = None
+
+
+class MapSurfaceAnnotations(StrictModel):
+    legendTitle: str | None = None
+    guidedPrompts: list[str] = Field(default_factory=list)
+    callouts: list[MapCallout] = Field(default_factory=list)
+    teacherNotes: str | None = None
+
+
+class MapGeoJsonWidget(StrictModel):
+    surfaceKind: Literal["map_surface"]
+    engineKind: Literal["map_geojson"]
+    version: Literal["1"] = "1"
+    instructionText: str | None = None
+    caption: str | None = None
+    surface: MapSurfaceConfig = Field(default_factory=MapSurfaceConfig)
+    display: MapSurfaceDisplay = Field(default_factory=MapSurfaceDisplay)
+    state: MapSurfaceState
+    interaction: MapSurfaceInteraction = Field(default_factory=MapSurfaceInteraction)
+    feedback: MapSurfaceFeedback = Field(default_factory=MapSurfaceFeedback)
+    layers: list[MapLayerConfig] = Field(default_factory=list, min_length=1)
+    evaluation: MapGeoJsonEvaluationConfig = Field(default_factory=MapGeoJsonEvaluationConfig)
+    annotations: MapSurfaceAnnotations = Field(default_factory=MapSurfaceAnnotations)
+
+    _normalize_instruction_text = field_validator("instructionText", mode="before")(_normalize_optional_text)
+    _normalize_caption = field_validator("caption", mode="before")(_normalize_optional_text)
+
+    @model_validator(mode="after")
+    def validate_runtime_semantics(self) -> "MapGeoJsonWidget":
+        _validate_feedback_semantics(
+            submission_mode=self.interaction.submissionMode,
+            feedback_mode=self.feedback.mode,
+        )
+        self.feedback.mode = _coerce_view_only_feedback(
+            mode=self.interaction.mode,
+            feedback_mode=self.feedback.mode,
+        )
+        if self.interaction.mode in {"guided_explore", "compare_layers", "timeline_scrub"}:
+            self.feedback.mode = "none"
+        if self.interaction.mode == "select_region" and self.interaction.selectionBehavior != "single":
+            raise ValueError("select_region widgets must use selectionBehavior='single'.")
+        if self.interaction.mode == "multi_select_regions" and self.interaction.selectionBehavior != "multiple":
+            raise ValueError("multi_select_regions widgets must use selectionBehavior='multiple'.")
+        if self.interaction.mode in {"select_region", "multi_select_regions"} and not self.evaluation.acceptedFeatureIds:
+            raise ValueError("Region-selection map widgets require evaluation.acceptedFeatureIds.")
+        if self.interaction.mode == "place_marker" and self.evaluation.markerTarget is None:
+            raise ValueError("place_marker map widgets require evaluation.markerTarget.")
+        if self.interaction.mode == "trace_path" and self.evaluation.expectedPath is None:
+            raise ValueError("trace_path map widgets require evaluation.expectedPath.")
+        if self.interaction.mode == "label_regions" and not self.evaluation.labelTargets:
+            raise ValueError("label_regions map widgets require evaluation.labelTargets.")
+        if self.interaction.mode == "compare_layers" and len(self.layers) < 2:
+            raise ValueError("compare_layers map widgets require at least two layers.")
+        return self
+
+
 InteractiveWidgetPayload = Annotated[
-    ChessBoardWidget | MathSymbolicWidget | GraphingWidget,
+    ChessBoardWidget | MathSymbolicWidget | GraphingWidget | MapGeoJsonWidget,
     Field(discriminator="engineKind"),
 ]
 
@@ -373,6 +568,14 @@ InteractiveWidgetPayload = Annotated[
 def widget_accepts_input(widget: InteractiveWidgetPayload) -> bool:
     if widget.engineKind == "chess":
         return widget.interaction.mode == "move_input"
+    if widget.engineKind == "map_geojson":
+        return widget.interaction.mode in {
+            "select_region",
+            "multi_select_regions",
+            "place_marker",
+            "trace_path",
+            "label_regions",
+        }
     return widget.interaction.mode != "view_only"
 
 

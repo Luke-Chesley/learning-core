@@ -18,6 +18,12 @@ from learning_core.observability.traces import ExecutionLineage, ExecutionTrace
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
+from learning_core.skills.activity_generate.packs.geography.engine import (
+    evaluate_feature_selection,
+    evaluate_labels,
+    evaluate_marker,
+    evaluate_path,
+)
 
 _NUMERIC_PATTERN = re.compile(r"^-?\d+(?:\.\d+)?(?:/\d+)?$")
 
@@ -74,6 +80,8 @@ def _extract_expected_answer(component: ActivityComponent | None, payload: Activ
             return list(widget.evaluation.expectedMoves)
         if widget.engineKind == "math_symbolic":
             return widget.evaluation.expectedExpression
+        if widget.engineKind == "map_geojson":
+            return widget.evaluation.model_dump(mode="json", exclude_none=True)
     return None
 
 
@@ -322,6 +330,84 @@ def _evaluate_chess_widget(
     )
 
 
+def _evaluate_map_widget(
+    payload: ActivityFeedbackRequest,
+    component: ActivityComponent | None,
+) -> ActivityFeedbackArtifact | None:
+    if payload.componentType != "interactive_widget":
+        return None
+
+    widget = _extract_widget(payload, component)
+    if widget is None or widget.engineKind != "map_geojson":
+        return None
+
+    expected_value = _extract_expected_answer(component, payload)
+    if not isinstance(expected_value, dict):
+        return None
+
+    result: dict[str, Any] | None = None
+    learner_response = payload.learnerResponse
+    mode = widget.interaction.mode
+
+    if mode in {"select_region", "multi_select_regions"}:
+        if not isinstance(learner_response, list) or not all(isinstance(item, str) for item in learner_response):
+            return None
+        result = evaluate_feature_selection(
+            accepted_feature_ids=list(expected_value.get("acceptedFeatureIds") or []),
+            learner_feature_ids=learner_response,
+            selection_mode=str(expected_value.get("featureSelectionMode") or "exact"),
+        )
+    elif mode == "place_marker":
+        if not isinstance(learner_response, dict):
+            return None
+        result = evaluate_marker(
+            learner_coordinate=learner_response,
+            target_coordinate=expected_value.get("markerTarget"),
+        )
+    elif mode == "trace_path":
+        if not isinstance(learner_response, list):
+            return None
+        result = evaluate_path(
+            learner_points=learner_response,
+            expected_path=expected_value.get("expectedPath"),
+        )
+    elif mode == "label_regions":
+        if not isinstance(learner_response, dict):
+            return None
+        result = evaluate_labels(
+            learner_labels=learner_response,
+            label_targets=list(expected_value.get("labelTargets") or []),
+        )
+
+    if result is None:
+        return None
+
+    status = result["status"]
+    return _feedback(
+        component_id=payload.componentId,
+        component_type=payload.componentType,
+        widget_engine_kind=widget.engineKind,
+        status=status,
+        message=(
+            "That map response matches the expected answer."
+            if status == "correct"
+            else "That map response is partially correct."
+            if status == "partial"
+            else "That map response does not match the expected answer."
+        ),
+        confidence=0.98,
+        hint=None if status == "correct" else "Check the map prompt, visible labels, and target region or route more carefully.",
+        next_step=None if status == "correct" else "Revise the map response and compare it to the prompt.",
+        allow_retry=status != "correct",
+        scoring=FeedbackScoring(
+            score=result.get("score"),
+            matchedTargets=result.get("matchedTargets"),
+            totalTargets=result.get("totalTargets"),
+            rubricNotes=None if status == "correct" else _serialize_json({k: v for k, v in result.items() if k not in {"status", "score", "matchedTargets", "totalTargets"}}),
+        ),
+    )
+
+
 def evaluate_deterministically(payload: ActivityFeedbackRequest) -> ActivityFeedbackArtifact | None:
     component = _extract_component(payload)
     evaluators = (
@@ -330,6 +416,7 @@ def evaluate_deterministically(payload: ActivityFeedbackRequest) -> ActivityFeed
         _evaluate_ordered_sequence,
         _evaluate_short_answer,
         _evaluate_chess_widget,
+        _evaluate_map_widget,
     )
     for evaluator in evaluators:
         result = evaluator(payload, component)

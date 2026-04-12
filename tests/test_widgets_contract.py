@@ -1,7 +1,13 @@
 import pytest
 
 from learning_core.contracts.activity import ActivityArtifact
-from learning_core.contracts.widgets import ChessBoardWidget, GraphingWidget, MathSymbolicWidget, widget_accepts_input
+from learning_core.contracts.widgets import (
+    ChessBoardWidget,
+    GraphingWidget,
+    MapGeoJsonWidget,
+    MathSymbolicWidget,
+    widget_accepts_input,
+)
 
 
 def test_chess_widget_payload_validates():
@@ -66,6 +72,63 @@ def test_graph_widget_view_only_is_not_treated_as_input():
     assert widget.display.surfaceRole == "primary"
     assert widget.interaction.allowReset is False
     assert widget_accepts_input(widget) is False
+
+
+def test_map_widget_payload_validates():
+    widget = MapGeoJsonWidget.model_validate(
+        {
+            "surfaceKind": "map_surface",
+            "engineKind": "map_geojson",
+            "version": "1",
+            "instructionText": "Select South America.",
+            "surface": {
+                "projection": "equal_earth",
+                "basemapStyle": "none",
+                "center": {"lon": -120.0, "lat": 39.0},
+                "zoom": 2.5,
+            },
+            "state": {
+                "sourceId": "geoboundaries:USA:ADM1",
+                "activeLayerIds": ["geoboundaries-usa-adm1-base"],
+                "selectedFeatureIds": [],
+                "markerCoordinate": None,
+                "drawnPath": [],
+                "labelAssignments": {},
+                "timelineYear": None,
+            },
+            "interaction": {
+                "mode": "select_region",
+                "submissionMode": "explicit_submit",
+                "selectionBehavior": "single",
+            },
+            "feedback": {"mode": "explicit_submit", "displayMode": "inline"},
+            "layers": [
+                {
+                    "id": "geoboundaries-usa-adm1-base",
+                    "sourceId": "geoboundaries:USA:ADM1",
+                    "featureIds": ["california", "oregon"],
+                    "labelField": "shapeName",
+                    "visible": True,
+                    "stylePreset": "political",
+                }
+            ],
+            "evaluation": {
+                "acceptedFeatureIds": ["california"],
+                "featureSelectionMode": "exact",
+                "requiredCount": 1,
+                "minimumCoverage": 1.0,
+            },
+            "annotations": {
+                "legendTitle": "World Regions Intro",
+                "guidedPrompts": [],
+                "callouts": [],
+            },
+        }
+    )
+
+    assert widget.engineKind == "map_geojson"
+    assert widget.interaction.mode == "select_region"
+    assert widget_accepts_input(widget) is True
 
 
 def test_board_widget_coerces_inspect_to_view_only():

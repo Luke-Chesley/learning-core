@@ -6,4 +6,4 @@ Packs are injected deterministically by the backend. The model does not choose t
 |------|----------|------|-------|
 | math | the request clearly targets math concepts, procedures, symbolic work, or graphing | math pedagogy guidance, math activity patterns, math examples, widget escalation guidance | `packs/math/pack.md`, `packs/math/patterns.md`, `packs/math/examples.md` |
 | chess | the request clearly targets chess positions, moves, plans, tactics, or endgames | board-centered chess guidance, chess activity patterns, chess examples, widget escalation guidance | `packs/chess/pack.md`, `packs/chess/patterns.md`, `packs/chess/examples.md` |
-
+| geography | the request clearly targets geography, history maps, regions, routes, borders, or map-based teaching artifacts | map pedagogy guidance, geography/history interaction patterns, teaching artifact patterns, widget escalation guidance | `packs/geography/pack.md`, `packs/geography/patterns.md`, `packs/geography/examples.md` |

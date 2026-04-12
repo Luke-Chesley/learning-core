@@ -8,7 +8,7 @@ from pydantic import Field, field_validator
 from learning_core.contracts.activity import ComponentType
 from learning_core.contracts.activity_feedback import ActivityFeedbackArtifact, FeedbackAttemptMetadata
 from learning_core.contracts.base import StrictModel
-from learning_core.contracts.widgets import EngineKind, InteractiveWidgetPayload
+from learning_core.contracts.widgets import EngineKind, InteractiveWidgetPayload, MapCoordinate
 
 _BOARD_SQUARE_PATTERN = re.compile(r"^[a-h][1-8]$")
 
@@ -53,8 +53,46 @@ class BoardResetAction(StrictModel):
     type: Literal["reset"]
 
 
+class MapSelectFeatureAction(StrictModel):
+    type: Literal["select_feature"]
+    featureId: str
+
+
+class MapPlaceMarkerAction(StrictModel):
+    type: Literal["place_marker"]
+    coordinate: MapCoordinate
+
+
+class MapSubmitPathAction(StrictModel):
+    type: Literal["submit_path"]
+    coordinates: list[MapCoordinate] = Field(min_length=2)
+
+
+class MapSubmitLabelsAction(StrictModel):
+    type: Literal["submit_labels"]
+    labels: dict[str, str]
+
+
+class MapToggleLayerAction(StrictModel):
+    type: Literal["toggle_layer"]
+    layerId: str
+
+
+class MapSetTimelineYearAction(StrictModel):
+    type: Literal["set_timeline_year"]
+    year: int
+
+
 WidgetLearnerAction = Annotated[
-    BoardSelectSquareAction | BoardSubmitMoveAction | BoardResetAction,
+    BoardSelectSquareAction
+    | BoardSubmitMoveAction
+    | BoardResetAction
+    | MapSelectFeatureAction
+    | MapPlaceMarkerAction
+    | MapSubmitPathAction
+    | MapSubmitLabelsAction
+    | MapToggleLayerAction
+    | MapSetTimelineYearAction,
     Field(discriminator="type"),
 ]
 

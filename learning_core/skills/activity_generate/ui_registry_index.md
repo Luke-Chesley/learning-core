@@ -76,4 +76,4 @@ These are not top-level activity components. Use them only inside `interactive_w
 | board_surface | chess | a board position is central evidence and the learner should inspect or play a move | the chess task is better handled as plain text or simple comparison | `ui_widgets/board_surface__chess.md` |
 | expression_surface | math_symbolic | structured symbolic entry matters more than freeform text | a short answer or build_steps component is enough | `ui_widgets/expression_surface__math_symbolic.md` |
 | graph_surface | graphing | graph interaction is central to the learning target | a static image, paragraph, or short answer is enough | `ui_widgets/graph_surface__graphing.md` |
-
+| map_surface | map_geojson | the map itself is central evidence or a teaching artifact needs layers, routes, regions, or annotations | a static image, hotspot_select, or label_map is enough | `ui_widgets/map_surface__geojson.md` |
