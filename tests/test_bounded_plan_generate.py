@@ -184,3 +184,35 @@ def test_bounded_plan_execute_accepts_valid_artifact(monkeypatch, tmp_path: Path
 
     assert result.artifact["horizon"] == "current_week"
     assert result.artifact["units"][0]["lessons"][0]["title"] == "Fractions practice"
+
+
+def test_bounded_plan_execute_backfills_document_from_units(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    artifact_without_document = _artifact()
+    artifact_without_document.pop("document", None)
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="test",
+            model="fake-bounded-plan",
+            client=_FakeClient(artifact_without_document),
+            temperature=0.2,
+            max_tokens=4096,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("bounded_plan_generate", _envelope())
+
+    assert result.artifact["document"] == {
+        "Math": {
+            "Current week fractions and decimals": [
+                "Fractions practice",
+                "Decimal review",
+                "Percent game",
+            ]
+        }
+    }
