@@ -71,6 +71,10 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    bounded_plan_generate/
+      SKILL.md
+      scripts/
+        main.py
     activity_generate/
       SKILL.md
       packs/
@@ -137,6 +141,7 @@ Current first-class operations:
 
 - `activity_feedback`
 - `activity_generate`
+- `bounded_plan_generate`
 - `session_generate`
 - `source_interpret`
 - `curriculum_intake`

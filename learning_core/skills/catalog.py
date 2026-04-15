@@ -3,6 +3,7 @@ from __future__ import annotations
 from learning_core.runtime.registry import SkillRegistry
 from learning_core.skills.activity_feedback.scripts.main import ActivityFeedbackSkill
 from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
+from learning_core.skills.bounded_plan_generate.scripts.main import BoundedPlanGenerateSkill
 from learning_core.skills.copilot_chat.scripts.main import CopilotChatSkill
 from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
 from learning_core.skills.curriculum_intake.scripts.main import CurriculumIntakeSkill
@@ -25,6 +26,10 @@ def build_skill_registry() -> SkillRegistry:
     registry.register(
         "activity_feedback",
         ActivityFeedbackSkill(),
+    )
+    registry.register(
+        "bounded_plan_generate",
+        BoundedPlanGenerateSkill(),
     )
     registry.register(
         "widget_transition",
