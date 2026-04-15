@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import os
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from learning_core.contracts.operation import OperationEnvelope
 from learning_core.contracts.responses import OperationExecuteResponse, OperationPromptPreviewResponse
 from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
 from learning_core.observability.provider_logs import write_provider_exchange_log
+from learning_core.runtime.agent_kernel import AgentKernel
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.errors import ContractValidationError, ProviderExecutionError
 from learning_core.runtime.providers import build_model_runtime
+from learning_core.runtime.request_normalization import normalize_runtime_request
 from learning_core.runtime.registry import SkillRegistry
 from learning_core.runtime.tooling import ToolRegistry
 
@@ -17,6 +21,7 @@ class AgentEngine:
     def __init__(self, skill_registry: SkillRegistry, tool_registry: ToolRegistry | None = None) -> None:
         self.skill_registry = skill_registry
         self.tool_registry = tool_registry or ToolRegistry()
+        self.kernel = AgentKernel()
 
     def _provider_request_payload(
         self,
@@ -70,7 +75,14 @@ class AgentEngine:
             return "function_calling"
         return None
 
-    def execute(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
+    def _kernel_enabled_for_operation(self, operation_name: str) -> bool:
+        env_name = f"LEARNING_CORE_USE_KERNEL_FOR_{operation_name.upper()}"
+        raw_value = os.getenv(env_name)
+        if raw_value is None:
+            return True
+        return raw_value.strip().lower() not in {"0", "false", "no", "off"}
+
+    def _execute_legacy(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
         skill = self.skill_registry.get(operation_name)
         envelope = OperationEnvelope.model_validate(envelope_data)
         context = RuntimeContext.create(
@@ -95,7 +107,7 @@ class AgentEngine:
             prompt_preview=prompt_preview,
         )
 
-    def preview(self, operation_name: str, envelope_data: dict) -> OperationPromptPreviewResponse:
+    def _preview_legacy(self, operation_name: str, envelope_data: dict) -> OperationPromptPreviewResponse:
         skill = self.skill_registry.get(operation_name)
         envelope = OperationEnvelope.model_validate(envelope_data)
         context = RuntimeContext.create(
@@ -123,6 +135,104 @@ class AgentEngine:
                 request_id=context.request_id,
             ),
         )
+
+    def execute(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
+        if not self._kernel_enabled_for_operation(operation_name):
+            return self._execute_legacy(operation_name, envelope_data)
+        skill = self.skill_registry.get(operation_name)
+        runtime_request = normalize_runtime_request(operation_name, envelope_data, skill.input_model)
+        result = self.kernel.execute(runtime_request, skill=skill, engine=self)
+        prompt_preview = (
+            result.trace.prompt_preview
+            if runtime_request.presentation_context.should_return_prompt_preview or runtime_request.app_context.debug
+            else None
+        )
+        return OperationExecuteResponse(
+            operation_name=operation_name,
+            artifact=result.artifact.model_dump(mode="json", exclude_none=True),
+            lineage=result.lineage,
+            trace=result.trace,
+            prompt_preview=prompt_preview,
+        )
+
+    def preview(self, operation_name: str, envelope_data: dict) -> OperationPromptPreviewResponse:
+        if not self._kernel_enabled_for_operation(operation_name):
+            return self._preview_legacy(operation_name, envelope_data)
+        skill = self.skill_registry.get(operation_name)
+        runtime_request = normalize_runtime_request(operation_name, envelope_data, skill.input_model)
+        preview = self.kernel.preview(runtime_request, skill=skill)
+        return OperationPromptPreviewResponse(
+            operation_name=operation_name,
+            skill_name=skill.name,
+            skill_version=skill.policy.skill_version,
+            request_id=runtime_request.request_id,
+            allowed_tools=preview.allowed_tools,
+            system_prompt=preview.prompt_preview.system_prompt,
+            user_prompt=preview.prompt_preview.user_prompt,
+            request_envelope=OperationEnvelope(
+                input=runtime_request.raw_payload,
+                app_context=runtime_request.app_context,
+                presentation_context=runtime_request.presentation_context,
+                user_authored_context=runtime_request.user_authored_context,
+                request_id=runtime_request.request_id,
+            ),
+            task_profile=preview.task_profile,
+            response_type=preview.response_type,
+            workflow_card=preview.workflow_card,
+            runtime_mode=preview.runtime_mode,
+            selected_packs=preview.selected_packs,
+            tool_families=preview.tool_families,
+        )
+
+    def execute_runtime_request_by_name(self, operation_name: str, envelope_data: dict) -> OperationExecuteResponse:
+        return self.execute(operation_name, envelope_data)
+
+    def execute_generate_from_source(self, envelope_data: dict) -> OperationExecuteResponse:
+        envelope = OperationEnvelope.model_validate(envelope_data)
+        source_request = envelope.input
+        source_result = self.execute("source_interpret", envelope_data)
+        interpretation = source_result.artifact
+        routed_route = (
+            "weekly_plan"
+            if interpretation["recommendedHorizon"] in {"next_few_days", "current_week", "starter_week"}
+            else "single_lesson"
+        )
+        bounded_plan_result = self.execute(
+            "bounded_plan_generate",
+            {
+                "input": {
+                    "learnerName": source_request.get("learnerName") or envelope.app_context.learner_id or "Learner",
+                    "requestedRoute": source_request.get("requestedRoute", routed_route),
+                    "routedRoute": routed_route,
+                    "sourceKind": interpretation["sourceKind"],
+                    "chosenHorizon": interpretation["recommendedHorizon"],
+                    "sourceText": source_request.get("extractedText") or source_request.get("rawText") or "",
+                    "titleCandidate": interpretation.get("suggestedTitle") or source_request.get("titleCandidate"),
+                    "detectedChunks": interpretation.get("detectedChunks", []),
+                    "assumptions": interpretation.get("assumptions", []),
+                },
+                "app_context": envelope.app_context.model_dump(mode="json"),
+                "presentation_context": envelope.presentation_context.model_dump(mode="json"),
+                "user_authored_context": envelope.user_authored_context.model_dump(mode="json"),
+                "request_id": envelope.request_id,
+            },
+        )
+        existing_trace = bounded_plan_result.trace.agent_trace or {}
+        bounded_plan_result.trace.agent_trace = {
+            **existing_trace,
+            "orchestration_profile": "generate_from_source",
+            "substeps": [
+                {
+                    "operation_name": "source_interpret",
+                    "artifact": source_result.artifact,
+                },
+                {
+                    "operation_name": "bounded_plan_generate",
+                    "artifact": bounded_plan_result.artifact,
+                },
+            ],
+        }
+        return bounded_plan_result
 
     def run_structured_output(self, *, skill, payload, context: RuntimeContext):
         preview = skill.build_prompt_preview(payload, context)

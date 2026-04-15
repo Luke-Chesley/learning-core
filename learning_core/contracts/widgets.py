@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, WithJsonSchema, field_validator, model_validator
 
 from learning_core.contracts.base import StrictModel
 
@@ -77,6 +77,17 @@ _MAP_INTERACTION_MODE_ALIASES: dict[str, str] = {
     "read_only": "view_only",
     "explore": "guided_explore",
 }
+
+ClosedStringAssignments = Annotated[
+    dict[str, str],
+    WithJsonSchema(
+        {
+            "type": "object",
+            "patternProperties": {"^.*$": {"type": "string"}},
+            "additionalProperties": False,
+        }
+    ),
+]
 
 
 class BoardArrow(StrictModel):
@@ -423,7 +434,7 @@ class MapSurfaceState(StrictModel):
     selectedFeatureIds: list[str] = Field(default_factory=list)
     markerCoordinate: MapCoordinate | None = None
     drawnPath: list[MapCoordinate] = Field(default_factory=list)
-    labelAssignments: dict[str, str] = Field(default_factory=dict)
+    labelAssignments: ClosedStringAssignments = Field(default_factory=dict)
     timelineYear: int | None = None
 
 

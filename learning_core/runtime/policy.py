@@ -12,3 +12,9 @@ class ExecutionPolicy:
     max_tokens: int = 4096
     allowed_tools: tuple[str, ...] = field(default_factory=tuple)
     max_attempts: int = 1
+    runtime_mode: str | None = None
+    autonomy_tier: str = "draft"
+    latency_class: str = "interactive"
+    tool_families: tuple[str, ...] = field(default_factory=tuple)
+    max_loop_steps: int = 0
+    repair_attempts: int = 0

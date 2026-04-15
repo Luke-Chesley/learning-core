@@ -15,6 +15,11 @@ class AppContext(StrictModel):
     lesson_session_id: str | None = None
     plan_item_ids: list[str] = Field(default_factory=list)
     workflow_mode: str | None = None
+    template: str | None = None
+    actor_role: str | None = None
+    autonomy_tier: str | None = None
+    latency_class: str | None = None
+    pack_hints: list[str] = Field(default_factory=list)
     request_origin: Literal["ui_action", "server_action", "background_job", "api", "copilot"] = "api"
     debug: bool = False
 

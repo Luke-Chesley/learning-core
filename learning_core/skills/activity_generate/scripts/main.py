@@ -608,22 +608,23 @@ class ActivityGenerateSkill(SkillDefinition):
                     "Keep IDs, overall composition, and intent stable unless the contract failure makes that impossible.\n\n"
                     "Return only the corrected JSON object. No text outside the JSON."
                 )
-                repair_result = _run_agent_loop_with_adaptive_retry(
-                    llm=model_runtime.client,
-                    system_prompt=preview.system_prompt,
-                    user_prompt=repair_prompt,
-                    tools=tools,
-                    initial_max_steps=4,
-                    fallback_max_steps=7,
+                repair_response = model_runtime.client.invoke(
+                    [
+                        SystemMessage(content=preview.system_prompt),
+                        HumanMessage(content=repair_prompt),
+                    ]
                 )
-                repair_json = _extract_json(repair_result.final_text)
+                repair_text = getattr(repair_response, "content", "")
+                if isinstance(repair_text, list):
+                    repair_text = "".join(
+                        item.get("text", "") if isinstance(item, dict) else str(item)
+                        for item in repair_text
+                    )
+                repair_json = _extract_json(str(repair_text))
                 repaired = json.loads(repair_json)
                 artifact = ActivityArtifact.model_validate(repaired)
-                repair_tool_log = _build_tool_call_log(repair_result.tool_calls)
-                tool_call_log.extend(repair_tool_log)
-                tool_names_used.update(_extract_tool_names_used(repair_result.tool_calls))
                 repair_succeeded = True
-                raw_text = repair_result.final_text
+                raw_text = str(repair_text)
                 json_text = repair_json
             except Exception as repair_error:
                 write_provider_exchange_log(

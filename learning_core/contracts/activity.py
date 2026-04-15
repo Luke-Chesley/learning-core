@@ -703,8 +703,6 @@ class ActivityArtifact(StrictModel):
         ids = [component.id for component in value]
         if len(ids) != len(set(ids)):
             raise ValueError("Activity artifact component ids must be unique.")
-        if not any(is_interactive_component(component) for component in value):
-            raise ValueError("Activity artifact must include at least one interactive component.")
         return value
 
 

@@ -2,75 +2,75 @@
 
 ## Phase 0
 
-- [ ] Write a short ADR locking the migration invariants.
-- [ ] Confirm external operation routes stay stable during the first migration.
-- [ ] Confirm the kernel will be product-neutral and not homeschool-specific.
-- [ ] Define the target runtime directory map.
-- [ ] Define the current-operation to future-task-profile map.
-- [ ] List intentionally deferred items.
+- [x] Write a short ADR locking the migration invariants.
+- [x] Confirm external operation routes stay stable during the first migration.
+- [x] Confirm the kernel will be product-neutral and not homeschool-specific.
+- [x] Define the target runtime directory map.
+- [x] Define the current-operation to future-task-profile map.
+- [x] List intentionally deferred items.
 
 ## Phase 1
 
-- [ ] Add `agent_kernel.py`.
-- [ ] Add shared request normalization.
-- [ ] Add shared preview generation path.
-- [ ] Add shared execution loop abstraction.
-- [ ] Add shared tool runtime abstraction.
-- [ ] Add shared finalization/validation hooks.
-- [ ] Add shared retry hooks.
-- [ ] Add shared trace assembly hooks.
-- [ ] Route one pilot operation through the kernel behind a flag.
+- [x] Add `agent_kernel.py`.
+- [x] Add shared request normalization.
+- [x] Add shared preview generation path.
+- [x] Add shared execution loop abstraction.
+- [x] Add shared tool runtime abstraction.
+- [x] Add shared finalization/validation hooks.
+- [x] Add shared retry hooks.
+- [x] Add shared trace assembly hooks.
+- [x] Route one pilot operation through the kernel behind a flag.
 
 ## Phase 2
 
-- [ ] Create `response_types/` with initial modules.
-- [ ] Create task-profile registry.
-- [ ] Define operation-to-profile mapping.
-- [ ] Define default runtime behavior per task profile.
-- [ ] Update the kernel to resolve behavior from task profile + response type.
+- [x] Create `response_types/` with initial modules.
+- [x] Create task-profile registry.
+- [x] Define operation-to-profile mapping.
+- [x] Define default runtime behavior per task profile.
+- [x] Update the kernel to resolve behavior from task profile + response type.
 
 ## Phase 3
 
-- [ ] Add `workflow_cards/`.
-- [ ] Add generic `packs/` layer or a clearly shared pack system.
-- [ ] Extract reusable pack concepts from `activity_generate`.
-- [ ] Implement at least one non-activity workflow card.
-- [ ] Make pack resolution explainable in traces.
+- [x] Add `workflow_cards/`.
+- [x] Add generic `packs/` layer or a clearly shared pack system.
+- [x] Extract reusable pack concepts from `activity_generate`.
+- [x] Implement at least one non-activity workflow card.
+- [x] Make pack resolution explainable in traces.
 
 ## Phase 4
 
-- [ ] Add shared tool family registration.
-- [ ] Add shared policy model.
-- [ ] Add response-type validation.
-- [ ] Add task-specific validation hooks.
-- [ ] Add repair-path handling.
-- [ ] Add shared retry policy by failure class.
-- [ ] Add uniform trace shape.
-- [ ] Verify prompt preview includes runtime metadata.
+- [x] Add shared tool family registration.
+- [x] Add shared policy model.
+- [x] Add response-type validation.
+- [x] Add task-specific validation hooks.
+- [x] Add repair-path handling.
+- [x] Add shared retry policy by failure class.
+- [x] Add uniform trace shape.
+- [x] Verify prompt preview includes runtime metadata.
 
 ## Phase 5
 
-- [ ] Migrate `session_generate`.
-- [ ] Migrate `activity_generate`.
-- [ ] Add parity and regression tests for both.
-- [ ] Migrate evaluation/proposal operations.
-- [ ] Migrate intake/planning/revision operations.
-- [ ] Migrate `copilot_chat` last.
+- [x] Migrate `session_generate`.
+- [x] Migrate `activity_generate`.
+- [x] Add parity and regression tests for both.
+- [x] Migrate evaluation/proposal operations.
+- [x] Migrate intake/planning/revision operations.
+- [x] Migrate `copilot_chat` last.
 - [ ] Delete duplicate runtime scaffolding from migrated operations.
 
 ## Phase 6
 
-- [ ] Add `source_interpret` profile.
-- [ ] Add bounded orchestration support.
-- [ ] Add `generate_from_source` flow if still needed.
-- [ ] Keep orchestration typed and bounded.
-- [ ] Keep any generic execute surface internal or experimental first.
+- [x] Add `source_interpret` profile.
+- [x] Add bounded orchestration support.
+- [x] Add `generate_from_source` flow if still needed.
+- [x] Keep orchestration typed and bounded.
+- [x] Keep any generic execute surface internal or experimental first.
 
 ## Phase 7
 
-- [ ] Roll operations to the kernel behind flags.
-- [ ] Run scenario suites and preview comparisons.
-- [ ] Inspect traces and repair behavior.
-- [ ] Update README and developer docs.
+- [x] Roll operations to the kernel behind flags.
+- [x] Run scenario suites and preview comparisons.
+- [x] Inspect traces and repair behavior.
+- [x] Update README and developer docs.
 - [ ] Remove dead runtime plumbing.
-- [ ] Confirm adding a new capability now follows the new shared path.
+- [x] Confirm adding a new capability now follows the new shared path.

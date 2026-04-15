@@ -3,6 +3,7 @@ from __future__ import annotations
 from learning_core.contracts.responses import OperationDescriptor
 from learning_core.runtime.errors import SkillNotFoundError
 from learning_core.runtime.skill import SkillDefinition
+from learning_core.runtime.task_profiles import get_operation_runtime_definition
 
 
 class SkillRegistry:
@@ -27,6 +28,9 @@ class SkillRegistry:
                     skill_version=skill.policy.skill_version,
                     task_kind=skill.policy.task_kind,
                     allowed_tools=list(skill.policy.allowed_tools),
+                    task_profile=get_operation_runtime_definition(operation_name).task_profile,
+                    response_type=get_operation_runtime_definition(operation_name).response_type,
+                    workflow_card=get_operation_runtime_definition(operation_name).workflow_card,
                 )
                 for operation_name, skill in self._skills.items()
             ],

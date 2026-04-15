@@ -16,6 +16,22 @@ Current interactive activity generation stays bounded by the `ActivityArtifact` 
 - Prompt ownership lives in `SKILL.md` plus Python prompt builders inside `learning-core`.
 - Skill runtime code lives under `learning_core/skills/<skill>/scripts/main.py` and any
   skill-local helper modules live alongside it in `scripts/`.
+- Public operations now route through a shared internal kernel that normalizes requests,
+  resolves task profiles and response types, builds workflow-card previews, and executes
+  through explicit bounded strategies.
+
+## Runtime Model
+
+`learning-core` now has one internal runtime vocabulary:
+
+- `task_profiles`: what kind of job the request is asking for
+- `response_types`: the typed artifact contract that must come back
+- `workflow_cards`: bounded prompt and execution recipes
+- `packs`: reusable domain context layered in by request metadata or task-specific selection
+- `AgentKernel`: the shared preview/execute backbone used by the public operation routes
+
+The public API is still operation-based.
+Internally, those operations map onto the shared runtime layer.
 
 ## Local Dev
 
@@ -138,6 +154,12 @@ learning_core/
 - `POST /v1/operations/{operation_name}/prompt-preview`
 - `POST /v1/operations/{operation_name}/execute`
 
+Internal orchestration helpers live behind the engine and are not the main public API.
+The first bounded chain currently available is `generate_from_source`, which composes:
+
+1. `source_interpret`
+2. `bounded_plan_generate`
+
 Current first-class operations:
 
 - `activity_feedback`
@@ -165,3 +187,16 @@ Current first-class operations:
 - Product repos send structured request envelopes only. They do not send prompt fragments or raw system prompts.
 - The legacy generic gateway surface is deleted. Apps call named operations only.
 - Backend domain logic is canonical for engine-backed widgets. Frontend libraries are rendering helpers, not the source of truth.
+
+## Adding Runtime Pieces
+
+When adding a new bounded capability:
+
+1. Add or reuse a `response_type`.
+2. Add or reuse a `task_profile`.
+3. Add a `workflow_card`.
+4. Add any reusable `packs` or tool families it needs.
+5. Map the public operation to the shared runtime in `learning_core/runtime/task_profiles.py`.
+
+Keep task-specific prompts and validators close to the task.
+Keep routing, preview, tracing, and policy in the shared runtime layer.

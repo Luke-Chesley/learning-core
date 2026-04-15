@@ -30,4 +30,10 @@ class ExecutionTrace(StrictModel):
     prompt_preview: PromptPreview
     request_envelope: OperationEnvelope
     executed_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    task_profile: str | None = None
+    response_type: str | None = None
+    workflow_card: str | None = None
+    runtime_mode: str | None = None
+    selected_packs: list[str] = Field(default_factory=list)
+    tool_families: list[str] = Field(default_factory=list)
     agent_trace: dict[str, Any] | None = None

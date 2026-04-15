@@ -15,6 +15,9 @@ class OperationDescriptor(StrictModel):
     skill_version: str
     task_kind: str
     allowed_tools: list[str] = Field(default_factory=list)
+    task_profile: str | None = None
+    response_type: str | None = None
+    workflow_card: str | None = None
 
 
 class OperationPromptPreviewResponse(StrictModel):
@@ -26,6 +29,12 @@ class OperationPromptPreviewResponse(StrictModel):
     system_prompt: str
     user_prompt: str
     request_envelope: OperationEnvelope
+    task_profile: str | None = None
+    response_type: str | None = None
+    workflow_card: str | None = None
+    runtime_mode: str | None = None
+    selected_packs: list[str] = Field(default_factory=list)
+    tool_families: list[str] = Field(default_factory=list)
 
 
 class OperationExecuteResponse(StrictModel):
