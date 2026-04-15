@@ -22,8 +22,10 @@ Interpretation rules:
 - Use `single_day_material` for one lesson, one chapter excerpt, one worksheet page, one assignment sheet, or one bounded daily chunk.
 - Use `weekly_assignments` for clearly multi-day current-week assignment lists or week schedules.
 - Use `sequence_outline` for outlines, tables of contents, multi-step sequences, and ordered unit/topic ladders.
+- If an outline or table of contents is messy, pasted badly, or missing bullets, keep it as `sequence_outline` when the sequence is still the core source shape.
 - Use `topic_seed` for open-ended topic prompts without a concrete sequence.
-- Use `manual_shell` only when the source clearly asks for a lightweight scaffold instead of content interpretation.
+- Use `manual_shell` only when the source clearly asks for a lightweight scaffold instead of content interpretation, or when there is effectively no interpretable source.
+- Do not downgrade a real outline, TOC, weekly list, or partial assignment source to `manual_shell` just because it is messy or incomplete.
 - Use `ambiguous` when the source is too thin or contradictory to classify confidently.
 
 Horizon rules:
@@ -34,6 +36,8 @@ Horizon rules:
 - `topic_seed` should usually recommend `starter_module`.
 - `manual_shell` should usually recommend `starter_week`.
 - Respect a `today_only` user intent by keeping the recommendation bounded to `today`.
+- If the parent gives real current-week schedule constraints like co-op days, travel, or light Fridays, preserve those constraints in `assumptions` and keep the horizon week-bounded instead of widening to a generic starter shell.
+- If the source is partial, cropped, or explicitly missing pages, keep the horizon conservative and state the uncertainty directly in `assumptions`.
 
 Quality bar:
 - `assumptions` should be short, operational, and honest.

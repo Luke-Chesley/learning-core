@@ -1,10 +1,90 @@
 from __future__ import annotations
 
+import re
+
 from learning_core.contracts.lesson_draft import LESSON_SHAPE_VALUES
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.prompt_utils import append_user_authored_context
+
+_EXACT_SCRIPT_PATTERNS = (
+    re.compile(r"\bexact(?:ly)? what to say\b", re.IGNORECASE),
+    re.compile(r"\bexact script\b", re.IGNORECASE),
+    re.compile(r"\bscript(?:ed)?\b", re.IGNORECASE),
+    re.compile(r"\bread (?:it|this) aloud\b", re.IGNORECASE),
+    re.compile(r"\bverbatim\b", re.IGNORECASE),
+    re.compile(r"\bcalm\b", re.IGNORECASE),
+    re.compile(r"\blimited branching\b", re.IGNORECASE),
+)
+
+_PARTIAL_SOURCE_PATTERNS = (
+    re.compile(r"\bpartial\b", re.IGNORECASE),
+    re.compile(r"\bmissing\b", re.IGNORECASE),
+    re.compile(r"\bexcerpt\b", re.IGNORECASE),
+    re.compile(r"\bcropped\b", re.IGNORECASE),
+    re.compile(r"\bcut off\b", re.IGNORECASE),
+    re.compile(r"\bdo not invent\b", re.IGNORECASE),
+)
+
+_MULTI_LEARNER_PATTERNS = (
+    re.compile(r"\btwo learners\b", re.IGNORECASE),
+    re.compile(r"\bboth kids\b", re.IGNORECASE),
+    re.compile(r"\bolder\b", re.IGNORECASE),
+    re.compile(r"\byounger\b", re.IGNORECASE),
+    re.compile(r"\b8-year-old\b", re.IGNORECASE),
+    re.compile(r"\b9-year-old\b", re.IGNORECASE),
+    re.compile(r"\b11-year-old\b", re.IGNORECASE),
+    re.compile(r"\b13-year-old\b", re.IGNORECASE),
+    re.compile(r"\bage split\b", re.IGNORECASE),
+    re.compile(r"\bdifferent depth\b", re.IGNORECASE),
+)
+
+
+def _request_signal_text(payload: SessionPlanGenerationRequest, context) -> str:
+    values: list[str] = [payload.topic or "", payload.title or ""]
+    values.extend(payload.objectives)
+    values.extend(item.title for item in payload.routeItems)
+    values.extend(item.objective for item in payload.routeItems)
+
+    authored = context.user_authored_context
+    values.extend(
+        [
+            authored.parent_goal or "",
+            authored.note or "",
+            authored.teacher_note or "",
+            authored.custom_instruction or "",
+            *authored.special_constraints,
+            *authored.avoidances,
+        ]
+    )
+
+    return "\n".join(value for value in values if value).strip()
+
+
+def _matches_any(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+    return any(pattern.search(text) for pattern in patterns)
+
+
+def _infer_total_minutes(payload: SessionPlanGenerationRequest, context) -> int:
+    if payload.resolvedTiming:
+        return payload.resolvedTiming.resolvedTotalMinutes
+
+    request_text = _request_signal_text(payload, context)
+    route_minutes = sum(
+        item.estimatedMinutes for item in payload.routeItems if isinstance(item.estimatedMinutes, int)
+    )
+
+    if _matches_any(request_text, _EXACT_SCRIPT_PATTERNS):
+        return min(route_minutes, 20) if route_minutes > 0 else 15
+
+    if _matches_any(request_text, _PARTIAL_SOURCE_PATTERNS):
+        return min(route_minutes, 25) if route_minutes > 0 else 20
+
+    if route_minutes > 0:
+        return max(10, min(route_minutes, 35))
+
+    return 30
 
 
 class SessionGenerateSkill(StructuredOutputSkill):
@@ -18,6 +98,10 @@ class SessionGenerateSkill(StructuredOutputSkill):
     )
 
     def build_user_prompt(self, payload: SessionPlanGenerationRequest, context) -> str:
+        request_text = _request_signal_text(payload, context)
+        exact_script_request = _matches_any(request_text, _EXACT_SCRIPT_PATTERNS)
+        partial_source_request = _matches_any(request_text, _PARTIAL_SOURCE_PATTERNS)
+        multi_learner_request = _matches_any(request_text, _MULTI_LEARNER_PATTERNS)
         objectives = (
             "\n".join(f"{index + 1}. {objective}" for index, objective in enumerate(payload.objectives))
             if payload.objectives
@@ -56,11 +140,7 @@ class SessionGenerateSkill(StructuredOutputSkill):
         elif context.app_context.learner_id:
             learner_name = context.app_context.learner_id
 
-        total_minutes = (
-            payload.resolvedTiming.resolvedTotalMinutes
-            if payload.resolvedTiming
-            else 45
-        )
+        total_minutes = _infer_total_minutes(payload, context)
 
         lines = [
             f"Generate a structured lesson plan for {learner_name or 'the learner'} on "
@@ -73,6 +153,41 @@ class SessionGenerateSkill(StructuredOutputSkill):
             f"Objectives in scope: {len(payload.objectives)}",
             f"Allowed lesson_shape slugs: {', '.join(LESSON_SHAPE_VALUES)}",
         ]
+
+        lines.extend(
+            [
+                "",
+                "Session sizing rules:",
+                f"- Keep the lesson genuinely teachable within about {total_minutes} minutes.",
+                "- Do not inflate a bounded request into a generic 45-minute lesson unless the source clearly requires it.",
+                "- Prefer fewer, clearer blocks over filler transitions or repeated review.",
+            ]
+        )
+
+        if exact_script_request:
+            lines.extend(
+                [
+                    "- This is a script-first request. The parent should be able to read the core prompts almost verbatim.",
+                    "- Keep teacher_action lines speakable, concise, and low-branching.",
+                    "- Favor 2 to 4 compact blocks and avoid broad open-ended questioning.",
+                ]
+            )
+
+        if partial_source_request:
+            lines.extend(
+                [
+                    "- The source is partial or messy. Keep uncertainty explicit and do not invent missing pages or hidden context.",
+                    "- Stay bounded to what the source can honestly support today plus only a light next-step hint if needed.",
+                ]
+            )
+
+        if multi_learner_request:
+            lines.extend(
+                [
+                    "- Preserve distinct expectations for the learners instead of collapsing into one shared task.",
+                    "- Make the split visible inside block actions, adaptations, or teacher notes so the parent can run it without guessing.",
+                ]
+            )
 
         if payload.lessonShape:
             lines.append(

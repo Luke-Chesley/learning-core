@@ -56,6 +56,10 @@ _BOARD_INTERACTION_MODE_ALIASES: dict[str, str] = {
     "read_only": "view_only",
 }
 
+_SURFACE_ROLE_ALIASES: dict[str, str] = {
+    "secondary": "supporting",
+}
+
 _EXPRESSION_INTERACTION_MODE_ALIASES: dict[str, str] = {
     "inspect": "view_only",
     "observe": "view_only",
@@ -113,6 +117,13 @@ class BoardSurfaceDisplay(StrictModel):
     showCoordinates: bool = True
     showMoveHint: bool = True
     boardRole: SurfaceRole = "primary"
+
+    @field_validator("boardRole", mode="before")
+    @classmethod
+    def normalize_board_role_alias(cls, value: str) -> str:
+        if isinstance(value, str):
+            return _SURFACE_ROLE_ALIASES.get(value.strip().lower(), value)
+        return value
 
 
 class BoardSurfaceState(StrictModel):

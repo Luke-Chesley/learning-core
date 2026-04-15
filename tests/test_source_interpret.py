@@ -7,6 +7,7 @@ import pytest
 
 import learning_core.runtime.engine as engine_module
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
+from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
 from learning_core.contracts.source_interpret import SourceInterpretationRequest
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.engine import AgentEngine
@@ -111,6 +112,8 @@ def test_source_interpret_prompt_preview_lists_allowed_kinds_and_guardrails():
     assert "Do not generate curriculum" in preview.system_prompt
     assert "Requested route: topic" in preview.user_prompt
     assert "User horizon intent: auto" in preview.user_prompt
+    assert "Do not downgrade a real outline" in preview.system_prompt
+    assert "co-op days" in preview.system_prompt
 
 
 def test_source_interpret_execute_rejects_invalid_source_kind(monkeypatch, tmp_path: Path):
@@ -183,3 +186,99 @@ def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
     assert result.artifact["recommendedHorizon"] == "current_week"
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
+
+
+def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    engine = AgentEngine(build_skill_registry())
+
+    captured_requests: list[tuple[str, dict]] = []
+    bounded_response = engine_module.OperationExecuteResponse(
+        operation_name="bounded_plan_generate",
+        artifact={
+            "title": "Messy outline week",
+            "description": "Bounded week plan",
+            "subjects": ["History"],
+            "horizon": "current_week",
+            "rationale": ["Preserve the messy outline as a bounded week."],
+            "document": {"History": {"Week": ["Lesson 1"]}},
+            "units": [
+                {
+                    "title": "Week",
+                    "description": "Week",
+                    "lessons": [{"title": "Lesson 1", "description": "Desc"}],
+                }
+            ],
+            "progression": None,
+            "suggestedSessionMinutes": 20,
+        },
+        lineage=ExecutionLineage(
+            operation_name="bounded_plan_generate",
+            skill_name="bounded_plan_generate",
+            skill_version="test",
+            provider="test",
+            model="test",
+        ),
+        trace=ExecutionTrace(
+            request_id="req-123",
+            operation_name="bounded_plan_generate",
+            allowed_tools=[],
+            prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
+            request_envelope=engine_module.OperationEnvelope.model_validate(
+                {
+                    "input": {"topic": "messy outline"},
+                    "app_context": {"product": "homeschool-v2", "surface": "onboarding"},
+                }
+            ),
+        ),
+        prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
+    )
+
+    def fake_execute(self, operation_name: str, envelope_data: dict):
+        captured_requests.append((operation_name, envelope_data))
+        if operation_name == "source_interpret":
+            return engine_module.OperationExecuteResponse(
+                operation_name="source_interpret",
+                artifact={
+                    "sourceKind": "sequence_outline",
+                    "suggestedTitle": "Mangled outline",
+                    "confidence": "medium",
+                    "recommendedHorizon": "current_week",
+                    "assumptions": ["Keep the copied outline structure visible."],
+                    "detectedChunks": ["Chapter 4", "co-op Thursday"],
+                    "followUpQuestion": None,
+                    "needsConfirmation": False,
+                },
+                lineage=ExecutionLineage(
+                    operation_name="source_interpret",
+                    skill_name="source_interpret",
+                    skill_version="test",
+                    provider="test",
+                    model="test",
+                ),
+                trace=ExecutionTrace(
+                    request_id="req-123",
+                    operation_name="source_interpret",
+                    allowed_tools=[],
+                    prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
+                    request_envelope=engine_module.OperationEnvelope.model_validate(
+                        {
+                            "input": _envelope()["input"],
+                            "app_context": {"product": "homeschool-v2", "surface": "onboarding"},
+                        }
+                    ),
+                ),
+                prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
+            )
+        if operation_name == "bounded_plan_generate":
+            return bounded_response
+        raise AssertionError(f"Unexpected operation: {operation_name}")
+
+    monkeypatch.setattr(engine_module.AgentEngine, "execute", fake_execute, raising=True)
+
+    result = AgentEngine(build_skill_registry()).execute_generate_from_source(_envelope())
+
+    bounded_call = next(data for name, data in captured_requests if name == "bounded_plan_generate")
+    assert bounded_call["input"]["requestedRoute"] == "outline"
+    assert bounded_call["input"]["routedRoute"] == "outline"
+    assert result.artifact["horizon"] == "current_week"

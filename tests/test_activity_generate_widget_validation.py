@@ -83,6 +83,35 @@ def test_widget_validation_normalizes_chess_widget_without_errors():
     assert widget.evaluation.expectedMoves == ["e2b5"]
 
 
+def test_widget_validation_accepts_secondary_board_role_alias():
+    artifact = _activity_with_components(
+        [
+            {
+                "type": "interactive_widget",
+                "id": "best-move",
+                "prompt": "White to move. Find the checking move.",
+                "required": True,
+                "widget": {
+                    **_VALID_CHESS_WIDGET,
+                    "display": {
+                        "showSideToMove": True,
+                        "showCoordinates": True,
+                        "showMoveHint": True,
+                        "boardRole": "secondary",
+                    },
+                },
+            }
+        ]
+    )
+
+    chess_pack = ChessPack()
+    normalized, hard_errors, soft_warnings = normalize_and_validate_widget_activity(artifact, [chess_pack])
+
+    assert hard_errors == []
+    assert normalized.components[0].widget.display.boardRole == "supporting"
+    assert any("board-centered" in warning or "move input" in warning for warning in soft_warnings)
+
+
 def test_primary_widget_not_first_interactive_is_soft_warning():
     """Primary widget not being the first interactive component should be a soft warning, not a hard error."""
     artifact = _activity_with_components(
