@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
+import re
+import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -71,9 +74,93 @@ class AgentEngine:
         }
 
     def _structured_output_method_for_provider(self, provider: str) -> str | None:
+        # GPT-5.4-mini is currently more reliable with JSON mode than with
+        # LangChain's explicit function-calling / json-schema steering.
         if provider == "openai":
-            return "function_calling"
+            return "json_mode"
         return None
+
+    def _is_retryable_provider_error(self, provider: str, error: Exception) -> bool:
+        if provider != "openai":
+            return False
+        message = str(error).lower()
+        return (
+            "error code: 500" in message
+            or "server_error" in message
+            or "upstream connect error" in message
+            or "disconnect/reset before headers" in message
+        )
+
+    def _invoke_provider_with_retry(self, provider: str, fn, *, max_attempts: int = 3):
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return fn()
+            except Exception as error:  # pragma: no cover - provider exceptions vary
+                last_error = error
+                if attempt >= max_attempts or not self._is_retryable_provider_error(provider, error):
+                    raise
+                time.sleep(0.4 * attempt)
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Provider invocation failed without an error.")
+
+    def _extract_json(self, text: str) -> str:
+        match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+
+        start = text.find("{")
+        if start == -1:
+            return text.strip()
+
+        depth = 0
+        end = start
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+
+        return text[start : end + 1]
+
+    def _run_text_json_fallback(self, *, skill, payload, context, structured_error: Exception):
+        raw_text, lineage, trace = self.run_text_output(
+            skill=skill,
+            payload=payload,
+            context=context,
+        )
+        extracted_json = self._extract_json(raw_text)
+
+        try:
+            raw_artifact = json.loads(extracted_json)
+        except Exception as error:
+            raise ContractValidationError(
+                "Structured-output fallback returned invalid JSON: "
+                f"{error}. Raw text: {raw_text[:400]}"
+            ) from error
+
+        try:
+            artifact = skill.output_model.model_validate(raw_artifact)
+        except Exception as error:
+            raise ContractValidationError(
+                f"Structured-output fallback returned an invalid artifact: {error}"
+            ) from error
+
+        trace.agent_trace = {
+            **(trace.agent_trace or {}),
+            "structured_output_fallback": {
+                "strategy": "text_json",
+                "reason": structured_error.__class__.__name__,
+                "message": str(structured_error),
+            },
+        }
+
+        return artifact, lineage, trace
 
     def _kernel_enabled_for_operation(self, operation_name: str) -> bool:
         env_name = f"LEARNING_CORE_USE_KERNEL_FOR_{operation_name.upper()}"
@@ -264,13 +351,32 @@ class AgentEngine:
                 skill.output_model,
                 **structured_kwargs,
             )
-            raw_artifact = structured.invoke(
-                [
-                    SystemMessage(content=preview.system_prompt),
-                    HumanMessage(content=preview.user_prompt),
-                ]
+            raw_artifact = self._invoke_provider_with_retry(
+                model_runtime.provider,
+                lambda: structured.invoke(
+                    [
+                        SystemMessage(content=preview.system_prompt),
+                        HumanMessage(content=preview.user_prompt),
+                    ]
+                ),
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
+            if self._is_retryable_provider_error(model_runtime.provider, error):
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "structured_error_fallback",
+                        "error_type": error.__class__.__name__,
+                        "error": str(error),
+                        "fallback_strategy": "text_json",
+                    },
+                )
+                return self._run_text_json_fallback(
+                    skill=skill,
+                    payload=payload,
+                    context=context,
+                    structured_error=error,
+                )
             write_provider_exchange_log(
                 request=provider_request,
                 response={
@@ -345,11 +451,14 @@ class AgentEngine:
         )
 
         try:
-            response = model_runtime.client.invoke(
-                [
-                    SystemMessage(content=preview.system_prompt),
-                    HumanMessage(content=preview.user_prompt),
-                ]
+            response = self._invoke_provider_with_retry(
+                model_runtime.provider,
+                lambda: model_runtime.client.invoke(
+                    [
+                        SystemMessage(content=preview.system_prompt),
+                        HumanMessage(content=preview.user_prompt),
+                    ]
+                ),
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
             write_provider_exchange_log(

@@ -191,7 +191,7 @@ def test_session_generate_execute_accepts_canonical_lesson_shape(monkeypatch, tm
     assert result.artifact["lesson_shape"] == "direct_instruction"
 
 
-def test_openai_structured_output_uses_function_calling(monkeypatch, tmp_path: Path):
+def test_openai_structured_output_uses_json_mode(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     fake_client = _FakeClient(_lesson_artifact("direct_instruction"))
     monkeypatch.setattr(
@@ -212,7 +212,7 @@ def test_openai_structured_output_uses_function_calling(monkeypatch, tmp_path: P
     result = engine.execute("session_generate", _session_generate_envelope())
 
     assert result.artifact["lesson_shape"] == "direct_instruction"
-    assert fake_client.structured_output_method == "function_calling"
+    assert fake_client.structured_output_method == "json_mode"
 
 
 def test_ollama_structured_output_does_not_use_openai_method(monkeypatch, tmp_path: Path):

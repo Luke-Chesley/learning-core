@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -49,6 +50,27 @@ class _FakeClient:
 
     def with_structured_output(self, _output_model, **_kwargs):
         return _FakeStructuredInvoker(self.artifact)
+
+
+class _ExplodingStructuredInvoker:
+    def invoke(self, _messages):
+        raise RuntimeError("Error code: 500 - provider exploded")
+
+
+class _FakeTextResponse:
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+
+class _FallbackClient:
+    def __init__(self, artifact: dict) -> None:
+        self.artifact = artifact
+
+    def with_structured_output(self, _output_model, **_kwargs):
+        return _ExplodingStructuredInvoker()
+
+    def invoke(self, _messages):
+        return _FakeTextResponse(json.dumps(self.artifact))
 
 
 def _envelope() -> dict:
@@ -134,3 +156,30 @@ def test_source_interpret_execute_accepts_valid_artifact(monkeypatch, tmp_path: 
 
     assert result.artifact["sourceKind"] == "weekly_assignments"
     assert result.artifact["recommendedHorizon"] == "current_week"
+
+
+def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-source-interpret",
+            client=_FallbackClient(_artifact()),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("source_interpret", _envelope())
+
+    assert result.artifact["sourceKind"] == "weekly_assignments"
+    assert result.artifact["recommendedHorizon"] == "current_week"
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
