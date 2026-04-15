@@ -41,6 +41,13 @@ def _parse_optional_str(value: str | None) -> str | None:
     return stripped or None
 
 
+_OPENAI_FLEX_UNSTABLE_TASKS = {
+    "activity_generate",
+    "bounded_plan_generate",
+    "session_generate",
+}
+
+
 def _read_required_str(name: str) -> str:
     value = _parse_optional_str(os.getenv(name))
     if value is None:
@@ -116,6 +123,20 @@ def _resolve_max_tokens(task_name: str, task_kind: str, policy_max_tokens: int |
     )
 
 
+def _resolve_openai_service_tier(task_name: str) -> str | None:
+    service_tier = _parse_optional_str(os.getenv("OPENAI_SERVICE_TIER"))
+    if service_tier != "flex":
+        return service_tier
+
+    # Flex is fast for lighter requests, but the larger structured and agentic
+    # generation calls on the onboarding path have been materially less stable
+    # there than on the default tier.
+    if task_name in _OPENAI_FLEX_UNSTABLE_TASKS:
+        return None
+
+    return service_tier
+
+
 def build_model_runtime(
     *,
     task_name: str,
@@ -154,7 +175,7 @@ def build_model_runtime(
 
     if provider == "openai":
         api_key = _read_required_str("OPENAI_API_KEY")
-        service_tier = _parse_optional_str(os.getenv("OPENAI_SERVICE_TIER"))
+        service_tier = _resolve_openai_service_tier(task_name)
         client = ChatOpenAI(
             model=model,
             temperature=resolved_temperature,
