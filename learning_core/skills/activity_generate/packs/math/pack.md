@@ -25,6 +25,15 @@ Prefer normal components when they are enough:
 - Use `interactive_widget` with `surfaceKind="graph_surface"` and `engineKind="graphing"` when graph interaction is central evidence.
 - Do not escalate to a widget just to make the activity feel more advanced.
 
+## Contract discipline
+
+- Use exact enum values from the widget contracts. Do not invent variants.
+- For math and graph widgets, `submissionMode` must be `immediate` or `explicit_submit`.
+- `resetPolicy` must be `not_allowed` or `reset_to_initial`.
+- `attemptPolicy` must be `single_attempt` or `allow_retry`.
+- `display.surfaceRole` must be `primary` or `supporting`.
+- For graph widgets, always set `evaluation.expectedGraphDescription`.
+
 ## Avoid quiz spam
 
 - Do not turn every math activity into a stack of disconnected single-select items.
@@ -40,4 +49,3 @@ Strong evidence can be:
 - an explanation of why a move works
 - identification of an error and how to fix it
 - a graph or symbolic entry when the representation itself matters
-

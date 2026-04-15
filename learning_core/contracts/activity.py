@@ -633,6 +633,13 @@ class ScoringModel(StrictModel):
     confidenceMasteryLevel: int | None = Field(default=None, ge=1, le=5)
     notes: str | None = None
 
+    @field_validator("rubricMasteryLevel", "confidenceMasteryLevel", mode="before")
+    @classmethod
+    def coerce_zeroish_optional_levels(cls, value: int | None) -> int | None:
+        if value in (0, "0", ""):
+            return None
+        return value
+
 
 class AdaptationRules(StrictModel):
     hintStrategy: Literal["on_request", "always", "after_wrong_attempt"] = "on_request"
@@ -661,6 +668,14 @@ class ActivityMetadata(StrictModel):
     lessonShape: str | None = None
     workflowMode: str | None = None
     subject: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def drop_unknown_keys(cls, value):
+        if not isinstance(value, dict):
+            return value
+        allowed = {"sessionScope", "sessionTitle", "lessonShape", "workflowMode", "subject"}
+        return {key: item for key, item in value.items() if key in allowed}
 
 
 class ActivityArtifact(StrictModel):

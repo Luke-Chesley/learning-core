@@ -9,4 +9,6 @@ This pack supports both:
 
 Prefer source-backed, cached geometry and engine-backed map widgets over freehand map JSON. Use the geography tools to inspect sources, fetch/cache geometry, build widgets, and validate configurations.
 
+Do not invent `sourceId`, layer ids, or feature ids. If you use `map_surface`, first use geography tools to discover the canonical source-backed values.
+
 Escalate to `interactive_widget` with `surfaceKind="map_surface"` and `engineKind="map_geojson"` when the map itself is a core part of the learning experience. If a static image is enough, use standard components like `image`, `hotspot_select`, or `label_map`.

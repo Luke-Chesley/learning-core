@@ -272,6 +272,45 @@ def validate_widget_config(widget_payload: dict[str, Any], refresh: bool = False
     return result
 
 
+def canonicalize_widget_feature_references(widget_payload: dict[str, Any], refresh: bool = False) -> dict[str, Any]:
+    normalized = json.loads(json.dumps(widget_payload))
+    state = normalized.get("state", {})
+    source_id = state.get("sourceId")
+    if not source_id:
+        return normalized
+
+    source_bundle = fetch_source_collection(source_id, refresh=refresh)
+    source_collection = source_bundle["featureCollection"]
+
+    for layer in normalized.get("layers", []):
+        layer_source_id = layer.get("sourceId") or source_id
+        layer_bundle = fetch_source_collection(layer_source_id, refresh=refresh)
+        layer["featureIds"] = [
+            resolve_feature_reference(layer_bundle["featureCollection"], feature_ref)
+            for feature_ref in layer.get("featureIds", [])
+        ]
+
+    evaluation = normalized.get("evaluation", {})
+    if isinstance(evaluation.get("acceptedFeatureIds"), list):
+        evaluation["acceptedFeatureIds"] = [
+            resolve_feature_reference(source_collection, feature_ref)
+            for feature_ref in evaluation.get("acceptedFeatureIds", [])
+        ]
+    if isinstance(evaluation.get("labelTargets"), list):
+        canonical_targets: list[dict[str, Any]] = []
+        for target in evaluation.get("labelTargets", []):
+            if not isinstance(target, dict):
+                canonical_targets.append(target)
+                continue
+            canonical_target = dict(target)
+            feature_ref = canonical_target.get("featureId")
+            if isinstance(feature_ref, str) and feature_ref.strip():
+                canonical_target["featureId"] = resolve_feature_reference(source_collection, feature_ref)
+            canonical_targets.append(canonical_target)
+        evaluation["labelTargets"] = canonical_targets
+    return normalized
+
+
 def evaluate_feature_selection(
     *,
     accepted_feature_ids: list[str],
@@ -547,10 +586,50 @@ def resolve_feature_ids(feature_collection: dict[str, Any], feature_ids: list[st
         return all_ids
     resolved: list[str] = []
     for feature_id in feature_ids:
-        feature_by_id(feature_collection, feature_id)
-        if feature_id not in resolved:
-            resolved.append(feature_id)
+        canonical_id = resolve_feature_reference(feature_collection, feature_id)
+        if canonical_id not in resolved:
+            resolved.append(canonical_id)
     return resolved
+
+
+def resolve_feature_reference(feature_collection: dict[str, Any], feature_ref: str) -> str:
+    normalized_ref = feature_ref.strip()
+    if not normalized_ref:
+        raise KeyError("Feature reference cannot be empty.")
+
+    features = feature_collection.get("features", [])
+    by_id = next((feature["id"] for feature in features if feature["id"] == normalized_ref), None)
+    if by_id is not None:
+        return by_id
+
+    lowered_ref = normalized_ref.lower()
+    slug_ref = slugify(normalized_ref)
+    matches: list[str] = []
+    for feature in features:
+        candidates = {
+            str(feature.get("id", "")),
+            feature_name(feature),
+        }
+        properties = feature.get("properties", {})
+        for key in ("shapeName", "name", "NAME", "shapeID"):
+            value = properties.get(key)
+            if value is not None:
+                candidates.add(str(value))
+        normalized_candidates = {
+            candidate.strip().lower()
+            for candidate in candidates
+            if isinstance(candidate, str) and candidate.strip()
+        }
+        slug_candidates = {slugify(candidate) for candidate in normalized_candidates}
+        if lowered_ref in normalized_candidates or slug_ref in slug_candidates:
+            matches.append(feature["id"])
+
+    unique_matches = list(dict.fromkeys(matches))
+    if len(unique_matches) == 1:
+        return unique_matches[0]
+    if not unique_matches:
+        raise KeyError(f"Unknown feature id '{feature_ref}'.")
+    raise KeyError(f"Ambiguous feature reference '{feature_ref}' matched multiple features.")
 
 
 def feature_centroid(feature: dict[str, Any]) -> dict[str, float]:

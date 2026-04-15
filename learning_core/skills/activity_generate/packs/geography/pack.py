@@ -51,7 +51,8 @@ _REQUIRED_TOOL_NAMES: list[str] = [
 _REPAIR_GUIDANCE = (
     "The activity contains map widgets but no geography validation tools were used during generation. "
     "Before finalizing, validate each map widget with map_validate_widget_config. "
-    "When building new map activities, prefer source-backed map_build_widget_config and source inspection tools over hand-authoring geometry."
+    "When building new map activities, prefer source-backed map_build_widget_config and source inspection tools over hand-authoring geometry. "
+    "Do not invent sourceId values, layer ids, or feature ids. Use map_describe_source, map_lookup_feature, and map_build_widget_config to get canonical source-backed values first."
 )
 
 

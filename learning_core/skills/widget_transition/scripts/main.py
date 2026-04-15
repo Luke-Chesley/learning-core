@@ -17,6 +17,8 @@ from learning_core.skills.activity_generate.packs.geography.engine import (
     evaluate_path,
 )
 
+TransitionHandler = callable
+
 
 def _prompt_preview(payload: WidgetTransitionRequest) -> PromptPreview:
     return PromptPreview(
@@ -212,9 +214,23 @@ def _transition_chess_widget(payload: WidgetTransitionRequest) -> WidgetTransiti
                 errorMessage=str(error),
             )
 
+    next_response = _move_response_payload(move_result)
+
+    if widget.interaction.submissionMode == "explicit_submit":
+        return WidgetTransitionArtifact(
+            schemaVersion="1",
+            componentId=payload.componentId,
+            componentType=payload.componentType,
+            widgetEngineKind=widget.engineKind,
+            accepted=True,
+            normalizedLearnerAction=move_result["normalizedMove"],
+            nextResponse=next_response,
+            canonicalWidget=widget,
+            legalTargets=[],
+        )
+
     next_widget = widget.model_copy(deep=True)
     next_widget.state.fen = move_result["fenAfter"]
-    next_response = _move_response_payload(move_result)
 
     immediate_feedback = None
     if widget.feedback.mode == "immediate" and widget.evaluation.expectedMoves:
@@ -418,6 +434,140 @@ def _transition_map_widget(payload: WidgetTransitionRequest) -> WidgetTransition
     )
 
 
+def _text_widget_response_payload(*, key: str, value: str) -> dict[str, Any]:
+    return {key: value}
+
+
+def _transition_math_symbolic_widget(payload: WidgetTransitionRequest) -> WidgetTransitionArtifact:
+    widget = payload.widget
+    action = payload.learnerAction
+
+    if action.type == "reset":
+        if not widget.interaction.allowReset or widget.interaction.resetPolicy == "not_allowed":
+            return WidgetTransitionArtifact(
+                schemaVersion="1",
+                componentId=payload.componentId,
+                componentType=payload.componentType,
+                widgetEngineKind=widget.engineKind,
+                accepted=False,
+                normalizedLearnerAction=action.model_dump(mode="json"),
+                nextResponse=payload.currentResponse,
+                canonicalWidget=widget,
+                legalTargets=[],
+                errorMessage="Reset is not allowed for this widget.",
+            )
+        reset_widget = widget.model_copy(deep=True)
+        reset_widget.state.initialValue = widget.state.initialValue or ""
+        return WidgetTransitionArtifact(
+            schemaVersion="1",
+            componentId=payload.componentId,
+            componentType=payload.componentType,
+            widgetEngineKind=widget.engineKind,
+            accepted=True,
+            normalizedLearnerAction=action.model_dump(mode="json"),
+            nextResponse=_text_widget_response_payload(key="value", value=reset_widget.state.initialValue or ""),
+            canonicalWidget=reset_widget,
+            legalTargets=[],
+        )
+
+    if action.type != "set_text_value":
+        return WidgetTransitionArtifact(
+            schemaVersion="1",
+            componentId=payload.componentId,
+            componentType=payload.componentType,
+            widgetEngineKind=widget.engineKind,
+            accepted=False,
+            normalizedLearnerAction=action.model_dump(mode="json", exclude_none=True),
+            nextResponse=payload.currentResponse,
+            canonicalWidget=widget,
+            legalTargets=[],
+            errorMessage=f"Action '{action.type}' is not supported for math_symbolic widgets.",
+        )
+
+    next_widget = widget.model_copy(deep=True)
+    next_widget.state.initialValue = action.value
+    return WidgetTransitionArtifact(
+        schemaVersion="1",
+        componentId=payload.componentId,
+        componentType=payload.componentType,
+        widgetEngineKind=widget.engineKind,
+        accepted=True,
+        normalizedLearnerAction=action.model_dump(mode="json", exclude_none=True),
+        nextResponse=_text_widget_response_payload(key="value", value=action.value),
+        canonicalWidget=next_widget,
+        legalTargets=[],
+    )
+
+
+def _transition_graphing_widget(payload: WidgetTransitionRequest) -> WidgetTransitionArtifact:
+    widget = payload.widget
+    action = payload.learnerAction
+
+    if action.type == "reset":
+        if not widget.interaction.allowReset or widget.interaction.resetPolicy == "not_allowed":
+            return WidgetTransitionArtifact(
+                schemaVersion="1",
+                componentId=payload.componentId,
+                componentType=payload.componentType,
+                widgetEngineKind=widget.engineKind,
+                accepted=False,
+                normalizedLearnerAction=action.model_dump(mode="json"),
+                nextResponse=payload.currentResponse,
+                canonicalWidget=widget,
+                legalTargets=[],
+                errorMessage="Reset is not allowed for this widget.",
+            )
+        reset_widget = widget.model_copy(deep=True)
+        reset_widget.state.initialExpression = widget.state.initialExpression or ""
+        return WidgetTransitionArtifact(
+            schemaVersion="1",
+            componentId=payload.componentId,
+            componentType=payload.componentType,
+            widgetEngineKind=widget.engineKind,
+            accepted=True,
+            normalizedLearnerAction=action.model_dump(mode="json"),
+            nextResponse=_text_widget_response_payload(key="expression", value=reset_widget.state.initialExpression or ""),
+            canonicalWidget=reset_widget,
+            legalTargets=[],
+        )
+
+    if action.type != "set_text_value":
+        return WidgetTransitionArtifact(
+            schemaVersion="1",
+            componentId=payload.componentId,
+            componentType=payload.componentType,
+            widgetEngineKind=widget.engineKind,
+            accepted=False,
+            normalizedLearnerAction=action.model_dump(mode="json", exclude_none=True),
+            nextResponse=payload.currentResponse,
+            canonicalWidget=widget,
+            legalTargets=[],
+            errorMessage=f"Action '{action.type}' is not supported for graphing widgets.",
+        )
+
+    next_widget = widget.model_copy(deep=True)
+    next_widget.state.initialExpression = action.value
+    return WidgetTransitionArtifact(
+        schemaVersion="1",
+        componentId=payload.componentId,
+        componentType=payload.componentType,
+        widgetEngineKind=widget.engineKind,
+        accepted=True,
+        normalizedLearnerAction=action.model_dump(mode="json", exclude_none=True),
+        nextResponse=_text_widget_response_payload(key="expression", value=action.value),
+        canonicalWidget=next_widget,
+        legalTargets=[],
+    )
+
+
+_TRANSITION_HANDLERS: dict[str, Any] = {
+    "chess": _transition_chess_widget,
+    "map_geojson": _transition_map_widget,
+    "math_symbolic": _transition_math_symbolic_widget,
+    "graphing": _transition_graphing_widget,
+}
+
+
 def evaluate_transition(payload: WidgetTransitionRequest) -> WidgetTransitionArtifact:
     if payload.componentType != "interactive_widget":
         return WidgetTransitionArtifact(
@@ -433,10 +583,9 @@ def evaluate_transition(payload: WidgetTransitionRequest) -> WidgetTransitionArt
             errorMessage="Widget transitions are only supported for interactive_widget components.",
         )
 
-    if payload.widget.engineKind == "chess":
-        return _transition_chess_widget(payload)
-    if payload.widget.engineKind == "map_geojson":
-        return _transition_map_widget(payload)
+    handler = _TRANSITION_HANDLERS.get(payload.widget.engineKind)
+    if handler is not None:
+        return handler(payload)
 
     return WidgetTransitionArtifact(
         schemaVersion="1",

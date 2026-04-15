@@ -44,6 +44,18 @@ Represent graph interaction in a bounded widget so backend graph logic can later
 }
 ```
 
+## Exact enum values
+
+When you include optional runtime fields, use only these values:
+
+- `display.surfaceRole`: `primary` or `supporting`
+- `interaction.mode`: `view_only`, `plot_point`, `plot_curve`, or `analyze_graph`
+- `interaction.submissionMode`: `immediate` or `explicit_submit`
+- `interaction.resetPolicy`: `not_allowed` or `reset_to_initial`
+- `interaction.attemptPolicy`: `single_attempt` or `allow_retry`
+
+Do not invent aliases like `final`, `learner_controlled`, `unlimited`, or custom surface roles.
+
 ## Evidence implications
 
 - Use only when graph interaction is the actual evidence.
@@ -59,4 +71,3 @@ Represent graph interaction in a bounded widget so backend graph logic can later
 - Using this widget when a static graph image would do.
 - Treating it as a generic drawing canvas.
 - Inventing fields outside the bounded payload.
-

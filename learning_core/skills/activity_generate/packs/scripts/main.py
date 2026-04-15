@@ -19,9 +19,9 @@ from learning_core.runtime.providers import build_model_runtime
 from learning_core.runtime.skill import SkillDefinition, SkillExecutionResult
 from learning_core.skills.activity_generate.packs import ALL_PACKS, Pack
 from learning_core.skills.activity_generate.packs.base import PackPlanningResult, PackValidationContext
-from learning_core.skills.activity_generate.scripts.policy import ACTIVITY_GENERATE_POLICY
-from learning_core.skills.activity_generate.scripts.schemas import ActivityArtifact, ActivityGenerationInput
-from learning_core.skills.activity_generate.scripts.tooling import read_ui_spec
+from learning_core.skills.activity_generate.packs.scripts.policy import ACTIVITY_GENERATE_POLICY
+from learning_core.skills.activity_generate.packs.scripts.schemas import ActivityArtifact, ActivityGenerationInput
+from learning_core.skills.activity_generate.packs.scripts.tooling import read_ui_spec
 from learning_core.skills.activity_generate.validation.widgets import normalize_and_validate_widget_activity
 
 _SKILL_DIR = Path(__file__).resolve().parent.parent
@@ -222,7 +222,7 @@ def _build_user_prompt(
 
     if context.user_authored_context.note:
         lines.append("")
-        lines.append(f"Author note: {context.user_authored_context.note}")
+        lines.append(f"Parent note: {context.user_authored_context.note}")
 
     if context.user_authored_context.teacher_note:
         lines.append("")

@@ -2,6 +2,10 @@ You are an expert homeschool activity designer. You generate structured activity
 
 Your primary input is a structured lesson plan. Use the lesson's objectives, block sequence, success criteria, and adaptations to design an activity that fits the actual lesson, not a generic exercise.
 
+Implementation notes for developers:
+- execution and prompt-building flow: [execution_flow.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/execution_flow.md)
+- widget engine onboarding pattern: [widget_engine_onboarding.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/widget_engine_onboarding.md)
+
 ## Your output
 
 Output a single JSON object that exactly matches the ActivitySpec schema (schemaVersion "2"). Do not add explanation text before or after the JSON.
@@ -112,9 +116,9 @@ construction_space:   { id, type, prompt, scaffoldText?, hint?, required? }
 ### Widget payloads (for interactive_widget.widget)
 
 ```
-board_surface/chess:          { surfaceKind: "board_surface", engineKind: "chess", version: "1", surface: {orientation}, state: {fen}, interaction: {mode}, evaluation: {expectedMoves}, annotations: {highlightSquares, arrows} }
-expression_surface/math:      { surfaceKind: "expression_surface", engineKind: "math_symbolic", version: "1", surface: {notation}, state: {expression?}, interaction: {mode}, evaluation: {expectedExpression?} }
-graph_surface/graphing:       { surfaceKind: "graph_surface", engineKind: "graphing", version: "1", surface: {xRange, yRange, gridVisible?}, state: {functions?}, interaction: {mode}, evaluation: {expectedFunction?} }
+board_surface/chess:          { surfaceKind: "board_surface", engineKind: "chess", version: "1", surface: {orientation}, display: {showSideToMove?, showCoordinates?, showMoveHint?, boardRole?}, state: {fen, initialFen?}, interaction: {mode, submissionMode?, selectionMode?, showLegalTargets?, allowReset?, resetPolicy?, attemptPolicy?}, feedback: {mode?, displayMode?}, evaluation: {expectedMoves}, annotations: {highlightSquares, arrows} }
+expression_surface/math:      { surfaceKind: "expression_surface", engineKind: "math_symbolic", version: "1", surface: {placeholder?, mathKeyboard?}, display: {surfaceRole?, showPromptLatex?}, state: {promptLatex?, initialValue?}, interaction: {mode, submissionMode?, allowReset?, resetPolicy?, attemptPolicy?}, feedback: {mode?, displayMode?}, evaluation: {expectedExpression?, equivalenceMode?}, annotations: {helperText?} }
+graph_surface/graphing:       { surfaceKind: "graph_surface", engineKind: "graphing", version: "1", surface: {xLabel?, yLabel?, grid?}, display: {surfaceRole?, showAxisLabels?}, state: {prompt?, initialExpression?}, interaction: {mode, submissionMode?, allowReset?, resetPolicy?, attemptPolicy?}, feedback: {mode?, displayMode?}, evaluation: {expectedGraphDescription?}, annotations: {overlayText?} }
 ```
 
 A compressed UI registry is included in your context. If you need full field contracts, examples, or usage guidance, call `read_ui_spec` with the doc path from the registry. Use good judgment — many requests need no doc reads.
@@ -145,4 +149,3 @@ answer_response, file_artifact, image_artifact, audio_artifact, self_assessment,
 17. Prefer a coherent, pedagogically strong activity over a crowded one.
 18. Use as many components and widgets as the activity genuinely needs and no more.
 19. Do not use components or widgets just because they exist.
-

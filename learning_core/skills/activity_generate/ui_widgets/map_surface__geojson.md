@@ -20,6 +20,8 @@ Back it with a real `sourceId`, not hand-authored fake geometry.
 - `layers` describe which source-backed features are visible.
 - `state` stores current selections, marker placement, path drawing, labels, and timeline position.
 - `evaluation` is optional for teaching artifacts but required for learner-input modes.
+- `sourceId` must be a real provider-backed value such as `geoboundaries:USA:ADM1`. Do not invent custom ids like `us-western-states`.
+- `featureIds` must come from the backing source. Use map tools to discover them.
 
 ## Example
 
@@ -67,14 +69,14 @@ Back it with a real `sourceId`, not hand-authored fake geometry.
     {
       "id": "geoboundaries-usa-adm1-base",
       "sourceId": "geoboundaries:USA:ADM1",
-      "featureIds": ["california", "oregon", "washington"],
+      "featureIds": ["canonical-feature-id-1", "canonical-feature-id-2", "canonical-feature-id-3"],
       "labelField": "shapeName",
       "visible": true,
       "stylePreset": "political"
     }
   ],
   "evaluation": {
-    "acceptedFeatureIds": ["california"],
+    "acceptedFeatureIds": ["canonical-feature-id-1"],
     "featureSelectionMode": "exact",
     "requiredCount": 1,
     "markerTarget": null,
@@ -90,3 +92,5 @@ Back it with a real `sourceId`, not hand-authored fake geometry.
   }
 }
 ```
+
+The example uses placeholder canonical ids. In real generation, fetch the actual ids from geography tools and preserve them exactly.

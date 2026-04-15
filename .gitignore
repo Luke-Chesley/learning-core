@@ -9,3 +9,6 @@ build/
 .env.local
 logs/*
 !logs/.gitkeep
+.cache/
+.playwright-cli/
+local_test/

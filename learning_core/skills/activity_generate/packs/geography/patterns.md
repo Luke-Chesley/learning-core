@@ -20,3 +20,4 @@
 - Keep source selection bounded and classroom-relevant.
 - Do not require live APIs for core interaction or scoring.
 - Use compare and timeline modes as teaching artifacts first; pair them with reflection rather than forcing correctness scoring.
+- Never hand-author fake `sourceId` or feature ids when geography tools can provide canonical values.

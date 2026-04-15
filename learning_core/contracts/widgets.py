@@ -511,6 +511,24 @@ class MapSurfaceAnnotations(StrictModel):
     callouts: list[MapCallout] = Field(default_factory=list)
     teacherNotes: str | None = None
 
+    @field_validator("callouts", mode="before")
+    @classmethod
+    def normalize_callouts(cls, value):
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            return value
+        normalized: list[object] = []
+        for index, item in enumerate(value, start=1):
+            if isinstance(item, str):
+                normalized.append({"id": f"callout-{index}", "text": item})
+                continue
+            if isinstance(item, dict) and "id" not in item and isinstance(item.get("text"), str):
+                normalized.append({"id": f"callout-{index}", **item})
+                continue
+            normalized.append(item)
+        return normalized
+
 
 class MapGeoJsonWidget(StrictModel):
     surfaceKind: Literal["map_surface"]

@@ -5,7 +5,10 @@ import re
 from learning_core.contracts.activity import ActivityArtifact, InteractiveWidgetComponent
 from learning_core.contracts.widgets import MapGeoJsonWidget
 from learning_core.skills.activity_generate.packs.base import PackValidationContext, PackValidator
-from learning_core.skills.activity_generate.packs.geography.engine import validate_widget_config
+from learning_core.skills.activity_generate.packs.geography.engine import (
+    canonicalize_widget_feature_references,
+    validate_widget_config,
+)
 
 _MAP_CENTERED_PATTERNS = (
     re.compile(r"\bmap\b", re.IGNORECASE),
@@ -29,10 +32,11 @@ def validate_map_widget(
     artifact: ActivityArtifact,
     component: InteractiveWidgetComponent,
     widget: MapGeoJsonWidget,
-) -> tuple[list[str], list[str]]:
+) -> tuple[MapGeoJsonWidget, list[str], list[str]]:
     hard_errors: list[str] = []
     soft_warnings: list[str] = []
-    raw = widget.model_dump(mode="json", exclude_none=True)
+    raw = canonicalize_widget_feature_references(widget.model_dump(mode="json", exclude_none=True))
+    canonical_widget = MapGeoJsonWidget.model_validate(raw)
     config_report = validate_widget_config(raw)
     hard_errors.extend(
         f'Interactive widget "{component.id}" {message[0].lower()}{message[1:]}'
@@ -68,7 +72,7 @@ def validate_map_widget(
             f'Interactive widget "{component.id}" uses compare_layers but does not define at least two layers.'
         )
 
-    return hard_errors, soft_warnings
+    return canonical_widget, hard_errors, soft_warnings
 
 
 class GeographyValidator(PackValidator):
@@ -84,7 +88,8 @@ class GeographyValidator(PackValidator):
         for component in normalized.components:
             if component.type != "interactive_widget" or component.widget.engineKind != "map_geojson":
                 continue
-            widget_hard, widget_soft = validate_map_widget(normalized, component, component.widget)
+            canonical_widget, widget_hard, widget_soft = validate_map_widget(normalized, component, component.widget)
+            component.widget = canonical_widget
             hard_errors.extend(widget_hard)
             soft_warnings.extend(widget_soft)
 

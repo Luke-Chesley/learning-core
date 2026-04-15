@@ -53,6 +53,11 @@ class BoardResetAction(StrictModel):
     type: Literal["reset"]
 
 
+class WidgetSetTextValueAction(StrictModel):
+    type: Literal["set_text_value"]
+    value: str
+
+
 class MapSelectFeatureAction(StrictModel):
     type: Literal["select_feature"]
     featureId: str
@@ -87,6 +92,7 @@ WidgetLearnerAction = Annotated[
     BoardSelectSquareAction
     | BoardSubmitMoveAction
     | BoardResetAction
+    | WidgetSetTextValueAction
     | MapSelectFeatureAction
     | MapPlaceMarkerAction
     | MapSubmitPathAction

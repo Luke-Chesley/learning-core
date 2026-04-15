@@ -80,6 +80,8 @@ def _extract_expected_answer(component: ActivityComponent | None, payload: Activ
             return list(widget.evaluation.expectedMoves)
         if widget.engineKind == "math_symbolic":
             return widget.evaluation.expectedExpression
+        if widget.engineKind == "graphing":
+            return widget.evaluation.expectedGraphDescription
         if widget.engineKind == "map_geojson":
             return widget.evaluation.model_dump(mode="json", exclude_none=True)
     return None
@@ -330,6 +332,103 @@ def _evaluate_chess_widget(
     )
 
 
+def _normalize_math_text_response(learner_response: Any, key: str) -> str | None:
+    if isinstance(learner_response, str):
+        return learner_response
+    if isinstance(learner_response, dict):
+        value = learner_response.get(key)
+        if isinstance(value, str):
+            return value
+    return None
+
+
+def _evaluate_math_symbolic_widget(
+    payload: ActivityFeedbackRequest,
+    component: ActivityComponent | None,
+) -> ActivityFeedbackArtifact | None:
+    if payload.componentType != "interactive_widget":
+        return None
+
+    widget = _extract_widget(payload, component)
+    if widget is None or widget.engineKind != "math_symbolic":
+        return None
+
+    expected_value = _extract_expected_answer(component, payload)
+    learner_value = _normalize_math_text_response(payload.learnerResponse, "value")
+    if not isinstance(expected_value, str) or learner_value is None:
+        return None
+
+    normalized_learner = _normalize_text(learner_value)
+    normalized_expected = _normalize_text(expected_value)
+    is_correct = normalized_learner == normalized_expected
+
+    if widget.evaluation.equivalenceMode != "exact":
+        compact_learner = re.sub(r"\s+", "", learner_value)
+        compact_expected = re.sub(r"\s+", "", expected_value)
+        is_correct = compact_learner == compact_expected
+
+    return _feedback(
+        component_id=payload.componentId,
+        component_type=payload.componentType,
+        widget_engine_kind=widget.engineKind,
+        status="correct" if is_correct else "incorrect",
+        message="That symbolic answer matches the expected expression." if is_correct else "That symbolic answer does not match the expected expression.",
+        confidence=0.98,
+        hint=None if is_correct else "Check the final solved expression and make sure you entered the complete symbolic answer.",
+        next_step=None if is_correct else "Revise the expression and compare it carefully to the prompt.",
+        allow_retry=not is_correct,
+        scoring=FeedbackScoring(score=1.0 if is_correct else 0.0, matchedTargets=int(is_correct), totalTargets=1),
+    )
+
+
+def _evaluate_graphing_widget(
+    payload: ActivityFeedbackRequest,
+    component: ActivityComponent | None,
+) -> ActivityFeedbackArtifact | None:
+    if payload.componentType != "interactive_widget":
+        return None
+
+    widget = _extract_widget(payload, component)
+    if widget is None or widget.engineKind != "graphing":
+        return None
+
+    learner_value = _normalize_math_text_response(payload.learnerResponse, "expression")
+    if learner_value is None:
+        return None
+
+    expected_value = _extract_expected_answer(component, payload)
+    if not isinstance(expected_value, str) or not expected_value.strip():
+        return None
+
+    normalized_learner = _normalize_text(learner_value)
+    normalized_expected = _normalize_text(expected_value)
+    if normalized_learner == normalized_expected:
+        return _feedback(
+            component_id=payload.componentId,
+            component_type=payload.componentType,
+            widget_engine_kind=widget.engineKind,
+            status="correct",
+            message="That graph entry matches the expected description.",
+            confidence=0.97,
+            allow_retry=False,
+            scoring=FeedbackScoring(score=1.0, matchedTargets=1, totalTargets=1),
+        )
+
+    # Graphing still relies on a lighter-weight heuristic path until a true graph evaluator exists.
+    return _feedback(
+        component_id=payload.componentId,
+        component_type=payload.componentType,
+        widget_engine_kind=widget.engineKind,
+        status="needs_review",
+        message="Graph input captured. This response needs review against the expected graph description.",
+        confidence=0.72,
+        hint="Use the prompt and the expected line description to check slope, intercept, or plotted shape.",
+        next_step="Adjust the graph entry or review it with the teacher.",
+        allow_retry=True,
+        scoring=FeedbackScoring(score=0.5, matchedTargets=0, totalTargets=1),
+    )
+
+
 def _evaluate_map_widget(
     payload: ActivityFeedbackRequest,
     component: ActivityComponent | None,
@@ -348,6 +447,16 @@ def _evaluate_map_widget(
     result: dict[str, Any] | None = None
     learner_response = payload.learnerResponse
     mode = widget.interaction.mode
+
+    if isinstance(learner_response, dict):
+        if mode in {"select_region", "multi_select_regions"} and isinstance(learner_response.get("selectedFeatureIds"), list):
+            learner_response = learner_response["selectedFeatureIds"]
+        elif mode == "place_marker" and isinstance(learner_response.get("markerCoordinate"), dict):
+            learner_response = learner_response["markerCoordinate"]
+        elif mode == "trace_path" and isinstance(learner_response.get("drawnPath"), list):
+            learner_response = learner_response["drawnPath"]
+        elif mode == "label_regions" and isinstance(learner_response.get("labelAssignments"), dict):
+            learner_response = learner_response["labelAssignments"]
 
     if mode in {"select_region", "multi_select_regions"}:
         if not isinstance(learner_response, list) or not all(isinstance(item, str) for item in learner_response):
@@ -416,6 +525,8 @@ def evaluate_deterministically(payload: ActivityFeedbackRequest) -> ActivityFeed
         _evaluate_ordered_sequence,
         _evaluate_short_answer,
         _evaluate_chess_widget,
+        _evaluate_math_symbolic_widget,
+        _evaluate_graphing_widget,
         _evaluate_map_widget,
     )
     for evaluator in evaluators:

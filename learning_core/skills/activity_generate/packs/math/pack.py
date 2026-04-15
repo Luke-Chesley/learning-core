@@ -53,7 +53,10 @@ _REPAIR_GUIDANCE = (
     "The activity contains math widgets but no math validation tools were used during generation. "
     "Before finalizing, validate each math widget using the math_validate_widget_config tool. "
     "For expression_entry widgets, ensure state.promptLatex and evaluation.expectedExpression are set. "
-    "For graphing widgets, ensure evaluation.expectedGraphDescription is set."
+    "For graphing widgets, ensure evaluation.expectedGraphDescription is set. "
+    "Use only the exact interaction enums from the contract: submissionMode must be 'immediate' or 'explicit_submit'; "
+    "resetPolicy must be 'not_allowed' or 'reset_to_initial'; attemptPolicy must be 'single_attempt' or 'allow_retry'; "
+    "display.surfaceRole must be 'primary' or 'supporting'."
 )
 
 
