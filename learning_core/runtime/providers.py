@@ -44,6 +44,7 @@ def _parse_optional_str(value: str | None) -> str | None:
 _OPENAI_FLEX_UNSTABLE_TASKS = {
     "activity_generate",
     "bounded_plan_generate",
+    "source_interpret",
     "session_generate",
 }
 
