@@ -216,6 +216,18 @@ def _build_user_prompt(
         lines.append("Standard IDs in scope:")
         lines.append(", ".join(payload.standard_ids))
 
+    if payload.feedback_notes:
+        lines.append("")
+        lines.append("Recent lesson feedback notes:")
+        for note in payload.feedback_notes[:5]:
+            lines.append(f"- {note}")
+
+    if payload.recent_lesson_outcomes:
+        lines.append("")
+        lines.append("Recent lesson outcomes:")
+        for outcome in payload.recent_lesson_outcomes[:5]:
+            lines.append(f"- {outcome.date}: {outcome.title} — {outcome.status}")
+
     if context.user_authored_context.parent_goal:
         lines.append("")
         lines.append(f"Parent goal: {context.user_authored_context.parent_goal}")
