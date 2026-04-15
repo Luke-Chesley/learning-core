@@ -216,6 +216,14 @@ _ENVELOPE_DATA = {
         "workflow_mode": "family_guided",
         "subject": "Math",
         "linked_skill_titles": ["Long Division"],
+        "feedback_notes": ["Long Division: Partial. Needed extra prompting on the final two problems."],
+        "recent_lesson_outcomes": [
+            {
+                "title": "Long Division",
+                "status": "Partial",
+                "date": "2026-04-15",
+            }
+        ],
         "lesson_draft": _LESSON_DRAFT,
     },
     "app_context": {
@@ -223,6 +231,16 @@ _ENVELOPE_DATA = {
         "surface": "today_workspace",
     },
 }
+
+
+def test_activity_generation_input_accepts_feedback_context():
+    payload = ActivityGenerationInput.model_validate(_ENVELOPE_DATA["input"])
+
+    assert payload.feedback_notes == [
+        "Long Division: Partial. Needed extra prompting on the final two problems."
+    ]
+    assert len(payload.recent_lesson_outcomes) == 1
+    assert payload.recent_lesson_outcomes[0].title == "Long Division"
 
 _CHESS_ENVELOPE_DATA = {
     "input": {

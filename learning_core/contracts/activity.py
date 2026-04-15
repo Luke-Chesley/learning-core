@@ -706,6 +706,12 @@ class ActivityArtifact(StrictModel):
         return value
 
 
+class RecentLessonOutcome(StrictModel):
+    title: str
+    status: str
+    date: str
+
+
 class ActivityGenerationInput(StrictModel):
     learner_name: str
     learner_grade_level: str | None = None
@@ -718,4 +724,6 @@ class ActivityGenerationInput(StrictModel):
     linked_skill_titles: list[str] = Field(default_factory=list)
     linked_objective_ids: list[str] = Field(default_factory=list)
     standard_ids: list[str] = Field(default_factory=list)
+    feedback_notes: list[str] = Field(default_factory=list)
+    recent_lesson_outcomes: list[RecentLessonOutcome] = Field(default_factory=list)
     lesson_draft: StructuredLessonDraft
