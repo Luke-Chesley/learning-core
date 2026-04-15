@@ -17,6 +17,7 @@ def test_other_skills_are_structured_output_skills():
         "activity_feedback",
         "widget_transition",
         "session_generate",
+        "source_interpret",
         "curriculum_intake",
         "curriculum_generate",
         "curriculum_revise",

@@ -112,6 +112,10 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    source_interpret/
+      SKILL.md
+      scripts/
+        main.py
     session_evaluate/
       SKILL.md
       scripts/
@@ -134,6 +138,7 @@ Current first-class operations:
 - `activity_feedback`
 - `activity_generate`
 - `session_generate`
+- `source_interpret`
 - `curriculum_intake`
 - `copilot_chat`
 - `curriculum_generate`

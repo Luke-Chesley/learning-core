@@ -30,6 +30,10 @@ from learning_core.contracts.progression import (
     ProgressionRevisionRequest,
 )
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
+from learning_core.contracts.source_interpret import (
+    SourceInterpretationArtifact,
+    SourceInterpretationRequest,
+)
 from learning_core.contracts.widgets import (
     EngineKind,
     InteractiveWidgetPayload,
@@ -66,6 +70,8 @@ __all__ = [
     "SessionEvaluationRequest",
     "SessionPlanArtifact",
     "SessionPlanGenerationRequest",
+    "SourceInterpretationArtifact",
+    "SourceInterpretationRequest",
     "StructuredLessonDraft",
     "EngineKind",
     "InteractiveWidgetPayload",
