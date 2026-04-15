@@ -137,6 +137,8 @@ def test_bounded_plan_prompt_preview_includes_guardrails():
     assert "Do not invent a semester" in preview.system_prompt
     assert "Routed route: weekly_plan" in preview.user_prompt
     assert "Chosen horizon: current_week" in preview.user_prompt
+    assert "The `document` field is required." in preview.user_prompt
+    assert "subject -> unit title -> ordered lesson title list" in preview.user_prompt
 
 
 def test_bounded_plan_execute_rejects_invalid_artifact(monkeypatch, tmp_path: Path):
