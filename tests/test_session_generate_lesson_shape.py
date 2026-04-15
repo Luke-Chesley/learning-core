@@ -147,6 +147,68 @@ def test_session_generate_prompt_preview_constrains_lesson_shape_values():
     ) in preview.user_prompt
 
 
+def test_session_generate_prompt_preview_adds_script_first_constraints():
+    payload = SessionPlanGenerationRequest.model_validate(
+        {
+            "topic": "Reluctant writer script",
+            "objectives": ["Help the parent read prompts almost verbatim."],
+        }
+    )
+
+    preview = SessionGenerateSkill().build_prompt_preview(
+        payload,
+        RuntimeContext.create(
+            operation_name="session_generate",
+            app_context=AppContext(product="homeschool-v2", surface="today"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(
+                parent_goal="Tell me exactly what to say.",
+                special_constraints=["Keep the script concise and calm."],
+            ),
+        ),
+    )
+
+    assert "script-first request" in preview.user_prompt
+    assert "almost verbatim" in preview.user_prompt
+    assert "about 15 minutes" in preview.user_prompt
+
+
+def test_session_generate_without_resolved_timing_uses_route_item_minutes():
+    payload = SessionPlanGenerationRequest.model_validate(
+        {
+            "topic": "Week plan day 1",
+            "routeItems": [
+                {
+                    "title": "Read chapter 2",
+                    "subject": "Science",
+                    "estimatedMinutes": 12,
+                    "objective": "Read chapter 2",
+                    "lessonLabel": "Day 1",
+                },
+                {
+                    "title": "Answer 1-4",
+                    "subject": "Science",
+                    "estimatedMinutes": 8,
+                    "objective": "Answer the questions",
+                    "lessonLabel": "Day 1",
+                },
+            ],
+        }
+    )
+
+    preview = SessionGenerateSkill().build_prompt_preview(
+        payload,
+        RuntimeContext.create(
+            operation_name="session_generate",
+            app_context=AppContext(product="homeschool-v2", surface="today"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+    )
+
+    assert "Total time: 20 minutes" in preview.user_prompt
+
+
 def test_session_generate_execute_rejects_prose_lesson_shape(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setattr(

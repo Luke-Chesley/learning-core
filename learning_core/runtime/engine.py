@@ -279,19 +279,33 @@ class AgentEngine:
         source_request = envelope.input
         source_result = self.execute("source_interpret", envelope_data)
         interpretation = source_result.artifact
+        source_kind = interpretation["sourceKind"]
+        requested_route = source_request.get("requestedRoute")
         routed_route = (
-            "weekly_plan"
+            "outline"
+            if source_kind == "sequence_outline"
+            else "weekly_plan"
             if interpretation["recommendedHorizon"] in {"next_few_days", "current_week", "starter_week"}
             else "single_lesson"
         )
+        if source_kind == "weekly_assignments":
+            requested_route = "weekly_plan"
+        elif source_kind == "sequence_outline":
+            requested_route = "outline"
+        elif source_kind == "single_day_material":
+            requested_route = "single_lesson"
+        elif source_kind == "topic_seed" and requested_route is None:
+            requested_route = "topic"
+        elif source_kind == "manual_shell" and requested_route is None:
+            requested_route = routed_route
         bounded_plan_result = self.execute(
             "bounded_plan_generate",
             {
                 "input": {
                     "learnerName": source_request.get("learnerName") or envelope.app_context.learner_id or "Learner",
-                    "requestedRoute": source_request.get("requestedRoute", routed_route),
+                    "requestedRoute": requested_route or routed_route,
                     "routedRoute": routed_route,
-                    "sourceKind": interpretation["sourceKind"],
+                    "sourceKind": source_kind,
                     "chosenHorizon": interpretation["recommendedHorizon"],
                     "sourceText": source_request.get("extractedText") or source_request.get("rawText") or "",
                     "titleCandidate": interpretation.get("suggestedTitle") or source_request.get("titleCandidate"),

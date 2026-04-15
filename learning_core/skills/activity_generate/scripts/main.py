@@ -141,6 +141,19 @@ def _build_user_prompt(
 ) -> str:
     lesson = payload.lesson_draft
     lines: list[str] = []
+    request_signal_text = " ".join(
+        [
+            lesson.title,
+            lesson.lesson_focus,
+            " ".join(lesson.primary_objectives),
+            " ".join(lesson.teacher_notes),
+            context.user_authored_context.parent_goal or "",
+            context.user_authored_context.note or "",
+            context.user_authored_context.teacher_note or "",
+            context.user_authored_context.custom_instruction or "",
+            " ".join(context.user_authored_context.special_constraints),
+        ]
+    ).lower()
 
     lines.append("## Activity generation request")
     lines.append("")
@@ -255,6 +268,27 @@ def _build_user_prompt(
     if context.user_authored_context.custom_instruction:
         lines.append("")
         lines.append(f"Custom instruction: {context.user_authored_context.custom_instruction}")
+
+    if any(
+        phrase in request_signal_text
+        for phrase in (
+            "two learners",
+            "both kids",
+            "older",
+            "younger",
+            "8-year-old",
+            "9-year-old",
+            "11-year-old",
+            "13-year-old",
+            "different depth",
+            "age split",
+        )
+    ):
+        lines.append("")
+        lines.append("Differentiation requirements:")
+        lines.append("- Preserve distinct expectations for each learner or age band.")
+        lines.append("- A shared theme is fine, but do not collapse the activity into one generic task.")
+        lines.append("- Make the split legible in prompts, components, or teacher support so the parent can run both paths.")
 
     lines.append("")
     lines.append("---")

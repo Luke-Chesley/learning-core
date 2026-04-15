@@ -370,6 +370,7 @@ def test_activity_generate_preview_includes_lesson_title():
     preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
     assert "Long Division" in preview.user_prompt
     assert "ActivitySpec" in preview.system_prompt
+    assert "Recent lesson feedback notes:" in preview.user_prompt
 
 
 def test_activity_generate_preview_includes_registry_index():
@@ -392,6 +393,31 @@ def test_activity_generate_preview_includes_pack_tool_discipline():
     """Prompt should instruct the model to validate pack-specific widgets with domain tools."""
     preview = ActivityGenerateSkill().build_prompt_preview(_make_payload(), _make_context())
     assert "validate it with the pack" in preview.user_prompt or "domain tools" in preview.user_prompt
+
+
+def test_activity_generate_preview_adds_differentiation_requirements_for_multi_learner_requests():
+    payload = _make_payload(
+        subject="Science",
+        linked_skill_titles=["Shared source packet"],
+        lesson_draft={
+            **_LESSON_DRAFT,
+            "title": "Shared science packet for two learners",
+            "lesson_focus": "Keep an 8-year-old and 13-year-old on the same theme with different depth.",
+            "teacher_notes": ["Older learner needs more depth; younger learner needs concrete prompts."],
+        },
+    )
+    context = RuntimeContext.create(
+        operation_name="activity_generate",
+        app_context=AppContext(product="homeschool-v2", surface="today_workspace"),
+        presentation_context=PresentationContext(),
+        user_authored_context=UserAuthoredContext(
+            special_constraints=["Both kids should share the same source without doing the same task."],
+        ),
+    )
+
+    preview = ActivityGenerateSkill().build_prompt_preview(payload, context)
+    assert "Differentiation requirements:" in preview.user_prompt
+    assert "do not collapse the activity into one generic task" in preview.user_prompt
 
 
 def test_chess_preview_auto_injects_ui_specs():
