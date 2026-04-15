@@ -44,6 +44,25 @@ def test_openai_service_tier_omits_flex_for_heavy_generation_tasks(monkeypatch):
     assert runtime.provider_settings["openai_service_tier"] is None
 
 
+def test_openai_service_tier_omits_flex_for_source_interpret(monkeypatch):
+    monkeypatch.setenv("LEARNING_CORE_PROVIDER", "openai")
+    monkeypatch.setenv("LEARNING_CORE_DEFAULT_TEMPERATURE", "0.2")
+    monkeypatch.setenv("LEARNING_CORE_MAX_TOKENS", "4096")
+    monkeypatch.setenv("LEARNING_CORE_GENERATION_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_SERVICE_TIER", "flex")
+
+    runtime = build_model_runtime(
+        task_name="source_interpret",
+        task_kind="generation",
+        temperature=None,
+        max_tokens=None,
+    )
+
+    assert runtime.client.service_tier is None
+    assert runtime.provider_settings["openai_service_tier"] is None
+
+
 def test_openai_service_tier_omitted_when_blank(monkeypatch):
     monkeypatch.setenv("LEARNING_CORE_PROVIDER", "openai")
     monkeypatch.setenv("LEARNING_CORE_DEFAULT_TEMPERATURE", "0.2")
@@ -67,17 +86,17 @@ def test_openai_service_tier_omitted_when_blank(monkeypatch):
     assert runtime.max_tokens_source == "LEARNING_CORE_MAX_TOKENS"
 
 
-def test_openai_service_tier_keeps_flex_for_light_generation_tasks(monkeypatch):
+def test_openai_service_tier_keeps_flex_for_chat_tasks(monkeypatch):
     monkeypatch.setenv("LEARNING_CORE_PROVIDER", "openai")
     monkeypatch.setenv("LEARNING_CORE_DEFAULT_TEMPERATURE", "0.2")
     monkeypatch.setenv("LEARNING_CORE_MAX_TOKENS", "4096")
-    monkeypatch.setenv("LEARNING_CORE_GENERATION_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("LEARNING_CORE_CHAT_MODEL", "gpt-5.4-mini")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "flex")
 
     runtime = build_model_runtime(
-        task_name="source_interpret",
-        task_kind="generation",
+        task_name="copilot_chat",
+        task_kind="chat",
         temperature=None,
         max_tokens=None,
     )
