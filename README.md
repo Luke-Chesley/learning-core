@@ -133,6 +133,7 @@ learning_core/
 ## API
 
 - `GET /healthz`
+- `GET /v1/runtime/status`
 - `GET /v1/operations`
 - `POST /v1/operations/{operation_name}/prompt-preview`
 - `POST /v1/operations/{operation_name}/execute`

@@ -39,6 +39,17 @@ def create_app() -> FastAPI:
     async def list_operations():
         return {"operations": [operation.model_dump() for operation in engine.skill_registry.list_operations()]}
 
+    @app.get("/v1/runtime/status")
+    async def runtime_status(x_learning_core_key: str | None = Header(default=None)):
+        await _authorize(x_learning_core_key)
+        return {
+            "status": "ok",
+            "service": "learning-core",
+            "version": "0.1.0",
+            "authRequired": bool((os.getenv("LEARNING_CORE_API_KEY") or "").strip()),
+            "operations": [operation.operation_name for operation in engine.skill_registry.list_operations()],
+        }
+
     @app.post("/v1/operations/{operation_name}/prompt-preview")
     async def operation_prompt_preview(
         operation_name: str,
