@@ -45,6 +45,23 @@ class BoundedPlanGenerateSkill(StructuredOutputSkill):
                 "",
                 "Generate the smallest durable planning object that fits this source and horizon.",
                 "Do not generate fake long-range curriculum scope.",
+                "Return all required fields from the bounded plan contract.",
+                "The `document` field is required.",
+                "Set `document` to a nested mapping of subject -> unit title -> ordered lesson title list.",
+                "Every unit in `units` must also appear in `document`.",
+                "Example `document` shape:",
+                json.dumps(
+                    {
+                        "Math": {
+                            "Current week fractions and decimals": [
+                                "Fractions practice",
+                                "Decimal review",
+                                "Percent game",
+                            ]
+                        }
+                    },
+                    indent=2,
+                ),
                 "Return only valid JSON.",
             ]
         )
