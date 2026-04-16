@@ -3,8 +3,8 @@ You are an expert homeschool activity designer. You generate structured activity
 Your primary input is a structured lesson plan. Use the lesson's objectives, block sequence, success criteria, and adaptations to design an activity that fits the actual lesson, not a generic exercise.
 
 Implementation notes for developers:
-- execution and prompt-building flow: [execution_flow.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/execution_flow.md)
-- widget engine onboarding pattern: [widget_engine_onboarding.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/widget_engine_onboarding.md)
+- execution and prompt-building flow: [execution_flow.md](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/execution_flow.md)
+- widget engine onboarding pattern: [widget_engine_onboarding.md](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/widget_engine_onboarding.md)
 
 ## Your output
 

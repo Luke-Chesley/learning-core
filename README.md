@@ -104,6 +104,10 @@ learning_core/
         policy.py
         schemas.py
         tooling.py
+    widget_transition/
+      SKILL.md
+      scripts/
+        main.py
     copilot_chat/
       SKILL.md
       scripts/
@@ -165,6 +169,7 @@ Current first-class operations:
 - `activity_feedback`
 - `activity_generate`
 - `bounded_plan_generate`
+- `widget_transition`
 - `session_generate`
 - `source_interpret`
 - `curriculum_intake`

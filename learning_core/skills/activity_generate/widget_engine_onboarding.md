@@ -2,7 +2,7 @@
 
 This document explains how to add a new engine-backed widget or subject pack without hard-coding a one-off flow.
 
-It complements [execution_flow.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/execution_flow.md), which explains how `activity_generate` builds prompts and activates packs.
+It complements [execution_flow.md](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/execution_flow.md), which explains how `activity_generate` builds prompts and activates packs.
 
 ## Design Goal
 
@@ -17,12 +17,12 @@ The shared shell should stay stable as new packs arrive. New packs should plug i
 
 These layers are generic across engines:
 
-- `interactive_widget` in [`learning_core/contracts/activity.py`](/home/luke/Desktop/learning-core/learning_core/contracts/activity.py)
-- widget payload union in [`learning_core/contracts/widgets.py`](/home/luke/Desktop/learning-core/learning_core/contracts/widgets.py)
-- widget transition request/response envelope in [`learning_core/contracts/widget_transition.py`](/home/luke/Desktop/learning-core/learning_core/contracts/widget_transition.py)
-- feedback envelope in [`learning_core/contracts/activity_feedback.py`](/home/luke/Desktop/learning-core/learning_core/contracts/activity_feedback.py)
-- prompt assembly and pack injection in [`learning_core/skills/activity_generate/scripts/main.py`](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
-- local debug renderer shell in [`local_test/static/app.js`](/home/luke/Desktop/learning-core/local_test/static/app.js)
+- `interactive_widget` in [`learning_core/contracts/activity.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/activity.py)
+- widget payload union in [`learning_core/contracts/widgets.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/widgets.py)
+- widget transition request/response envelope in [`learning_core/contracts/widget_transition.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/widget_transition.py)
+- feedback envelope in [`learning_core/contracts/activity_feedback.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/activity_feedback.py)
+- prompt assembly and pack injection in [`learning_core/skills/activity_generate/scripts/main.py`](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- local debug renderer shell in [`local_test/static/app.js`](/home/luke/Desktop/learning/learning-core/local_test/static/app.js)
 
 This means a new engine does not need a new top-level operation or a custom app path. It needs a new adapter behind the existing operations.
 
@@ -43,7 +43,7 @@ The extension point is the engine adapter, not a new end-to-end pipeline.
 
 ### 1. Widget contract
 
-Add the widget payload to [`learning_core/contracts/widgets.py`](/home/luke/Desktop/learning-core/learning_core/contracts/widgets.py).
+Add the widget payload to [`learning_core/contracts/widgets.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/widgets.py).
 
 The contract should define:
 
@@ -82,9 +82,9 @@ The goal is to reject malformed engine payloads before they reach runtime.
 
 ### 4. Widget transition adapter
 
-Add the learner action types to [`learning_core/contracts/widget_transition.py`](/home/luke/Desktop/learning-core/learning_core/contracts/widget_transition.py).
+Add the learner action types to [`learning_core/contracts/widget_transition.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/widget_transition.py).
 
-Then add an engine handler in [`learning_core/skills/widget_transition/scripts/main.py`](/home/luke/Desktop/learning-core/learning_core/skills/widget_transition/scripts/main.py).
+Then add an engine handler in [`learning_core/skills/widget_transition/scripts/main.py`](/home/luke/Desktop/learning/learning-core/learning_core/skills/widget_transition/scripts/main.py).
 
 Recommended pattern:
 
@@ -101,7 +101,7 @@ Current examples:
 
 ### 5. Deterministic feedback adapter
 
-Add deterministic evaluation in [`learning_core/skills/activity_feedback/scripts/main.py`](/home/luke/Desktop/learning-core/learning_core/skills/activity_feedback/scripts/main.py).
+Add deterministic evaluation in [`learning_core/skills/activity_feedback/scripts/main.py`](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_feedback/scripts/main.py).
 
 Prefer deterministic evaluation whenever the engine has a bounded target.
 
@@ -116,7 +116,7 @@ If deterministic evaluation is not yet possible, return `needs_review` cleanly i
 
 ### 6. Local debug renderer
 
-Add a renderer adapter in [`local_test/static/app.js`](/home/luke/Desktop/learning-core/local_test/static/app.js).
+Add a renderer adapter in [`local_test/static/app.js`](/home/luke/Desktop/learning/learning-core/local_test/static/app.js).
 
 The renderer should:
 
@@ -129,7 +129,7 @@ This renderer is for debug quality, not visual polish.
 
 ### 7. Smoke coverage
 
-Add a case to [`local_test/smoke_cases.json`](/home/luke/Desktop/learning-core/local_test/smoke_cases.json) and exercise it in [`local_test/smoke_harness_runner.js`](/home/luke/Desktop/learning-core/local_test/smoke_harness_runner.js).
+Add a case to [`local_test/smoke_cases.json`](/home/luke/Desktop/learning/learning-core/local_test/smoke_cases.json) and exercise it in [`local_test/smoke_harness_runner.js`](/home/luke/Desktop/learning/learning-core/local_test/smoke_harness_runner.js).
 
 Every engine should have at least one local path that proves:
 
@@ -169,10 +169,10 @@ The correct balance is:
 
 Files:
 
-- [`learning_core/contracts/widgets.py`](/home/luke/Desktop/learning-core/learning_core/contracts/widgets.py)
-- [`learning_core/contracts/widget_transition.py`](/home/luke/Desktop/learning-core/learning_core/contracts/widget_transition.py)
-- [`learning_core/skills/widget_transition/scripts/main.py`](/home/luke/Desktop/learning-core/learning_core/skills/widget_transition/scripts/main.py)
-- [`learning_core/skills/activity_feedback/scripts/main.py`](/home/luke/Desktop/learning-core/learning_core/skills/activity_feedback/scripts/main.py)
+- [`learning_core/contracts/widgets.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/widgets.py)
+- [`learning_core/contracts/widget_transition.py`](/home/luke/Desktop/learning/learning-core/learning_core/contracts/widget_transition.py)
+- [`learning_core/skills/widget_transition/scripts/main.py`](/home/luke/Desktop/learning/learning-core/learning_core/skills/widget_transition/scripts/main.py)
+- [`learning_core/skills/activity_feedback/scripts/main.py`](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_feedback/scripts/main.py)
 
 Pattern:
 
@@ -185,8 +185,8 @@ Pattern:
 
 Files:
 
-- [`learning_core/skills/activity_generate/packs/geography/`](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/packs/geography)
-- [`learning_core/skills/activity_generate/ui_widgets/map_surface__geojson.md`](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/ui_widgets/map_surface__geojson.md)
+- [`learning_core/skills/activity_generate/packs/geography/`](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/packs/geography)
+- [`learning_core/skills/activity_generate/ui_widgets/map_surface__geojson.md`](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/ui_widgets/map_surface__geojson.md)
 
 Pattern:
 

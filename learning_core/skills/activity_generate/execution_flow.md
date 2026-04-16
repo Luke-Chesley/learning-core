@@ -4,11 +4,11 @@ This document maps the actual execution flow for `learning_core.skills.activity_
 
 It is based on the implementation in:
 
-- [scripts/main.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
-- [scripts/tooling.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/tooling.py)
-- [validation/widgets.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/validation/widgets.py)
-- [packs/__init__.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/packs/__init__.py)
-- [packs/base.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/packs/base.py)
+- [scripts/main.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- [scripts/tooling.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/tooling.py)
+- [validation/widgets.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/validation/widgets.py)
+- [packs/__init__.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/packs/__init__.py)
+- [packs/base.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/packs/base.py)
 
 ## High-Level Flow
 
@@ -45,7 +45,7 @@ There is no embedding retrieval, vector search, or fuzzy semantic lookup here.
 Pack activation is currently deterministic `keyword matching`.
 
 Implementation:
-- `_select_packs(...)` in [scripts/main.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- `_select_packs(...)` in [scripts/main.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
 
 Input fields considered:
 - `payload.subject`
@@ -58,7 +58,7 @@ Each pack exposes:
 - `keywords`
 
 Source of packs:
-- `ALL_PACKS` in [packs/__init__.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/packs/__init__.py)
+- `ALL_PACKS` in [packs/__init__.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/packs/__init__.py)
 
 Current packs:
 - `ChessPack()`
@@ -91,7 +91,7 @@ These are included in provider logs and execution trace metadata.
 ## Prompt Construction
 
 Implementation:
-- `_build_user_prompt(...)` in [scripts/main.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- `_build_user_prompt(...)` in [scripts/main.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
 
 The final prompt is built as a single large text prompt with ordered sections.
 
@@ -128,7 +128,7 @@ This is the first major section of the user prompt.
 ### 2. Base UI Registry
 
 The compressed base registry is appended from:
-- [ui_registry_index.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/ui_registry_index.md)
+- [ui_registry_index.md](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/ui_registry_index.md)
 
 This gives the model:
 - available top-level components
@@ -139,7 +139,7 @@ This gives the model:
 ### 3. Pack Index
 
 If any packs are active, the pack index is appended from:
-- [packs/index.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/packs/index.md)
+- [packs/index.md](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/packs/index.md)
 
 This explains what each pack adds.
 
@@ -196,14 +196,14 @@ The prompt ends with strict generation instructions telling the model to:
 ## System Prompt
 
 The system prompt is simply:
-- [SKILL.md](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/SKILL.md)
+- [SKILL.md](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/SKILL.md)
 
 Loaded by `_read_skill_markdown()`.
 
 ## Tool Availability
 
 Implementation:
-- `_build_active_tools(...)` in [scripts/main.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- `_build_active_tools(...)` in [scripts/main.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
 
 The tool set is:
 
@@ -219,7 +219,7 @@ If a pack is not active, its tools are not exposed.
 ## UI Spec Retrieval Mechanism
 
 Implementation:
-- `read_ui_spec(...)` in [scripts/tooling.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/tooling.py)
+- `read_ui_spec(...)` in [scripts/tooling.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/tooling.py)
 
 This is not open-ended file access.
 
@@ -243,7 +243,7 @@ So the retrieval model is:
 ## Agent Loop
 
 Implementation:
-- `run_agent_loop(...)` call in [scripts/main.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- `run_agent_loop(...)` call in [scripts/main.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
 
 The final generation run uses:
 - the system prompt from `SKILL.md`
@@ -274,7 +274,7 @@ If repair fails again:
 ## Pack Tool Usage Enforcement
 
 Implementation:
-- `_check_pack_tool_usage(...)` in [scripts/main.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/scripts/main.py)
+- `_check_pack_tool_usage(...)` in [scripts/main.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/scripts/main.py)
 
 This step checks whether the artifact contains pack-specific widgets but the model never used that pack’s required tools.
 
@@ -298,7 +298,7 @@ Important:
 ## Semantic Validation
 
 Implementation:
-- `normalize_and_validate_widget_activity(...)` in [validation/widgets.py](/home/luke/Desktop/learning-core/learning_core/skills/activity_generate/validation/widgets.py)
+- `normalize_and_validate_widget_activity(...)` in [validation/widgets.py](/home/luke/Desktop/learning/learning-core/learning_core/skills/activity_generate/validation/widgets.py)
 
 This stage does more than schema validation.
 

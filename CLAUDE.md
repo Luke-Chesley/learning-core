@@ -12,59 +12,75 @@ uv sync --extra dev
 # Run the API server (http://127.0.0.1:8000)
 uv run learning-core
 
+# Run the local widget/debug harness
+./local_test/run.sh
+
 # Run all tests
-pytest
+uv run pytest
 
 # Run a single test file
-pytest tests/test_skill_registry.py
-
-# Run with coverage
-pytest --cov=learning_core
+uv run pytest tests/test_skill_registry.py
 ```
 
 ## Architecture
 
-**learning-core** is a headless Python/FastAPI service that owns the AI agent runtime for learning products. It exposes typed AI operations via REST — product repos call this service and handle their own persistence/auth.
+**learning-core** is a FastAPI service that owns AI runtime behavior for learning products. Product repos call named operations over REST and handle their own UI, auth, and persistence.
 
 ### Request Flow
 
 ```
 POST /v1/operations/{operation_name}/execute
-  → FastAPI validates OperationEnvelope (Pydantic)
-  → AgentEngine.execute() (runtime/engine.py)
-      → SkillRegistry looks up skill by operation name
-      → Parses input against skill's input_model
-      → Creates RuntimeContext
-      → Skill.execute()
-          → StructuredOutputSkill calls engine.run_structured_output()
-          → Builds system prompt (from SKILL.md) + user prompt (from build_user_prompt())
-          → Invokes LangChain model (Anthropic/OpenAI/Ollama)
-          → Logs exchange to logs/YYYY-MM-DD/
-          → Returns artifact + ExecutionLineage + ExecutionTrace
+  → FastAPI validates OperationEnvelope in learning_core/api/app.py
+  → AgentEngine.execute() in runtime/engine.py
+      → SkillRegistry resolves the operation's skill
+      → normalize_runtime_request() maps the envelope onto the shared runtime model
+      → AgentKernel.preview()/execute() resolves:
+          → task_profile
+          → response_type
+          → workflow_card
+          → runtime packs
+          → tool plan
+      → execution strategy from runtime/task_profiles.py runs one of:
+          → structured
+          → text
+          → skill_execute
+          → generate_from_source
+      → artifact is validated, traced, and returned
   → OperationExecuteResponse
 ```
 
 ### Skill Anatomy
 
-Each operation lives in `learning_core/skills/{skill_name}/` with this structure:
+Each operation lives in `learning_core/skills/{skill_name}/`.
+
+Common layout:
 
 ```
 skill_name/
-├── SKILL.md          # System prompt (loaded from file at runtime)
+├── SKILL.md          # Prompt instructions loaded at runtime
 ├── scripts/
-│   ├── main.py       # Skill class + build_user_prompt()
-│   ├── policy.py     # ExecutionPolicy (temperature, max_tokens, task_kind)
-│   ├── schemas.py    # Input & output Pydantic models
-│   └── tooling.py    # Allowed tools list
-└── examples/         # Test fixtures (optional)
+│   └── main.py       # Skill entrypoint
+├── examples/         # Optional fixtures
+├── packs/            # Optional skill-local pack docs/helpers
+├── validation/       # Optional validators
+├── ui_components/    # Optional activity component docs
+└── ui_widgets/       # Optional engine-backed widget docs
 ```
 
-All skills are registered in `learning_core/skills/catalog.py`. To add a new operation, create the skill directory and register it there.
+Many skills also keep optional `policy.py`, `schemas.py`, and `tooling.py` helpers next to `main.py`.
+
+To add a new operation:
+
+- create or extend the skill under `learning_core/skills/`
+- register it in `learning_core/skills/catalog.py`
+- add runtime metadata in `learning_core/runtime/task_profiles.py`
+- add or reuse the matching response type and workflow card when needed
 
 ### Key Contracts (`learning_core/contracts/`)
 
-- **`OperationEnvelope`** — request wrapper: `{input, app_context, presentation_context, user_authored_context}`
+- **`OperationEnvelope`** — request wrapper: `{input, app_context, presentation_context, user_authored_context, request_id}`
 - **`AppContext`** — product/surface metadata passed by caller
+- **`PresentationContext` / `UserAuthoredContext`** — response shaping and user-provided guidance
 - **`StrictModel`** (from `base.py`) — all contracts inherit this; forbids extra fields
 
 ### Provider Abstraction (`runtime/providers.py`)
