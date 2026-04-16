@@ -129,38 +129,14 @@ class AgentEngine:
         return text[start : end + 1]
 
     def _run_text_json_fallback(self, *, skill, payload, context, structured_error: Exception):
-        raw_text, lineage, trace = self.run_text_output(
+        return self._run_text_json_fallback_with_preview(
             skill=skill,
             payload=payload,
             context=context,
+            structured_error=structured_error,
+            preview=skill.build_prompt_preview(payload, context),
+            strategy="text_json",
         )
-        extracted_json = self._extract_json(raw_text)
-
-        try:
-            raw_artifact = json.loads(extracted_json)
-        except Exception as error:
-            raise ContractValidationError(
-                "Structured-output fallback returned invalid JSON: "
-                f"{error}. Raw text: {raw_text[:400]}"
-            ) from error
-
-        try:
-            artifact = skill.output_model.model_validate(raw_artifact)
-        except Exception as error:
-            raise ContractValidationError(
-                f"Structured-output fallback returned an invalid artifact: {error}"
-            ) from error
-
-        trace.agent_trace = {
-            **(trace.agent_trace or {}),
-            "structured_output_fallback": {
-                "strategy": "text_json",
-                "reason": structured_error.__class__.__name__,
-                "message": str(structured_error),
-            },
-        }
-
-        return artifact, lineage, trace
 
     def _kernel_enabled_for_operation(self, operation_name: str) -> bool:
         env_name = f"LEARNING_CORE_USE_KERNEL_FOR_{operation_name.upper()}"
@@ -404,6 +380,85 @@ class AgentEngine:
         try:
             artifact = skill.output_model.model_validate(raw_artifact)
         except Exception as error:
+            repaired_artifact = skill.repair_invalid_artifact(
+                raw_artifact=raw_artifact,
+                payload=payload,
+                context=context,
+                error=error,
+            )
+            if repaired_artifact is not None:
+                try:
+                    artifact = skill.output_model.model_validate(repaired_artifact)
+                except Exception:
+                    artifact = None
+                else:
+                    write_provider_exchange_log(
+                        request=provider_request,
+                        response={
+                            "status": "validation_repaired",
+                            "error_type": error.__class__.__name__,
+                            "error": str(error),
+                            "raw_response": raw_artifact,
+                            "repaired_response": repaired_artifact,
+                            "validated_artifact": artifact.model_dump(mode="json", exclude_none=True),
+                        },
+                    )
+                    lineage = ExecutionLineage(
+                        operation_name=context.operation_name,
+                        skill_name=skill.name,
+                        skill_version=skill.policy.skill_version,
+                        provider=model_runtime.provider,
+                        model=model_runtime.model,
+                    )
+                    trace = ExecutionTrace(
+                        request_id=context.request_id,
+                        operation_name=context.operation_name,
+                        allowed_tools=list(skill.policy.allowed_tools),
+                        prompt_preview=preview,
+                        request_envelope=OperationEnvelope(
+                            input=payload.model_dump(mode="json"),
+                            app_context=context.app_context,
+                            presentation_context=context.presentation_context,
+                            user_authored_context=context.user_authored_context,
+                            request_id=context.request_id,
+                        ),
+                    )
+                    trace.agent_trace = {
+                        **(trace.agent_trace or {}),
+                        "structured_output_fallback": {
+                            "strategy": "deterministic_repair",
+                            "reason": error.__class__.__name__,
+                            "message": str(error),
+                        },
+                    }
+                    return artifact, lineage, trace
+
+            repair_preview = skill.build_validation_retry_preview(
+                payload=payload,
+                context=context,
+                raw_artifact=raw_artifact,
+                error=error,
+            )
+            if repair_preview is not None:
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "validation_error_fallback",
+                        "error_type": error.__class__.__name__,
+                        "error": str(error),
+                        "raw_response": raw_artifact,
+                        "fallback_strategy": "validation_repair",
+                    },
+                )
+                return self._run_text_json_fallback_with_preview(
+                    skill=skill,
+                    payload=payload,
+                    context=context,
+                    structured_error=error,
+                    preview=repair_preview,
+                    strategy="validation_repair",
+                )
+
             write_provider_exchange_log(
                 request=provider_request,
                 response={
@@ -446,8 +501,59 @@ class AgentEngine:
         )
         return artifact, lineage, trace
 
-    def run_text_output(self, *, skill, payload, context: RuntimeContext) -> tuple[str, ExecutionLineage, ExecutionTrace]:
-        preview = skill.build_prompt_preview(payload, context)
+    def _run_text_json_fallback_with_preview(
+        self,
+        *,
+        skill,
+        payload,
+        context,
+        structured_error: Exception,
+        preview: PromptPreview,
+        strategy: str,
+    ):
+        raw_text, lineage, trace = self.run_text_output(
+            skill=skill,
+            payload=payload,
+            context=context,
+            preview_override=preview,
+        )
+        extracted_json = self._extract_json(raw_text)
+
+        try:
+            raw_artifact = json.loads(extracted_json)
+        except Exception as error:
+            raise ContractValidationError(
+                "Structured-output fallback returned invalid JSON: "
+                f"{error}. Raw text: {raw_text[:400]}"
+            ) from error
+
+        try:
+            artifact = skill.output_model.model_validate(raw_artifact)
+        except Exception as error:
+            raise ContractValidationError(
+                f"Structured-output fallback returned an invalid artifact: {error}"
+            ) from error
+
+        trace.agent_trace = {
+            **(trace.agent_trace or {}),
+            "structured_output_fallback": {
+                "strategy": strategy,
+                "reason": structured_error.__class__.__name__,
+                "message": str(structured_error),
+            },
+        }
+
+        return artifact, lineage, trace
+
+    def run_text_output(
+        self,
+        *,
+        skill,
+        payload,
+        context: RuntimeContext,
+        preview_override: PromptPreview | None = None,
+    ) -> tuple[str, ExecutionLineage, ExecutionTrace]:
+        preview = preview_override or skill.build_prompt_preview(payload, context)
         self.tool_registry.resolve_many(skill.policy.allowed_tools)
         model_runtime = build_model_runtime(
             task_name=context.operation_name,

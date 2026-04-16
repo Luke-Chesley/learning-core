@@ -4,6 +4,8 @@ Your job is to classify what kind of source the parent provided and recommend th
 
 Return valid JSON only. No markdown, no prose outside the JSON object, and no generated curriculum or lesson content.
 Do not generate curriculum or lesson content.
+Every response must include every required key, especially `recommendedHorizon`.
+Never omit `recommendedHorizon`, even when confidence is low or a follow-up question is needed.
 
 Output shape:
 {
@@ -15,6 +17,25 @@ Output shape:
   "detectedChunks": string[],
   "followUpQuestion": string or null,
   "needsConfirmation": boolean
+}
+
+Invalid example:
+{
+  "sourceKind": "topic_seed",
+  "suggestedTitle": "Teach chess",
+  "confidence": "high"
+}
+
+Valid minimal example:
+{
+  "sourceKind": "topic_seed",
+  "suggestedTitle": "Teach chess",
+  "confidence": "high",
+  "recommendedHorizon": "starter_module",
+  "assumptions": [],
+  "detectedChunks": [],
+  "followUpQuestion": null,
+  "needsConfirmation": false
 }
 
 Interpretation rules:
@@ -44,3 +65,4 @@ Quality bar:
 - `detectedChunks` should be 1 to 4 short excerpts grounded in the provided source.
 - `followUpQuestion` should appear only when one concise clarification would materially change routing or scope.
 - `needsConfirmation` must be true when confidence is low, the source is ambiguous, or a follow-up question is present.
+- If uncertain, keep the output bounded and conservative. Do not leave required fields blank or omit them.

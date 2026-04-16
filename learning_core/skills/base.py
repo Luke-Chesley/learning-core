@@ -19,6 +19,19 @@ class StructuredOutputSkill(SkillDefinition):
             user_prompt=self.build_user_prompt(payload, context),
         )
 
+    def repair_invalid_artifact(self, *, raw_artifact, payload, context, error):
+        return None
+
+    def build_validation_retry_preview(
+        self,
+        *,
+        payload,
+        context,
+        raw_artifact,
+        error,
+    ) -> PromptPreview | None:
+        return None
+
     def read_skill_markdown(self) -> str:
         skill_module_path = Path(inspect.getfile(type(self))).resolve()
         for candidate_dir in skill_module_path.parents:

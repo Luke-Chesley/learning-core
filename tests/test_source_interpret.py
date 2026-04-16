@@ -17,12 +17,15 @@ from learning_core.skills.catalog import build_skill_registry
 from learning_core.skills.source_interpret.scripts.main import SourceInterpretSkill
 
 
-def _artifact(source_kind: str = "weekly_assignments") -> dict:
+def _artifact(
+    source_kind: str = "weekly_assignments",
+    recommended_horizon: str = "current_week",
+) -> dict:
     return {
         "sourceKind": source_kind,
         "suggestedTitle": "Week plan: Fractions and decimals",
         "confidence": "high",
-        "recommendedHorizon": "current_week",
+        "recommendedHorizon": recommended_horizon,
         "assumptions": [
             "The source appears to describe the current week only.",
             "We should keep planning bounded to the current week.",
@@ -52,6 +55,9 @@ class _FakeClient:
     def with_structured_output(self, _output_model, **_kwargs):
         return _FakeStructuredInvoker(self.artifact)
 
+    def invoke(self, _messages):
+        return _FakeTextResponse(json.dumps(self.artifact))
+
 
 class _ExplodingStructuredInvoker:
     def invoke(self, _messages):
@@ -72,6 +78,18 @@ class _FallbackClient:
 
     def invoke(self, _messages):
         return _FakeTextResponse(json.dumps(self.artifact))
+
+
+class _RepairFallbackClient:
+    def __init__(self, structured_artifact: dict, repaired_artifact: dict) -> None:
+        self.structured_artifact = structured_artifact
+        self.repaired_artifact = repaired_artifact
+
+    def with_structured_output(self, _output_model, **_kwargs):
+        return _FakeStructuredInvoker(self.structured_artifact)
+
+    def invoke(self, _messages):
+        return _FakeTextResponse(json.dumps(self.repaired_artifact))
 
 
 def _envelope() -> dict:
@@ -114,6 +132,8 @@ def test_source_interpret_prompt_preview_lists_allowed_kinds_and_guardrails():
     assert "User horizon intent: auto" in preview.user_prompt
     assert "Do not downgrade a real outline" in preview.system_prompt
     assert "co-op days" in preview.system_prompt
+    assert "Never omit `recommendedHorizon`" in preview.system_prompt
+    assert "Valid minimal example" in preview.system_prompt
 
 
 def test_source_interpret_execute_rejects_invalid_source_kind(monkeypatch, tmp_path: Path):
@@ -186,6 +206,70 @@ def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
     assert result.artifact["recommendedHorizon"] == "current_week"
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
+
+
+def test_source_interpret_repairs_missing_recommended_horizon(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    invalid_artifact = _artifact()
+    invalid_artifact.pop("recommendedHorizon")
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-source-interpret",
+            client=_FakeClient(invalid_artifact),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("source_interpret", _envelope())
+
+    assert result.artifact["sourceKind"] == "weekly_assignments"
+    assert result.artifact["recommendedHorizon"] == "current_week"
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "deterministic_repair"
+
+
+def test_source_interpret_retries_with_repair_prompt_on_validation_error(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    structured_artifact = {
+        "suggestedTitle": "Teach chess",
+        "confidence": "high",
+        "assumptions": [],
+        "detectedChunks": [],
+        "needsConfirmation": False,
+    }
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-source-interpret",
+            client=_RepairFallbackClient(
+                structured_artifact,
+                _artifact(source_kind="topic_seed", recommended_horizon="starter_module"),
+            ),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    engine = AgentEngine(build_skill_registry())
+    result = engine.execute("source_interpret", _envelope())
+
+    assert result.artifact["sourceKind"] == "topic_seed"
+    assert result.artifact["recommendedHorizon"] == "starter_module"
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "validation_repair"
 
 
 def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tmp_path: Path):
