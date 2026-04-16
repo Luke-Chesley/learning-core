@@ -9,6 +9,7 @@ def test_openai_service_tier_from_env(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "flex")
     monkeypatch.delenv("LEARNING_CORE_CHAT_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("LEARNING_CORE_COPILOT_CHAT_MAX_TOKENS", raising=False)
     monkeypatch.delenv("LEARNING_CORE_ACTIVITY_GENERATE_MAX_TOKENS", raising=False)
 
     runtime = build_model_runtime(
