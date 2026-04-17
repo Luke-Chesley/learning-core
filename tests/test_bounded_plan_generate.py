@@ -101,6 +101,30 @@ def _envelope() -> dict:
             "sourceKind": "weekly_assignments",
             "chosenHorizon": "current_week",
             "sourceText": "Monday: fractions practice\nWednesday: decimal review\nFriday: percent game",
+            "sourcePackages": [
+                {
+                    "id": "ipkg-1",
+                    "title": "Week 1 upload",
+                    "modality": "file",
+                    "summary": "File · Monday fractions practice",
+                    "extractionStatus": "ready",
+                    "assetCount": 1,
+                    "assetIds": ["asset-1"],
+                    "detectedChunks": ["Monday: fractions practice"],
+                    "sourceFingerprint": "fp-1",
+                }
+            ],
+            "sourceFiles": [
+                {
+                    "assetId": "asset-1",
+                    "packageId": "ipkg-1",
+                    "title": "Week 1 upload",
+                    "modality": "pdf",
+                    "fileName": "week-1.pdf",
+                    "mimeType": "application/pdf",
+                    "fileUrl": "https://example.com/week-1.pdf",
+                }
+            ],
             "titleCandidate": "Monday/Wednesday/Friday math practice plan",
             "detectedChunks": [
                 "Monday: fractions practice",
@@ -137,8 +161,36 @@ def test_bounded_plan_prompt_preview_includes_guardrails():
     assert "Do not invent a semester" in preview.system_prompt
     assert "Routed route: weekly_plan" in preview.user_prompt
     assert "Chosen horizon: current_week" in preview.user_prompt
+    assert "Source packages:" in preview.user_prompt
+    assert "Week 1 upload" in preview.user_prompt
+    assert "Attached source files:" in preview.user_prompt
+    assert "week-1.pdf" in preview.user_prompt
     assert "The `document` field is required." in preview.user_prompt
     assert "subject -> unit title -> ordered lesson title list" in preview.user_prompt
+
+
+def test_bounded_plan_builds_openai_file_message_blocks():
+    payload = BoundedPlanGenerationRequest.model_validate(_envelope()["input"])
+    content = BoundedPlanGenerateSkill().build_user_message_content(
+        payload,
+        RuntimeContext.create(
+            operation_name="bounded_plan_generate",
+            app_context=AppContext(product="homeschool-v2", surface="onboarding"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+        provider="openai",
+    )
+
+    assert isinstance(content, list)
+    assert content[0]["type"] == "text"
+    assert content[1] == {
+        "type": "file",
+        "file": {
+            "file_url": "https://example.com/week-1.pdf",
+            "filename": "week-1.pdf",
+        },
+    }
 
 
 def test_bounded_plan_execute_rejects_invalid_artifact(monkeypatch, tmp_path: Path):

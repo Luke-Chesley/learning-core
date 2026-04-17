@@ -170,6 +170,7 @@ def _build_openai_client(
         api_key=api_key,
         service_tier=service_tier,
         timeout=None,
+        use_responses_api=True,
     )
 
 

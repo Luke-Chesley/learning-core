@@ -8,7 +8,11 @@ from learning_core.contracts.bounded_plan import (
 )
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.skills.prompt_utils import append_user_authored_context
+from learning_core.skills.prompt_utils import (
+    append_user_authored_context,
+    build_openai_file_blocks,
+    format_source_files,
+)
 
 
 class BoundedPlanGenerateSkill(StructuredOutputSkill):
@@ -17,7 +21,7 @@ class BoundedPlanGenerateSkill(StructuredOutputSkill):
     output_model = BoundedPlanArtifact
     policy = ExecutionPolicy(
         skill_name="bounded_plan_generate",
-        skill_version="2026-04-14",
+        skill_version="2026-04-17",
         max_tokens=5000,
     )
 
@@ -29,6 +33,12 @@ class BoundedPlanGenerateSkill(StructuredOutputSkill):
             f"Source kind: {payload.sourceKind}",
             f"Chosen horizon: {payload.chosenHorizon}",
             f"Title candidate: {payload.titleCandidate or 'None provided'}",
+            "",
+            "Source packages:",
+            json.dumps([source.model_dump(mode="json") for source in payload.sourcePackages], indent=2),
+            "",
+            "Attached source files:",
+            format_source_files(payload.sourceFiles),
             "",
             "Detected chunks:",
             json.dumps(payload.detectedChunks, indent=2),
@@ -66,3 +76,16 @@ class BoundedPlanGenerateSkill(StructuredOutputSkill):
             ]
         )
         return "\n".join(lines)
+
+    def build_user_message_content(
+        self,
+        payload: BoundedPlanGenerationRequest,
+        context,
+        *,
+        prompt_text: str | None = None,
+        provider: str | None = None,
+    ) -> str | list[dict]:
+        prompt = prompt_text if prompt_text is not None else self.build_user_prompt(payload, context)
+        if provider != "openai" or not payload.sourceFiles:
+            return prompt
+        return [{"type": "text", "text": prompt}, *build_openai_file_blocks(payload.sourceFiles)]

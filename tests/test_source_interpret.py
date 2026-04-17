@@ -101,6 +101,30 @@ def _envelope() -> dict:
             "rawText": "Monday: fractions practice\nWednesday: decimal review\nFriday: percent game",
             "extractedText": "Monday: fractions practice\nWednesday: decimal review\nFriday: percent game",
             "assetRefs": ["asset-1"],
+            "sourcePackages": [
+                {
+                    "id": "ipkg-1",
+                    "title": "Week 1 upload",
+                    "modality": "file",
+                    "summary": "File · Monday fractions practice",
+                    "extractionStatus": "ready",
+                    "assetCount": 1,
+                    "assetIds": ["asset-1"],
+                    "detectedChunks": ["Monday: fractions practice"],
+                    "sourceFingerprint": "fp-1",
+                }
+            ],
+            "sourceFiles": [
+                {
+                    "assetId": "asset-1",
+                    "packageId": "ipkg-1",
+                    "title": "Week 1 upload",
+                    "modality": "pdf",
+                    "fileName": "week-1.pdf",
+                    "mimeType": "application/pdf",
+                    "fileUrl": "https://example.com/week-1.pdf",
+                }
+            ],
             "userHorizonIntent": "auto",
             "titleCandidate": "Week 1",
         },
@@ -130,10 +154,38 @@ def test_source_interpret_prompt_preview_lists_allowed_kinds_and_guardrails():
     assert "Do not generate curriculum" in preview.system_prompt
     assert "Requested route: topic" in preview.user_prompt
     assert "User horizon intent: auto" in preview.user_prompt
+    assert "Source packages:" in preview.user_prompt
+    assert "Week 1 upload" in preview.user_prompt
+    assert "Attached source files:" in preview.user_prompt
+    assert "week-1.pdf" in preview.user_prompt
     assert "Do not downgrade a real outline" in preview.system_prompt
     assert "co-op days" in preview.system_prompt
     assert "Never omit `recommendedHorizon`" in preview.system_prompt
     assert "Valid minimal example" in preview.system_prompt
+
+
+def test_source_interpret_builds_openai_file_message_blocks():
+    payload = SourceInterpretationRequest.model_validate(_envelope()["input"])
+    content = SourceInterpretSkill().build_user_message_content(
+        payload,
+        RuntimeContext.create(
+            operation_name="source_interpret",
+            app_context=AppContext(product="homeschool-v2", surface="onboarding"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+        provider="openai",
+    )
+
+    assert isinstance(content, list)
+    assert content[0]["type"] == "text"
+    assert content[1] == {
+        "type": "file",
+        "file": {
+            "file_url": "https://example.com/week-1.pdf",
+            "filename": "week-1.pdf",
+        },
+    }
 
 
 def test_source_interpret_execute_rejects_invalid_source_kind(monkeypatch, tmp_path: Path):
@@ -365,4 +417,5 @@ def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tm
     bounded_call = next(data for name, data in captured_requests if name == "bounded_plan_generate")
     assert bounded_call["input"]["requestedRoute"] == "outline"
     assert bounded_call["input"]["routedRoute"] == "outline"
+    assert bounded_call["input"]["sourcePackages"] == _envelope()["input"]["sourcePackages"]
     assert result.artifact["horizon"] == "current_week"

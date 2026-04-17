@@ -33,7 +33,7 @@ class AgentEngine:
         skill,
         model_runtime,
         payload,
-        prompt_preview: PromptPreview,
+        provider_messages: list[dict[str, object]],
         response_mode: str,
         structured_output_method: str | None = None,
     ) -> dict:
@@ -59,10 +59,7 @@ class AgentEngine:
             "response_mode": response_mode,
             "provider_request_kind": provider_request_kind,
             "allowed_tools": list(skill.policy.allowed_tools),
-            "provider_messages": [
-                {"role": "system", "content": prompt_preview.system_prompt},
-                {"role": "user", "content": prompt_preview.user_prompt},
-            ],
+            "provider_messages": provider_messages,
             "input_payload": payload.model_dump(mode="json"),
             "request_envelope": OperationEnvelope(
                 input=payload.model_dump(mode="json"),
@@ -72,6 +69,31 @@ class AgentEngine:
                 request_id=context.request_id,
             ).model_dump(mode="json"),
         }
+
+    def _build_provider_messages(
+        self,
+        *,
+        skill,
+        payload,
+        context: RuntimeContext,
+        prompt_preview: PromptPreview,
+        provider: str,
+    ) -> tuple[list[object], list[dict[str, object]]]:
+        user_content = skill.build_user_message_content(
+            payload,
+            context,
+            prompt_text=prompt_preview.user_prompt,
+            provider=provider,
+        )
+        messages = [
+            SystemMessage(content=prompt_preview.system_prompt),
+            HumanMessage(content=user_content),
+        ]
+        serialized = [
+            {"role": "system", "content": prompt_preview.system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        return messages, serialized
 
     def _structured_output_method_for_provider(self, provider: str) -> str | None:
         # GPT-5.4-mini is currently more reliable with JSON mode than with
@@ -284,6 +306,7 @@ class AgentEngine:
                     "sourceKind": source_kind,
                     "chosenHorizon": interpretation["recommendedHorizon"],
                     "sourceText": source_request.get("extractedText") or source_request.get("rawText") or "",
+                    "sourcePackages": source_request.get("sourcePackages", []),
                     "titleCandidate": interpretation.get("suggestedTitle") or source_request.get("titleCandidate"),
                     "detectedChunks": interpretation.get("detectedChunks", []),
                     "assumptions": interpretation.get("assumptions", []),
@@ -321,12 +344,19 @@ class AgentEngine:
             max_tokens=skill.policy.max_tokens,
         )
         structured_output_method = self._structured_output_method_for_provider(model_runtime.provider)
+        provider_messages, provider_messages_payload = self._build_provider_messages(
+            skill=skill,
+            payload=payload,
+            context=context,
+            prompt_preview=preview,
+            provider=model_runtime.provider,
+        )
         provider_request = self._provider_request_payload(
             context=context,
             skill=skill,
             model_runtime=model_runtime,
             payload=payload,
-            prompt_preview=preview,
+            provider_messages=provider_messages_payload,
             response_mode="structured",
             structured_output_method=structured_output_method,
         )
@@ -343,12 +373,7 @@ class AgentEngine:
             )
             raw_artifact = self._invoke_provider_with_retry(
                 model_runtime.provider,
-                lambda: structured.invoke(
-                    [
-                        SystemMessage(content=preview.system_prompt),
-                        HumanMessage(content=preview.user_prompt),
-                    ]
-                ),
+                lambda: structured.invoke(provider_messages),
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
             if self._is_retryable_provider_error(model_runtime.provider, error):
@@ -561,24 +586,26 @@ class AgentEngine:
             temperature=skill.policy.temperature,
             max_tokens=skill.policy.max_tokens,
         )
+        provider_messages, provider_messages_payload = self._build_provider_messages(
+            skill=skill,
+            payload=payload,
+            context=context,
+            prompt_preview=preview,
+            provider=model_runtime.provider,
+        )
         provider_request = self._provider_request_payload(
             context=context,
             skill=skill,
             model_runtime=model_runtime,
             payload=payload,
-            prompt_preview=preview,
+            provider_messages=provider_messages_payload,
             response_mode="text",
         )
 
         try:
             response = self._invoke_provider_with_retry(
                 model_runtime.provider,
-                lambda: model_runtime.client.invoke(
-                    [
-                        SystemMessage(content=preview.system_prompt),
-                        HumanMessage(content=preview.user_prompt),
-                    ]
-                ),
+                lambda: model_runtime.client.invoke(provider_messages),
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
             write_provider_exchange_log(
