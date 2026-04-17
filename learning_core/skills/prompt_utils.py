@@ -30,11 +30,8 @@ def build_openai_file_blocks(source_files: Iterable[object]) -> list[dict[str, o
     for source_file in source_files:
         blocks.append(
             {
-                "type": "file",
-                "file": {
-                    "file_url": getattr(source_file, "fileUrl"),
-                    "filename": getattr(source_file, "fileName"),
-                },
+                "type": "input_file",
+                "file_url": getattr(source_file, "fileUrl"),
             }
         )
     return blocks

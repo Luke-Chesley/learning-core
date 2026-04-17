@@ -180,11 +180,8 @@ def test_source_interpret_builds_openai_file_message_blocks():
     assert isinstance(content, list)
     assert content[0]["type"] == "text"
     assert content[1] == {
-        "type": "file",
-        "file": {
-            "file_url": "https://example.com/week-1.pdf",
-            "filename": "week-1.pdf",
-        },
+        "type": "input_file",
+        "file_url": "https://example.com/week-1.pdf",
     }
 
 

@@ -72,9 +72,6 @@ def test_curriculum_generate_builds_openai_file_message_blocks():
     assert isinstance(content, list)
     assert content[0]["type"] == "text"
     assert content[1] == {
-        "type": "file",
-        "file": {
-            "file_url": "https://example.com/egypt-reader.pdf",
-            "filename": "egypt-reader.pdf",
-        },
+        "type": "input_file",
+        "file_url": "https://example.com/egypt-reader.pdf",
     }
