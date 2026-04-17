@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
@@ -138,6 +139,62 @@ def _resolve_openai_service_tier(task_name: str) -> str | None:
     return service_tier
 
 
+@lru_cache(maxsize=32)
+def _build_anthropic_client(
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    api_key: str,
+):
+    return ChatAnthropic(
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        anthropic_api_key=api_key,
+        timeout=None,
+    )
+
+
+@lru_cache(maxsize=32)
+def _build_openai_client(
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    api_key: str,
+    service_tier: str | None,
+):
+    return ChatOpenAI(
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        api_key=api_key,
+        service_tier=service_tier,
+        timeout=None,
+    )
+
+
+@lru_cache(maxsize=32)
+def _build_ollama_client(
+    model: str,
+    base_url: str,
+    temperature: float,
+    max_tokens: int,
+    num_ctx: int | None,
+    keep_alive: str | None,
+    auth_token: str | None,
+):
+    client_kwargs = {"headers": {"Authorization": f"Bearer {auth_token}"}} if auth_token else None
+    return ChatOllama(
+        model=model,
+        base_url=base_url,
+        temperature=temperature,
+        num_predict=max_tokens,
+        num_ctx=num_ctx,
+        keep_alive=keep_alive,
+        client_kwargs=client_kwargs,
+    )
+
+
 def build_model_runtime(
     *,
     task_name: str,
@@ -157,12 +214,11 @@ def build_model_runtime(
 
     if provider == "anthropic":
         api_key = _read_required_str("ANTHROPIC_API_KEY")
-        client = ChatAnthropic(
-            model=model,
-            temperature=resolved_temperature,
-            max_tokens=resolved_max_tokens,
-            anthropic_api_key=api_key,
-            timeout=None,
+        client = _build_anthropic_client(
+            model,
+            resolved_temperature,
+            resolved_max_tokens,
+            api_key,
         )
         return ModelRuntime(
             provider=provider,
@@ -177,13 +233,12 @@ def build_model_runtime(
     if provider == "openai":
         api_key = _read_required_str("OPENAI_API_KEY")
         service_tier = _resolve_openai_service_tier(task_name)
-        client = ChatOpenAI(
-            model=model,
-            temperature=resolved_temperature,
-            max_tokens=resolved_max_tokens,
-            api_key=api_key,
-            service_tier=service_tier,
-            timeout=None,
+        client = _build_openai_client(
+            model,
+            resolved_temperature,
+            resolved_max_tokens,
+            api_key,
+            service_tier,
         )
         return ModelRuntime(
             provider=provider,
@@ -201,15 +256,14 @@ def build_model_runtime(
     auth_token = _parse_optional_str(os.getenv("OLLAMA_AUTH_TOKEN"))
     num_ctx = _parse_optional_int(os.getenv("OLLAMA_NUM_CTX"))
     keep_alive = _parse_optional_str(os.getenv("OLLAMA_KEEP_ALIVE"))
-    client_kwargs = {"headers": {"Authorization": f"Bearer {auth_token}"}} if auth_token else None
-    client = ChatOllama(
-        model=model,
-        base_url=base_url,
-        temperature=resolved_temperature,
-        num_predict=resolved_max_tokens,
-        num_ctx=num_ctx,
-        keep_alive=keep_alive,
-        client_kwargs=client_kwargs,
+    client = _build_ollama_client(
+        model,
+        base_url,
+        resolved_temperature,
+        resolved_max_tokens,
+        num_ctx,
+        keep_alive,
+        auth_token,
     )
     return ModelRuntime(
         provider=provider,
