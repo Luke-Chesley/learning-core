@@ -14,6 +14,32 @@ def format_curriculum_transcript(messages: Iterable[CurriculumChatMessage]) -> s
     return "\n".join(rows) if rows else "No conversation yet."
 
 
+def format_source_files(source_files: Iterable[object]) -> str:
+    rows: list[str] = []
+    for index, source_file in enumerate(source_files, start=1):
+        file_name = getattr(source_file, "fileName", "file")
+        mime_type = getattr(source_file, "mimeType", "application/octet-stream")
+        modality = getattr(source_file, "modality", "file")
+        title = getattr(source_file, "title", "Untitled source")
+        rows.append(f"{index}. {title} ({modality}) -> {file_name} [{mime_type}]")
+    return "\n".join(rows) if rows else "No attached source files."
+
+
+def build_openai_file_blocks(source_files: Iterable[object]) -> list[dict[str, object]]:
+    blocks: list[dict[str, object]] = []
+    for source_file in source_files:
+        blocks.append(
+            {
+                "type": "file",
+                "file": {
+                    "file_url": getattr(source_file, "fileUrl"),
+                    "filename": getattr(source_file, "fileName"),
+                },
+            }
+        )
+    return blocks
+
+
 def append_user_authored_context(lines: list[str], context: RuntimeContext) -> None:
     authored = context.user_authored_context
 

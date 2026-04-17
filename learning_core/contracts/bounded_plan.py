@@ -8,6 +8,8 @@ from learning_core.contracts.base import StrictModel
 from learning_core.contracts.progression import ProgressionArtifact
 from learning_core.contracts.source_interpret import (
     RequestedIntakeRoute,
+    SourceInputFile,
+    SourcePackageContext,
     SourceInterpretationHorizon,
     SourceKind,
 )
@@ -38,6 +40,8 @@ class BoundedPlanGenerationRequest(StrictModel):
     sourceKind: SourceKind
     chosenHorizon: SourceInterpretationHorizon
     sourceText: str = Field(min_length=1)
+    sourcePackages: list[SourcePackageContext] = Field(default_factory=list)
+    sourceFiles: list[SourceInputFile] = Field(default_factory=list)
     titleCandidate: str | None = None
     detectedChunks: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)

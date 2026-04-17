@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from pathlib import Path
+from typing import Any
 
 from learning_core.observability.traces import PromptPreview
 from learning_core.runtime.skill import SkillDefinition, SkillExecutionResult
@@ -12,6 +13,17 @@ class StructuredOutputSkill(SkillDefinition):
 
     def build_user_prompt(self, payload, context) -> str:  # pragma: no cover - implemented by subclasses
         raise NotImplementedError
+
+    def build_user_message_content(
+        self,
+        payload,
+        context,
+        *,
+        prompt_text: str | None = None,
+        provider: str | None = None,
+    ) -> str | list[dict[str, Any]]:
+        del provider
+        return prompt_text if prompt_text is not None else self.build_user_prompt(payload, context)
 
     def build_prompt_preview(self, payload, context) -> PromptPreview:
         return PromptPreview(

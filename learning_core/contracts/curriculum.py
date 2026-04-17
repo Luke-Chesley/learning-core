@@ -6,6 +6,7 @@ from pydantic import Field
 
 from learning_core.contracts.base import StrictModel
 from learning_core.contracts.progression import ProgressionArtifact
+from learning_core.contracts.source_interpret import SourceInputFile, SourcePackageContext
 
 
 class CurriculumChatMessage(StrictModel):
@@ -100,6 +101,8 @@ class CurriculumGenerationRequest(StrictModel):
     pacingExpectations: CurriculumPacingExpectations | None = None
     granularityGuidance: list[str] = Field(default_factory=list)
     correctionNotes: list[str] = Field(default_factory=list)
+    sourcePackages: list[SourcePackageContext] = Field(default_factory=list)
+    sourceFiles: list[SourceInputFile] = Field(default_factory=list)
 
 
 class CurriculumRevisionRequest(StrictModel):

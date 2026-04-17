@@ -8,7 +8,12 @@ from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.curriculum_common import build_skill_catalog_from_document
 from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
-from learning_core.skills.prompt_utils import append_user_authored_context, format_curriculum_transcript
+from learning_core.skills.prompt_utils import (
+    append_user_authored_context,
+    build_openai_file_blocks,
+    format_curriculum_transcript,
+    format_source_files,
+)
 
 
 class CurriculumGenerateSkill(StructuredOutputSkill):
@@ -17,7 +22,7 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
     output_model = CurriculumArtifact
     policy = ExecutionPolicy(
         skill_name="curriculum_generate",
-        skill_version="2026-04-09",
+        skill_version="2026-04-17",
         max_tokens=12000,
     )
 
@@ -49,6 +54,24 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             ]
         )
 
+        if payload.sourcePackages:
+            lines.extend(
+                [
+                    "",
+                    "Source packages:",
+                    payload.model_dump_json(indent=2, include={"sourcePackages"}),
+                ]
+            )
+
+        if payload.sourceFiles:
+            lines.extend(
+                [
+                    "",
+                    "Attached source files:",
+                    format_source_files(payload.sourceFiles),
+                ]
+            )
+
         if payload.correctionNotes:
             lines.extend(
                 [
@@ -61,6 +84,19 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
         append_user_authored_context(lines, context)
         lines.extend(["", "Generate the core curriculum artifact."])
         return "\n".join(lines)
+
+    def build_user_message_content(
+        self,
+        payload: CurriculumGenerationRequest,
+        context,
+        *,
+        prompt_text: str | None = None,
+        provider: str | None = None,
+    ) -> str | list[dict]:
+        prompt = prompt_text if prompt_text is not None else self.build_user_prompt(payload, context)
+        if provider != "openai" or not payload.sourceFiles:
+            return prompt
+        return [{"type": "text", "text": prompt}, *build_openai_file_blocks(payload.sourceFiles)]
 
     def execute(self, engine, payload: CurriculumGenerationRequest, context: RuntimeContext) -> SkillExecutionResult[CurriculumArtifact]:
         artifact, lineage, trace = engine.run_structured_output(

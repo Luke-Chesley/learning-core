@@ -10,7 +10,11 @@ from learning_core.contracts.source_interpret import (
 from learning_core.observability.traces import PromptPreview
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.skills.prompt_utils import append_user_authored_context
+from learning_core.skills.prompt_utils import (
+    append_user_authored_context,
+    build_openai_file_blocks,
+    format_source_files,
+)
 
 
 _RECOMMENDED_HORIZON_BY_SOURCE_KIND: dict[str, SourceInterpretationHorizon] = {
@@ -29,7 +33,7 @@ class SourceInterpretSkill(StructuredOutputSkill):
     output_model = SourceInterpretationArtifact
     policy = ExecutionPolicy(
         skill_name="source_interpret",
-        skill_version="2026-04-14",
+        skill_version="2026-04-17",
         max_tokens=2500,
     )
 
@@ -41,6 +45,12 @@ class SourceInterpretSkill(StructuredOutputSkill):
             f"Asset refs: {len(payload.assetRefs)}",
             f"Title candidate: {payload.titleCandidate or 'None provided'}",
             f"Learner: {payload.learnerName or 'Unknown learner'}",
+            "",
+            "Source packages:",
+            json.dumps([source.model_dump(mode="json") for source in payload.sourcePackages], indent=2),
+            "",
+            "Attached source files:",
+            format_source_files(payload.sourceFiles),
             "",
             "Extracted structure:",
             json.dumps(payload.extractedStructure or {}, indent=2),
@@ -61,6 +71,19 @@ class SourceInterpretSkill(StructuredOutputSkill):
             ]
         )
         return "\n".join(lines)
+
+    def build_user_message_content(
+        self,
+        payload: SourceInterpretationRequest,
+        context,
+        *,
+        prompt_text: str | None = None,
+        provider: str | None = None,
+    ) -> str | list[dict]:
+        prompt = prompt_text if prompt_text is not None else self.build_user_prompt(payload, context)
+        if provider != "openai" or not payload.sourceFiles:
+            return prompt
+        return [{"type": "text", "text": prompt}, *build_openai_file_blocks(payload.sourceFiles)]
 
     def repair_invalid_artifact(self, *, raw_artifact, payload, context, error):
         if not isinstance(raw_artifact, dict):
