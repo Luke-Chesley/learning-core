@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from learning_core.contracts.base import StrictModel
 
@@ -49,7 +49,14 @@ class SourceInputFile(StrictModel):
     modality: SourceInputModality
     fileName: str
     mimeType: str
-    fileUrl: str
+    fileUrl: str | None = None
+    fileData: str | None = None
+
+    @model_validator(mode="after")
+    def validate_reference(self) -> "SourceInputFile":
+        if bool(self.fileUrl) == bool(self.fileData):
+            raise ValueError("Provide exactly one of fileUrl or fileData.")
+        return self
 
 
 class SourceInterpretationRequest(StrictModel):

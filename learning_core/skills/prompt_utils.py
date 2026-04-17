@@ -28,12 +28,28 @@ def format_source_files(source_files: Iterable[object]) -> str:
 def build_openai_file_blocks(source_files: Iterable[object]) -> list[dict[str, object]]:
     blocks: list[dict[str, object]] = []
     for source_file in source_files:
-        blocks.append(
-            {
-                "type": "input_file",
-                "file_url": getattr(source_file, "fileUrl"),
-            }
-        )
+        file_data = getattr(source_file, "fileData", None)
+        if file_data:
+            blocks.append(
+                {
+                    "type": "input_file",
+                    "filename": getattr(source_file, "fileName", "file"),
+                    "file_data": file_data,
+                }
+            )
+            continue
+
+        file_url = getattr(source_file, "fileUrl", None)
+        if file_url:
+            blocks.append(
+                {
+                    "type": "input_file",
+                    "file_url": file_url,
+                }
+            )
+            continue
+
+        raise ValueError("Expected source file to include fileUrl or fileData.")
     return blocks
 
 

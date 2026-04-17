@@ -37,7 +37,7 @@ def _payload() -> CurriculumGenerationRequest:
                     "modality": "pdf",
                     "fileName": "egypt-reader.pdf",
                     "mimeType": "application/pdf",
-                    "fileUrl": "https://example.com/egypt-reader.pdf",
+                    "fileData": "data:application/pdf;base64,ZmFrZS1wZGY=",
                 }
             ],
         }
@@ -73,5 +73,6 @@ def test_curriculum_generate_builds_openai_file_message_blocks():
     assert content[0]["type"] == "text"
     assert content[1] == {
         "type": "input_file",
-        "file_url": "https://example.com/egypt-reader.pdf",
+        "filename": "egypt-reader.pdf",
+        "file_data": "data:application/pdf;base64,ZmFrZS1wZGY=",
     }
