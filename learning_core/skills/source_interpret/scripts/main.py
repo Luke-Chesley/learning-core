@@ -66,6 +66,7 @@ class SourceInterpretSkill(StructuredOutputSkill):
             [
                 "",
                 "Interpret the source only.",
+                "When attached source files are present, treat them as the authoritative source and use the raw or extracted text as supporting note context.",
                 "Do not generate curriculum, lesson steps, activities, or pacing beyond the recommended bounded horizon.",
                 "Return only valid JSON.",
             ]
@@ -104,6 +105,8 @@ class SourceInterpretSkill(StructuredOutputSkill):
         if repaired.get("needsConfirmation") is None and repaired.get("followUpQuestion"):
             repaired["needsConfirmation"] = True
 
+        if repaired.get("sliceNotes") is None:
+            repaired["sliceNotes"] = []
         if repaired.get("assumptions") is None:
             repaired["assumptions"] = []
         if repaired.get("detectedChunks") is None:
@@ -129,7 +132,7 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "- `recommendedHorizon` is required and may never be omitted.",
                 "- If the source is weak or ambiguous, choose a conservative horizon instead of omitting the field.",
                 '- Invalid example: {"sourceKind":"topic_seed","suggestedTitle":"Chess","confidence":"high"}',
-                '- Valid example: {"sourceKind":"topic_seed","suggestedTitle":"Chess","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":[],"followUpQuestion":null,"needsConfirmation":false}',
+                '- Valid example: {"sourceKind":"topic_seed","sourceScale":null,"sliceStrategy":"manual_shell_only","sliceNotes":[],"suggestedTitle":"Chess","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":[],"followUpQuestion":null,"needsConfirmation":false}',
             ]
         )
         user_prompt = "\n".join(

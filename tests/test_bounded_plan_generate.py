@@ -99,6 +99,9 @@ def _envelope() -> dict:
             "requestedRoute": "topic",
             "routedRoute": "weekly_plan",
             "sourceKind": "weekly_assignments",
+            "sourceScale": "medium",
+            "sliceStrategy": "current_week_only",
+            "sliceNotes": ["Use the Monday, Wednesday, and Friday assignments only."],
             "chosenHorizon": "current_week",
             "sourceText": "Monday: fractions practice\nWednesday: decimal review\nFriday: percent game",
             "sourcePackages": [
@@ -160,11 +163,16 @@ def test_bounded_plan_prompt_preview_includes_guardrails():
     assert "current_week" in preview.system_prompt
     assert "Do not invent a semester" in preview.system_prompt
     assert "Routed route: weekly_plan" in preview.user_prompt
+    assert "Source scale: medium" in preview.user_prompt
+    assert "Slice strategy: current_week_only" in preview.user_prompt
+    assert "Use the Monday, Wednesday, and Friday assignments only." in preview.user_prompt
     assert "Chosen horizon: current_week" in preview.user_prompt
     assert "Source packages:" in preview.user_prompt
     assert "Week 1 upload" in preview.user_prompt
     assert "Attached source files:" in preview.user_prompt
     assert "week-1.pdf" in preview.user_prompt
+    assert "The first lesson or day must be immediately teachable and ready to open as day 1." in preview.user_prompt
+    assert "If the source is large, generate only the bounded initial slice" in preview.user_prompt
     assert "The `document` field is required." in preview.user_prompt
     assert "subject -> unit title -> ordered lesson title list" in preview.user_prompt
 

@@ -28,6 +28,17 @@ SourceInterpretationHorizon = Literal[
     "starter_week",
 ]
 SourceInterpretationConfidence = Literal["low", "medium", "high"]
+SourceInterpretationScale = Literal["small", "medium", "large"]
+SourceInterpretationSliceStrategy = Literal[
+    "single_lesson",
+    "first_lesson",
+    "first_chapter",
+    "first_unit",
+    "first_few_sections",
+    "current_week_only",
+    "explicit_range",
+    "manual_shell_only",
+]
 
 
 class SourcePackageContext(StrictModel):
@@ -75,6 +86,9 @@ class SourceInterpretationRequest(StrictModel):
 
 class SourceInterpretationArtifact(StrictModel):
     sourceKind: SourceKind
+    sourceScale: SourceInterpretationScale | None = None
+    sliceStrategy: SourceInterpretationSliceStrategy | None = None
+    sliceNotes: list[str] = Field(default_factory=list)
     suggestedTitle: str
     confidence: SourceInterpretationConfidence
     recommendedHorizon: SourceInterpretationHorizon

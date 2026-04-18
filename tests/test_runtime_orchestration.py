@@ -9,28 +9,36 @@ from learning_core.skills.catalog import build_skill_registry
 
 
 class _FakeStructuredInvoker:
-    def __init__(self, artifact: dict) -> None:
+    def __init__(self, artifact: dict, captured_messages: list | None = None) -> None:
         self.artifact = artifact
+        self.captured_messages = captured_messages
 
-    def invoke(self, _messages):
+    def invoke(self, messages):
+        if self.captured_messages is not None:
+            self.captured_messages.extend(messages)
         return self.artifact
 
 
 class _FakeClient:
-    def __init__(self, artifact: dict) -> None:
+    def __init__(self, artifact: dict, captured_messages: list | None = None) -> None:
         self.artifact = artifact
+        self.captured_messages = captured_messages
 
     def with_structured_output(self, _output_model, **_kwargs):
-        return _FakeStructuredInvoker(self.artifact)
+        return _FakeStructuredInvoker(self.artifact, self.captured_messages)
 
 
 def test_execute_generate_from_source_chains_source_interpret_into_bounded_plan(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    captured_bounded_messages: list = []
 
     def fake_build_model_runtime(*, task_name: str, **_kwargs):
         if task_name == "source_interpret":
             artifact = {
                 "sourceKind": "weekly_assignments",
+                "sourceScale": "large",
+                "sliceStrategy": "explicit_range",
+                "sliceNotes": ["Parent asked to use chapter 1 only."],
                 "suggestedTitle": "Week plan: Fractions and decimals",
                 "confidence": "high",
                 "recommendedHorizon": "current_week",
@@ -93,7 +101,10 @@ def test_execute_generate_from_source_chains_source_interpret_into_bounded_plan(
         return ModelRuntime(
             provider="test",
             model=f"fake-{task_name}",
-            client=_FakeClient(artifact),
+            client=_FakeClient(
+                artifact,
+                captured_bounded_messages if task_name == "bounded_plan_generate" else None,
+            ),
             temperature=0.2,
             max_tokens=4096,
             max_tokens_source="test",
@@ -129,3 +140,7 @@ def test_execute_generate_from_source_chains_source_interpret_into_bounded_plan(
         "source_interpret",
         "bounded_plan_generate",
     ]
+    bounded_prompt = captured_bounded_messages[1].content
+    assert "Source scale: large" in bounded_prompt
+    assert "Slice strategy: explicit_range" in bounded_prompt
+    assert "Parent asked to use chapter 1 only." in bounded_prompt

@@ -11,6 +11,8 @@ from learning_core.contracts.source_interpret import (
     SourceInputFile,
     SourcePackageContext,
     SourceInterpretationHorizon,
+    SourceInterpretationScale,
+    SourceInterpretationSliceStrategy,
     SourceKind,
 )
 
@@ -38,6 +40,9 @@ class BoundedPlanGenerationRequest(StrictModel):
     requestedRoute: RequestedIntakeRoute
     routedRoute: RequestedIntakeRoute
     sourceKind: SourceKind
+    sourceScale: SourceInterpretationScale | None = None
+    sliceStrategy: SourceInterpretationSliceStrategy | None = None
+    sliceNotes: list[str] = Field(default_factory=list)
     chosenHorizon: SourceInterpretationHorizon
     sourceText: str = Field(min_length=1)
     sourcePackages: list[SourcePackageContext] = Field(default_factory=list)

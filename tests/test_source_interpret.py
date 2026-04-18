@@ -159,6 +159,10 @@ def test_source_interpret_prompt_preview_lists_allowed_kinds_and_guardrails():
     assert "Attached source files:" in preview.user_prompt
     assert "week-1.pdf" in preview.user_prompt
     assert "Do not downgrade a real outline" in preview.system_prompt
+    assert "A whole book, workbook, or long PDF is still a valid source." in preview.system_prompt
+    assert "Choose the smallest horizon that makes the uploaded source feel useful immediately." in preview.system_prompt
+    assert "A large source should still produce a conservative launch horizon derived from the initial slice" in preview.system_prompt
+    assert "When attached source files are present, treat those files as the primary source." in preview.system_prompt
     assert "co-op days" in preview.system_prompt
     assert "Never omit `recommendedHorizon`" in preview.system_prompt
     assert "Valid minimal example" in preview.system_prompt
@@ -374,6 +378,9 @@ def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tm
                 operation_name="source_interpret",
                 artifact={
                     "sourceKind": "sequence_outline",
+                    "sourceScale": "large",
+                    "sliceStrategy": "first_chapter",
+                    "sliceNotes": ["Start with chapter 1 only."],
                     "suggestedTitle": "Mangled outline",
                     "confidence": "medium",
                     "recommendedHorizon": "current_week",
@@ -414,5 +421,9 @@ def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tm
     bounded_call = next(data for name, data in captured_requests if name == "bounded_plan_generate")
     assert bounded_call["input"]["requestedRoute"] == "outline"
     assert bounded_call["input"]["routedRoute"] == "outline"
+    assert bounded_call["input"]["sourceScale"] == "large"
+    assert bounded_call["input"]["sliceStrategy"] == "first_chapter"
+    assert bounded_call["input"]["sliceNotes"] == ["Start with chapter 1 only."]
     assert bounded_call["input"]["sourcePackages"] == _envelope()["input"]["sourcePackages"]
+    assert bounded_call["input"]["sourceFiles"] == _envelope()["input"]["sourceFiles"]
     assert result.artifact["horizon"] == "current_week"
