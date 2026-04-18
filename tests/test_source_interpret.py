@@ -165,12 +165,22 @@ def test_source_interpret_prompt_preview_lists_new_taxonomy_and_guardrails():
     assert "entryStrategy" in preview.system_prompt
     assert "continuationMode" in preview.system_prompt
     assert "Do not treat a whole book as" in preview.system_prompt
+    assert "single_day_material" not in preview.system_prompt
+    assert "weekly_assignments" not in preview.system_prompt
+    assert "sequence_outline" not in preview.system_prompt
+    assert "manual_shell" not in preview.system_prompt
+    assert "today" not in preview.system_prompt
+    assert "tomorrow" not in preview.system_prompt
+    assert "next_few_days" not in preview.system_prompt
+    assert "current_week" not in preview.system_prompt
+    assert "starter_week" not in preview.system_prompt
     assert "Requested route: topic" in preview.user_prompt
     assert "Source packages:" in preview.user_prompt
     assert "Week 1 upload" in preview.user_prompt
     assert "Attached source files:" in preview.user_prompt
     assert "week-1.pdf" in preview.user_prompt
     assert "User horizon intent" not in preview.user_prompt
+    assert "userHorizonIntent" not in preview.user_prompt
 
 
 def test_source_interpret_builds_openai_file_message_blocks():

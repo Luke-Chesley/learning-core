@@ -92,3 +92,13 @@ class SourceInterpretationArtifact(StrictModel):
     detectedChunks: list[str] = Field(default_factory=list)
     followUpQuestion: str | None = None
     needsConfirmation: bool = False
+
+    @model_validator(mode="after")
+    def validate_confirmation_requirements(self) -> "SourceInterpretationArtifact":
+        if self.followUpQuestion and not self.needsConfirmation:
+            raise ValueError("needsConfirmation must be true when followUpQuestion is present.")
+        if self.confidence == "low" and not self.needsConfirmation:
+            raise ValueError("needsConfirmation must be true when confidence is low.")
+        if self.sourceKind == "ambiguous" and not self.needsConfirmation:
+            raise ValueError("needsConfirmation must be true when sourceKind is ambiguous.")
+        return self

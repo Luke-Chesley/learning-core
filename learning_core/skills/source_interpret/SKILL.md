@@ -7,6 +7,7 @@ Do not generate curriculum, lesson steps, worksheets, activities, or pacing beyo
 
 Every response must include every required key.
 Never omit `recommendedHorizon`, `entryStrategy`, or `continuationMode`, even when confidence is low or follow-up is needed.
+Use only the exact taxonomy values listed below. Do not invent synonyms, alternate enum names, or legacy labels.
 
 Output shape:
 {
