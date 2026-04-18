@@ -193,6 +193,8 @@ class CurriculumGenerationRequest(StrictModel):
         if not self.messages:
             raise ValueError("conversation_intake requests require at least one message.")
         forbidden_fields = {
+            "requestedRoute": self.requestedRoute,
+            "routedRoute": self.routedRoute,
             "sourceKind": self.sourceKind,
             "entryStrategy": self.entryStrategy,
             "entryLabel": self.entryLabel,

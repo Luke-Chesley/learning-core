@@ -88,10 +88,10 @@ class SourceInterpretationArtifact(StrictModel):
     suggestedTitle: str
     confidence: SourceInterpretationConfidence
     recommendedHorizon: SourceInterpretationHorizon
-    assumptions: list[str] = Field(default_factory=list)
-    detectedChunks: list[str] = Field(default_factory=list)
+    assumptions: list[str]
+    detectedChunks: list[str] = Field(min_length=1, max_length=6)
     followUpQuestion: str | None = None
-    needsConfirmation: bool = False
+    needsConfirmation: bool
 
     @model_validator(mode="after")
     def validate_confirmation_requirements(self) -> "SourceInterpretationArtifact":

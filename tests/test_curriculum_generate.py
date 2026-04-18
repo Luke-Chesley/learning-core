@@ -97,6 +97,8 @@ def test_curriculum_generate_prompt_preview_mentions_conversation_fields():
     assert "Teach my daughter fractions this summer" in preview.user_prompt
     assert "Granularity guidance:" in preview.user_prompt
     assert "Correction notes for this retry:" in preview.user_prompt
+    assert "Requested route:" not in preview.user_prompt
+    assert "Routed route:" not in preview.user_prompt
 
 
 def test_curriculum_generate_builds_openai_file_message_blocks_for_source_entry():
@@ -134,5 +136,17 @@ def test_curriculum_generate_rejects_source_fields_in_conversation_mode():
                 "requestMode": "conversation_intake",
                 "messages": [{"role": "user", "content": "Teach fractions."}],
                 "sourceText": "This should not be allowed.",
+            }
+        )
+
+
+def test_curriculum_generate_rejects_route_fields_in_conversation_mode():
+    with pytest.raises(ValueError):
+        CurriculumGenerationRequest.model_validate(
+            {
+                "learnerName": "Maya",
+                "requestMode": "conversation_intake",
+                "requestedRoute": "topic",
+                "messages": [{"role": "user", "content": "Teach fractions."}],
             }
         )

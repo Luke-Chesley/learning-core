@@ -67,7 +67,7 @@ Valid minimal example:
   "confidence": "high",
   "recommendedHorizon": "starter_module",
   "assumptions": [],
-  "detectedChunks": [],
+  "detectedChunks": ["Teach chess openings"],
   "followUpQuestion": null,
   "needsConfirmation": false
 }
@@ -110,7 +110,7 @@ Horizon rules:
 - `recommendedHorizon` is the recommended initial planning horizon, not the total curriculum length.
 - Use `single_day` for one clearly bounded day-sized source.
 - Use `few_days` for 2 to 4 clearly sequential chunks or a small assigned range that naturally spans a few lessons.
-- Use `one_week` for a week-bounded plan or a clearly usable one-week starting window.
+- Use `one_week` for a week-sized plan or a clearly usable one-week starting window.
 - Use `two_weeks` for a two-week plan or a large source with a clearly bounded opening that supports a safe two-week start.
 - Use `starter_module` for topic-seed starts or shell-style starts that need a small bounded module rather than a timeboxed schedule.
 - Do not maximize scope just because more could be imagined.
@@ -121,7 +121,7 @@ Horizon rules:
 
 Quality bar:
 - `assumptions` should be short, operational, and honest.
-- `detectedChunks` should be 1 to 6 short excerpts or chunk labels grounded in the provided source.
+- `detectedChunks` must contain 1 to 6 short excerpts or chunk labels grounded in the provided source.
 - `entryLabel` should only be present when it clarifies the recommended starting point.
 - `followUpQuestion` should appear only when one concise clarification would materially change routing or initial scope.
 - `needsConfirmation` must be true when confidence is low, the source is ambiguous, a follow-up question is present, or the chosen entry point is too uncertain to trust automatically.

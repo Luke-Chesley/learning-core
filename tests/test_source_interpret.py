@@ -343,6 +343,11 @@ def test_source_interpret_repairs_missing_required_fields(monkeypatch, tmp_path:
     assert result.artifact["entryStrategy"] == "section_start"
     assert result.artifact["continuationMode"] == "sequential"
     assert result.artifact["recommendedHorizon"] == "one_week"
+    assert result.artifact["detectedChunks"] == [
+        "Monday: fractions practice",
+        "Wednesday: decimal review",
+        "Friday: percent game",
+    ]
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "deterministic_repair"
 

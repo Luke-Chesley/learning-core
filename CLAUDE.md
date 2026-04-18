@@ -41,13 +41,14 @@ POST /v1/operations/{operation_name}/execute
           → runtime packs
           → tool plan
       → execution strategy from runtime/task_profiles.py runs one of:
+          → skill_execute
           → structured
           → text
-          → skill_execute
-          → generate_from_source
       → artifact is validated, traced, and returned
   → OperationExecuteResponse
 ```
+
+Internal orchestration helpers such as `AgentEngine.execute_generate_from_source()` live in `runtime/engine.py`; they are not task-profile execution strategies inside `AgentKernel`.
 
 ### Skill Anatomy
 

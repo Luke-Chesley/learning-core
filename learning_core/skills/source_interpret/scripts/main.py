@@ -50,6 +50,49 @@ _CONTINUATION_MODE_BY_SOURCE_KIND: dict[str, SourceContinuationMode] = {
 }
 
 
+def _collect_grounded_chunks(values: list[str], chunk: str | None) -> None:
+    normalized = (chunk or "").strip()
+    if not normalized or normalized in values:
+        return
+    values.append(normalized)
+
+
+def _extend_grounded_chunks(values: list[str], chunks) -> None:
+    if not isinstance(chunks, list):
+        return
+
+    for chunk in chunks:
+        if isinstance(chunk, str):
+            _collect_grounded_chunks(values, chunk)
+            continue
+        if isinstance(chunk, dict):
+            for key in ("title", "label", "name", "text"):
+                maybe_value = chunk.get(key)
+                if isinstance(maybe_value, str):
+                    _collect_grounded_chunks(values, maybe_value)
+                    break
+
+
+def _derive_detected_chunks(payload: SourceInterpretationRequest) -> list[str]:
+    derived: list[str] = []
+
+    for source_package in payload.sourcePackages:
+        _extend_grounded_chunks(derived, source_package.detectedChunks)
+
+    structure = payload.extractedStructure or {}
+    if isinstance(structure, dict):
+        for key in ("detectedChunks", "headings", "sections", "chapters", "units", "topics"):
+            _extend_grounded_chunks(derived, structure.get(key))
+
+    for text in (payload.extractedText, payload.rawText):
+        if not text:
+            continue
+        for line in text.splitlines():
+            _collect_grounded_chunks(derived, line)
+
+    return derived[:6]
+
+
 class SourceInterpretSkill(StructuredOutputSkill):
     name = "source_interpret"
     input_model = SourceInterpretationRequest
@@ -145,8 +188,8 @@ class SourceInterpretSkill(StructuredOutputSkill):
 
         if repaired.get("assumptions") is None:
             repaired["assumptions"] = []
-        if repaired.get("detectedChunks") is None:
-            repaired["detectedChunks"] = []
+        if not repaired.get("detectedChunks"):
+            repaired["detectedChunks"] = _derive_detected_chunks(payload)
 
         return repaired if repaired != raw_artifact else None
 
@@ -168,7 +211,7 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "- `recommendedHorizon`, `entryStrategy`, and `continuationMode` are required and may never be omitted.",
                 "- If the source is weak or ambiguous, choose conservative values instead of omitting required fields.",
                 '- Invalid example: {"sourceKind":"topic_seed","suggestedTitle":"Chess","confidence":"high"}',
-                '- Valid example: {"sourceKind":"topic_seed","entryStrategy":"scaffold_only","entryLabel":null,"continuationMode":"manual_review","suggestedTitle":"Teach chess openings","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":[],"followUpQuestion":null,"needsConfirmation":false}',
+                '- Valid example: {"sourceKind":"topic_seed","entryStrategy":"scaffold_only","entryLabel":null,"continuationMode":"manual_review","suggestedTitle":"Teach chess openings","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":["Teach chess openings"],"followUpQuestion":null,"needsConfirmation":false}',
             ]
         )
         user_prompt = "\n".join(

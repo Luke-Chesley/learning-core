@@ -31,13 +31,13 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             f"Active learner: {payload.learnerName}",
             f"Request mode: {payload.requestMode}",
             f"Title candidate: {payload.titleCandidate or 'None provided'}",
-            f"Requested route: {payload.requestedRoute or 'None provided'}",
-            f"Routed route: {payload.routedRoute or 'None provided'}",
         ]
 
         if payload.requestMode == "source_entry":
             lines.extend(
                 [
+                    f"Requested route: {payload.requestedRoute or 'None provided'}",
+                    f"Routed route: {payload.routedRoute or 'None provided'}",
                     "",
                     f"Source kind: {payload.sourceKind}",
                     f"Entry strategy: {payload.entryStrategy}",
