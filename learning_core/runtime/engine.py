@@ -279,23 +279,15 @@ class AgentEngine:
         interpretation = source_result.artifact
         source_kind = interpretation["sourceKind"]
         requested_route = source_request.get("requestedRoute")
-        routed_route = (
-            "outline"
-            if source_kind == "sequence_outline"
-            else "weekly_plan"
-            if interpretation["recommendedHorizon"] in {"next_few_days", "current_week", "starter_week"}
-            else "single_lesson"
-        )
-        if source_kind == "weekly_assignments":
-            requested_route = "weekly_plan"
-        elif source_kind == "sequence_outline":
-            requested_route = "outline"
-        elif source_kind == "single_day_material":
-            requested_route = "single_lesson"
-        elif source_kind == "topic_seed" and requested_route is None:
-            requested_route = "topic"
-        elif source_kind == "manual_shell" and requested_route is None:
-            requested_route = routed_route
+        routed_route = {
+            "bounded_material": "single_lesson",
+            "timeboxed_plan": "weekly_plan",
+            "structured_sequence": "outline",
+            "comprehensive_source": "outline",
+            "topic_seed": "topic",
+            "shell_request": "manual_shell",
+            "ambiguous": requested_route or "manual_shell",
+        }[source_kind]
         bounded_plan_result = self.execute(
             "bounded_plan_generate",
             {
@@ -303,15 +295,15 @@ class AgentEngine:
                     "learnerName": source_request.get("learnerName") or envelope.app_context.learner_id or "Learner",
                     "requestedRoute": requested_route or routed_route,
                     "routedRoute": routed_route,
-                    "sourceKind": source_kind,
-                    "sourceScale": interpretation.get("sourceScale"),
-                    "sliceStrategy": interpretation.get("sliceStrategy"),
-                    "sliceNotes": interpretation.get("sliceNotes", []),
+                    "sourceKind": interpretation["sourceKind"],
+                    "entryStrategy": interpretation["entryStrategy"],
+                    "entryLabel": interpretation.get("entryLabel"),
+                    "continuationMode": interpretation["continuationMode"],
                     "chosenHorizon": interpretation["recommendedHorizon"],
                     "sourceText": source_request.get("extractedText") or source_request.get("rawText") or "",
                     "sourcePackages": source_request.get("sourcePackages", []),
                     "sourceFiles": source_request.get("sourceFiles", []),
-                    "titleCandidate": interpretation.get("suggestedTitle") or source_request.get("titleCandidate"),
+                    "titleCandidate": source_request.get("titleCandidate"),
                     "detectedChunks": interpretation.get("detectedChunks", []),
                     "assumptions": interpretation.get("assumptions", []),
                 },

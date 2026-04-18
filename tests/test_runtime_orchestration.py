@@ -28,75 +28,87 @@ class _FakeClient:
         return _FakeStructuredInvoker(self.artifact, self.captured_messages)
 
 
-def test_execute_generate_from_source_chains_source_interpret_into_bounded_plan(monkeypatch, tmp_path: Path):
+def test_execute_generate_from_source_chains_new_interpretation_into_bounded_plan(
+    monkeypatch, tmp_path: Path
+):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     captured_bounded_messages: list = []
 
     def fake_build_model_runtime(*, task_name: str, **_kwargs):
         if task_name == "source_interpret":
             artifact = {
-                "sourceKind": "weekly_assignments",
-                "sourceScale": "large",
-                "sliceStrategy": "explicit_range",
-                "sliceNotes": ["Parent asked to use chapter 1 only."],
-                "suggestedTitle": "Week plan: Fractions and decimals",
+                "sourceKind": "comprehensive_source",
+                "entryStrategy": "explicit_range",
+                "entryLabel": "pages 1-12",
+                "continuationMode": "sequential",
+                "suggestedTitle": "Workbook launch",
                 "confidence": "high",
-                "recommendedHorizon": "current_week",
+                "recommendedHorizon": "few_days",
                 "assumptions": [
-                    "The source appears to describe the current week only.",
+                    "Parent explicitly asked to use pages 1-12 only.",
                 ],
                 "detectedChunks": [
-                    "Monday: fractions practice",
-                    "Wednesday: decimal review",
+                    "pages 1-12",
+                    "later chapters",
                 ],
                 "followUpQuestion": None,
                 "needsConfirmation": False,
             }
         else:
             artifact = {
-                "title": "Week plan: Fractions and decimals",
-                "description": "A bounded math week plan.",
+                "title": "Workbook launch",
+                "description": "A bounded opening plan.",
                 "subjects": ["Math"],
-                "horizon": "current_week",
-                "rationale": ["The source is a short current-week assignment list."],
+                "horizon": "few_days",
+                "rationale": ["Stay inside the explicit assigned range."],
                 "document": {
                     "Math": {
-                        "Week plan: Fractions and decimals": [
-                            "Fractions practice",
-                            "Decimal review",
+                        "Pages 1-12": [
+                            "Warm-up from page 1",
+                            "Guided practice from pages 2-6",
+                            "Independent practice from pages 7-12",
                         ]
                     }
                 },
                 "units": [
                     {
-                        "title": "Week plan: Fractions and decimals",
-                        "description": "A short plan from the source.",
+                        "title": "Pages 1-12",
+                        "description": "Bounded opening range",
                         "estimatedWeeks": 1,
-                        "estimatedSessions": 2,
+                        "estimatedSessions": 3,
                         "lessons": [
                             {
-                                "title": "Fractions practice",
-                                "description": "Work the first assignment.",
+                                "title": "Warm-up from page 1",
+                                "description": "Open the workbook safely.",
                                 "subject": "Math",
-                                "estimatedMinutes": 35,
+                                "estimatedMinutes": 25,
                                 "materials": [],
-                                "objectives": ["Practice fractions"],
-                                "linkedSkillTitles": ["Fractions practice"],
+                                "objectives": ["Begin the range"],
+                                "linkedSkillTitles": ["Pages 1-12"],
                             },
                             {
-                                "title": "Decimal review",
-                                "description": "Work the second assignment.",
+                                "title": "Guided practice from pages 2-6",
+                                "description": "Continue the bounded opening.",
                                 "subject": "Math",
-                                "estimatedMinutes": 35,
+                                "estimatedMinutes": 30,
                                 "materials": [],
-                                "objectives": ["Review decimals"],
-                                "linkedSkillTitles": ["Decimal review"],
+                                "objectives": ["Practice the middle chunk"],
+                                "linkedSkillTitles": ["Pages 1-12"],
+                            },
+                            {
+                                "title": "Independent practice from pages 7-12",
+                                "description": "Finish the explicit opening range.",
+                                "subject": "Math",
+                                "estimatedMinutes": 30,
+                                "materials": [],
+                                "objectives": ["Finish the range"],
+                                "linkedSkillTitles": ["Pages 1-12"],
                             },
                         ],
                     }
                 ],
                 "progression": None,
-                "suggestedSessionMinutes": 35,
+                "suggestedSessionMinutes": 30,
             }
         return ModelRuntime(
             provider="test",
@@ -113,18 +125,16 @@ def test_execute_generate_from_source_chains_source_interpret_into_bounded_plan(
 
     monkeypatch.setattr(engine_module, "build_model_runtime", fake_build_model_runtime)
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute_generate_from_source(
+    result = AgentEngine(build_skill_registry()).execute_generate_from_source(
         {
             "input": {
                 "learnerName": "Nora",
                 "requestedRoute": "topic",
                 "inputModalities": ["file"],
-                "rawText": "Monday: fractions practice\nWednesday: decimal review",
-                "extractedText": "Monday: fractions practice\nWednesday: decimal review",
+                "rawText": "Workbook pages 1-12 only",
+                "extractedText": "Workbook pages 1-12 only",
                 "assetRefs": ["asset-1"],
-                "userHorizonIntent": "auto",
-                "titleCandidate": "Week 1",
+                "titleCandidate": "Workbook launch",
             },
             "app_context": {
                 "product": "homeschool-v2",
@@ -134,13 +144,18 @@ def test_execute_generate_from_source_chains_source_interpret_into_bounded_plan(
     )
 
     assert result.operation_name == "bounded_plan_generate"
-    assert result.artifact["horizon"] == "current_week"
+    assert result.artifact["horizon"] == "few_days"
     assert result.trace.agent_trace["orchestration_profile"] == "generate_from_source"
     assert [step["operation_name"] for step in result.trace.agent_trace["substeps"]] == [
         "source_interpret",
         "bounded_plan_generate",
     ]
     bounded_prompt = captured_bounded_messages[1].content
-    assert "Source scale: large" in bounded_prompt
-    assert "Slice strategy: explicit_range" in bounded_prompt
-    assert "Parent asked to use chapter 1 only." in bounded_prompt
+    assert "Source kind: comprehensive_source" in bounded_prompt
+    assert "Entry strategy: explicit_range" in bounded_prompt
+    assert "Entry label: pages 1-12" in bounded_prompt
+    assert "Continuation mode: sequential" in bounded_prompt
+    assert "Chosen horizon: few_days" in bounded_prompt
+    assert "Detected chunks:" in bounded_prompt
+    assert "Assumptions:" in bounded_prompt
+    assert "\"Parent explicitly asked to use pages 1-12 only.\"" in bounded_prompt

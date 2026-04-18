@@ -10,35 +10,32 @@ from learning_core.contracts.base import StrictModel
 SourceInputModality = Literal["text", "outline", "photo", "image", "pdf", "file"]
 SourceAssetExtractionStatus = Literal["pending", "ready", "requires_review", "failed"]
 RequestedIntakeRoute = Literal["single_lesson", "weekly_plan", "outline", "topic", "manual_shell"]
-UserHorizonIntent = Literal["today_only", "auto"]
 SourceKind = Literal[
-    "single_day_material",
-    "weekly_assignments",
-    "sequence_outline",
+    "bounded_material",
+    "timeboxed_plan",
+    "structured_sequence",
+    "comprehensive_source",
     "topic_seed",
-    "manual_shell",
+    "shell_request",
     "ambiguous",
 ]
+SourceEntryStrategy = Literal[
+    "use_as_is",
+    "explicit_range",
+    "sequential_start",
+    "section_start",
+    "timebox_start",
+    "scaffold_only",
+]
+SourceContinuationMode = Literal["none", "sequential", "timebox", "manual_review"]
 SourceInterpretationHorizon = Literal[
-    "today",
-    "tomorrow",
-    "next_few_days",
-    "current_week",
+    "single_day",
+    "few_days",
+    "one_week",
+    "two_weeks",
     "starter_module",
-    "starter_week",
 ]
 SourceInterpretationConfidence = Literal["low", "medium", "high"]
-SourceInterpretationScale = Literal["small", "medium", "large"]
-SourceInterpretationSliceStrategy = Literal[
-    "single_lesson",
-    "first_lesson",
-    "first_chapter",
-    "first_unit",
-    "first_few_sections",
-    "current_week_only",
-    "explicit_range",
-    "manual_shell_only",
-]
 
 
 class SourcePackageContext(StrictModel):
@@ -80,15 +77,14 @@ class SourceInterpretationRequest(StrictModel):
     assetRefs: list[str] = Field(default_factory=list)
     sourcePackages: list[SourcePackageContext] = Field(default_factory=list)
     sourceFiles: list[SourceInputFile] = Field(default_factory=list)
-    userHorizonIntent: UserHorizonIntent = "auto"
     titleCandidate: str | None = None
 
 
 class SourceInterpretationArtifact(StrictModel):
     sourceKind: SourceKind
-    sourceScale: SourceInterpretationScale | None = None
-    sliceStrategy: SourceInterpretationSliceStrategy | None = None
-    sliceNotes: list[str] = Field(default_factory=list)
+    entryStrategy: SourceEntryStrategy
+    entryLabel: str | None = None
+    continuationMode: SourceContinuationMode
     suggestedTitle: str
     confidence: SourceInterpretationConfidence
     recommendedHorizon: SourceInterpretationHorizon

@@ -7,8 +7,8 @@ import pytest
 
 import learning_core.runtime.engine as engine_module
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
-from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
 from learning_core.contracts.source_interpret import SourceInterpretationRequest
+from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.engine import AgentEngine
 from learning_core.runtime.errors import ContractValidationError
@@ -18,17 +18,25 @@ from learning_core.skills.source_interpret.scripts.main import SourceInterpretSk
 
 
 def _artifact(
-    source_kind: str = "weekly_assignments",
-    recommended_horizon: str = "current_week",
+    *,
+    source_kind: str = "timeboxed_plan",
+    entry_strategy: str = "timebox_start",
+    entry_label: str | None = "week 1",
+    continuation_mode: str = "timebox",
+    recommended_horizon: str = "one_week",
+    **overrides,
 ) -> dict:
-    return {
+    artifact = {
         "sourceKind": source_kind,
+        "entryStrategy": entry_strategy,
+        "entryLabel": entry_label,
+        "continuationMode": continuation_mode,
         "suggestedTitle": "Week plan: Fractions and decimals",
         "confidence": "high",
         "recommendedHorizon": recommended_horizon,
         "assumptions": [
-            "The source appears to describe the current week only.",
-            "We should keep planning bounded to the current week.",
+            "The source appears to describe an initial week only.",
+            "The safest start is to keep the opening bounded.",
         ],
         "detectedChunks": [
             "Monday: fractions practice",
@@ -38,6 +46,8 @@ def _artifact(
         "followUpQuestion": None,
         "needsConfirmation": False,
     }
+    artifact.update(overrides)
+    return artifact
 
 
 class _FakeStructuredInvoker:
@@ -125,7 +135,6 @@ def _envelope() -> dict:
                     "fileUrl": "https://example.com/week-1.pdf",
                 }
             ],
-            "userHorizonIntent": "auto",
             "titleCandidate": "Week 1",
         },
         "app_context": {
@@ -135,7 +144,7 @@ def _envelope() -> dict:
     }
 
 
-def test_source_interpret_prompt_preview_lists_allowed_kinds_and_guardrails():
+def test_source_interpret_prompt_preview_lists_new_taxonomy_and_guardrails():
     payload = SourceInterpretationRequest.model_validate(_envelope()["input"])
 
     preview = SourceInterpretSkill().build_prompt_preview(
@@ -148,24 +157,20 @@ def test_source_interpret_prompt_preview_lists_allowed_kinds_and_guardrails():
         ),
     )
 
-    assert "single_day_material" in preview.system_prompt
-    assert "weekly_assignments" in preview.system_prompt
-    assert "sequence_outline" in preview.system_prompt
-    assert "Do not generate curriculum" in preview.system_prompt
+    assert "bounded_material" in preview.system_prompt
+    assert "timeboxed_plan" in preview.system_prompt
+    assert "structured_sequence" in preview.system_prompt
+    assert "comprehensive_source" in preview.system_prompt
+    assert "shell_request" in preview.system_prompt
+    assert "entryStrategy" in preview.system_prompt
+    assert "continuationMode" in preview.system_prompt
+    assert "Do not treat a whole book as" in preview.system_prompt
     assert "Requested route: topic" in preview.user_prompt
-    assert "User horizon intent: auto" in preview.user_prompt
     assert "Source packages:" in preview.user_prompt
     assert "Week 1 upload" in preview.user_prompt
     assert "Attached source files:" in preview.user_prompt
     assert "week-1.pdf" in preview.user_prompt
-    assert "Do not downgrade a real outline" in preview.system_prompt
-    assert "A whole book, workbook, or long PDF is still a valid source." in preview.system_prompt
-    assert "Choose the smallest horizon that makes the uploaded source feel useful immediately." in preview.system_prompt
-    assert "A large source should still produce a conservative launch horizon derived from the initial slice" in preview.system_prompt
-    assert "When attached source files are present, treat those files as the primary source." in preview.system_prompt
-    assert "co-op days" in preview.system_prompt
-    assert "Never omit `recommendedHorizon`" in preview.system_prompt
-    assert "Valid minimal example" in preview.system_prompt
+    assert "User horizon intent" not in preview.user_prompt
 
 
 def test_source_interpret_builds_openai_file_message_blocks():
@@ -197,7 +202,7 @@ def test_source_interpret_execute_rejects_invalid_source_kind(monkeypatch, tmp_p
         lambda **_kwargs: ModelRuntime(
             provider="test",
             model="fake-source-interpret",
-            client=_FakeClient(_artifact(source_kind="full_curriculum")),
+            client=_FakeClient({**_artifact(), "sourceKind": "full_curriculum"}),
             temperature=0.2,
             max_tokens=2048,
             max_tokens_source="test",
@@ -205,10 +210,8 @@ def test_source_interpret_execute_rejects_invalid_source_kind(monkeypatch, tmp_p
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-
     with pytest.raises(ContractValidationError):
-        engine.execute("source_interpret", _envelope())
+        AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
 
 
 def test_source_interpret_execute_accepts_valid_artifact(monkeypatch, tmp_path: Path):
@@ -227,11 +230,52 @@ def test_source_interpret_execute_accepts_valid_artifact(monkeypatch, tmp_path: 
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute("source_interpret", _envelope())
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
 
-    assert result.artifact["sourceKind"] == "weekly_assignments"
-    assert result.artifact["recommendedHorizon"] == "current_week"
+    assert result.artifact["sourceKind"] == "timeboxed_plan"
+    assert result.artifact["entryStrategy"] == "timebox_start"
+    assert result.artifact["continuationMode"] == "timebox"
+    assert result.artifact["recommendedHorizon"] == "one_week"
+
+
+def test_source_interpret_execute_accepts_comprehensive_source_whole_book_artifact(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="test",
+            model="fake-source-interpret",
+            client=_FakeClient(
+                _artifact(
+                    source_kind="comprehensive_source",
+                    entry_strategy="section_start",
+                    entry_label="chapter 1",
+                    continuation_mode="sequential",
+                    recommended_horizon="one_week",
+                    suggestedTitle="Kids in the Kitchen",
+                    assumptions=[
+                        "This is a whole book, so launch from chapter 1 and keep the rest for continuation.",
+                    ],
+                    detectedChunks=["chapter 1", "chapter 2", "appendix"],
+                )
+            ),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
+
+    assert result.artifact["sourceKind"] == "comprehensive_source"
+    assert result.artifact["entryStrategy"] == "section_start"
+    assert result.artifact["entryLabel"] == "chapter 1"
+    assert result.artifact["continuationMode"] == "sequential"
+    assert result.artifact["recommendedHorizon"] == "one_week"
 
 
 def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
@@ -252,19 +296,23 @@ def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute("source_interpret", _envelope())
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
 
-    assert result.artifact["sourceKind"] == "weekly_assignments"
-    assert result.artifact["recommendedHorizon"] == "current_week"
+    assert result.artifact["sourceKind"] == "timeboxed_plan"
+    assert result.artifact["recommendedHorizon"] == "one_week"
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
 
 
-def test_source_interpret_repairs_missing_recommended_horizon(monkeypatch, tmp_path: Path):
+def test_source_interpret_repairs_missing_required_fields(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
-    invalid_artifact = _artifact()
-    invalid_artifact.pop("recommendedHorizon")
+    invalid_artifact = {
+        "sourceKind": "comprehensive_source",
+        "suggestedTitle": "Kids in the Kitchen",
+        "confidence": "medium",
+        "assumptions": [],
+        "detectedChunks": [],
+    }
     monkeypatch.setattr(
         engine_module,
         "build_model_runtime",
@@ -279,11 +327,12 @@ def test_source_interpret_repairs_missing_recommended_horizon(monkeypatch, tmp_p
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute("source_interpret", _envelope())
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
 
-    assert result.artifact["sourceKind"] == "weekly_assignments"
-    assert result.artifact["recommendedHorizon"] == "current_week"
+    assert result.artifact["sourceKind"] == "comprehensive_source"
+    assert result.artifact["entryStrategy"] == "section_start"
+    assert result.artifact["continuationMode"] == "sequential"
+    assert result.artifact["recommendedHorizon"] == "one_week"
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "deterministic_repair"
 
@@ -307,7 +356,13 @@ def test_source_interpret_retries_with_repair_prompt_on_validation_error(
             model="fake-source-interpret",
             client=_RepairFallbackClient(
                 structured_artifact,
-                _artifact(source_kind="topic_seed", recommended_horizon="starter_module"),
+                _artifact(
+                    source_kind="topic_seed",
+                    entry_strategy="scaffold_only",
+                    entry_label=None,
+                    continuation_mode="manual_review",
+                    recommended_horizon="starter_module",
+                ),
             ),
             temperature=0.2,
             max_tokens=2048,
@@ -316,38 +371,37 @@ def test_source_interpret_retries_with_repair_prompt_on_validation_error(
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute("source_interpret", _envelope())
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
 
     assert result.artifact["sourceKind"] == "topic_seed"
+    assert result.artifact["entryStrategy"] == "scaffold_only"
+    assert result.artifact["continuationMode"] == "manual_review"
     assert result.artifact["recommendedHorizon"] == "starter_module"
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "validation_repair"
 
 
-def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tmp_path: Path):
+def test_generate_from_source_threads_new_interpretation_fields_into_bounded_plan(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
-    engine = AgentEngine(build_skill_registry())
-
     captured_requests: list[tuple[str, dict]] = []
     bounded_response = engine_module.OperationExecuteResponse(
         operation_name="bounded_plan_generate",
         artifact={
-            "title": "Messy outline week",
-            "description": "Bounded week plan",
-            "subjects": ["History"],
-            "horizon": "current_week",
-            "rationale": ["Preserve the messy outline as a bounded week."],
-            "document": {"History": {"Week": ["Lesson 1"]}},
+            "title": "Kids in the Kitchen",
+            "description": "A bounded opening plan",
+            "subjects": ["Life Skills"],
+            "horizon": "one_week",
+            "rationale": ["Start with chapter 1 only."],
+            "document": {"Life Skills": {"Chapter 1": ["Kitchen setup"]}},
             "units": [
                 {
-                    "title": "Week",
-                    "description": "Week",
-                    "lessons": [{"title": "Lesson 1", "description": "Desc"}],
+                    "title": "Chapter 1",
+                    "description": "Bounded opening unit",
+                    "lessons": [{"title": "Kitchen setup", "description": "Get ready to cook."}],
                 }
             ],
             "progression": None,
-            "suggestedSessionMinutes": 20,
+            "suggestedSessionMinutes": 25,
         },
         lineage=ExecutionLineage(
             operation_name="bounded_plan_generate",
@@ -363,7 +417,7 @@ def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tm
             prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
             request_envelope=engine_module.OperationEnvelope.model_validate(
                 {
-                    "input": {"topic": "messy outline"},
+                    "input": {"topic": "kitchen"},
                     "app_context": {"product": "homeschool-v2", "surface": "onboarding"},
                 }
             ),
@@ -377,15 +431,15 @@ def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tm
             return engine_module.OperationExecuteResponse(
                 operation_name="source_interpret",
                 artifact={
-                    "sourceKind": "sequence_outline",
-                    "sourceScale": "large",
-                    "sliceStrategy": "first_chapter",
-                    "sliceNotes": ["Start with chapter 1 only."],
-                    "suggestedTitle": "Mangled outline",
-                    "confidence": "medium",
-                    "recommendedHorizon": "current_week",
-                    "assumptions": ["Keep the copied outline structure visible."],
-                    "detectedChunks": ["Chapter 4", "co-op Thursday"],
+                    "sourceKind": "comprehensive_source",
+                    "entryStrategy": "explicit_range",
+                    "entryLabel": "chapter 1",
+                    "continuationMode": "sequential",
+                    "suggestedTitle": "Kids in the Kitchen",
+                    "confidence": "high",
+                    "recommendedHorizon": "one_week",
+                    "assumptions": ["Honor the explicit chapter 1 request."],
+                    "detectedChunks": ["chapter 1", "chapter 2"],
                     "followUpQuestion": None,
                     "needsConfirmation": False,
                 },
@@ -419,11 +473,13 @@ def test_generate_from_source_routes_sequence_outline_to_outline(monkeypatch, tm
     result = AgentEngine(build_skill_registry()).execute_generate_from_source(_envelope())
 
     bounded_call = next(data for name, data in captured_requests if name == "bounded_plan_generate")
-    assert bounded_call["input"]["requestedRoute"] == "outline"
+    assert bounded_call["input"]["requestedRoute"] == "topic"
     assert bounded_call["input"]["routedRoute"] == "outline"
-    assert bounded_call["input"]["sourceScale"] == "large"
-    assert bounded_call["input"]["sliceStrategy"] == "first_chapter"
-    assert bounded_call["input"]["sliceNotes"] == ["Start with chapter 1 only."]
-    assert bounded_call["input"]["sourcePackages"] == _envelope()["input"]["sourcePackages"]
-    assert bounded_call["input"]["sourceFiles"] == _envelope()["input"]["sourceFiles"]
-    assert result.artifact["horizon"] == "current_week"
+    assert bounded_call["input"]["sourceKind"] == "comprehensive_source"
+    assert bounded_call["input"]["entryStrategy"] == "explicit_range"
+    assert bounded_call["input"]["entryLabel"] == "chapter 1"
+    assert bounded_call["input"]["continuationMode"] == "sequential"
+    assert bounded_call["input"]["chosenHorizon"] == "one_week"
+    assert bounded_call["input"]["detectedChunks"] == ["chapter 1", "chapter 2"]
+    assert bounded_call["input"]["assumptions"] == ["Honor the explicit chapter 1 request."]
+    assert result.artifact["horizon"] == "one_week"

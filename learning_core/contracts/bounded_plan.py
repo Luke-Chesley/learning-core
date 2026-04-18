@@ -8,12 +8,12 @@ from learning_core.contracts.base import StrictModel
 from learning_core.contracts.progression import ProgressionArtifact
 from learning_core.contracts.source_interpret import (
     RequestedIntakeRoute,
+    SourceContinuationMode,
+    SourceEntryStrategy,
     SourceInputFile,
+    SourceKind,
     SourcePackageContext,
     SourceInterpretationHorizon,
-    SourceInterpretationScale,
-    SourceInterpretationSliceStrategy,
-    SourceKind,
 )
 
 
@@ -40,9 +40,9 @@ class BoundedPlanGenerationRequest(StrictModel):
     requestedRoute: RequestedIntakeRoute
     routedRoute: RequestedIntakeRoute
     sourceKind: SourceKind
-    sourceScale: SourceInterpretationScale | None = None
-    sliceStrategy: SourceInterpretationSliceStrategy | None = None
-    sliceNotes: list[str] = Field(default_factory=list)
+    entryStrategy: SourceEntryStrategy
+    entryLabel: str | None = None
+    continuationMode: SourceContinuationMode
     chosenHorizon: SourceInterpretationHorizon
     sourceText: str = Field(min_length=1)
     sourcePackages: list[SourcePackageContext] = Field(default_factory=list)

@@ -15,64 +15,85 @@ from learning_core.skills.bounded_plan_generate.scripts.main import BoundedPlanG
 from learning_core.skills.catalog import build_skill_registry
 
 
-def _artifact(title: str = "Current week fractions plan") -> dict:
+def _interpretation() -> dict:
+    return {
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "explicit_range",
+        "entryLabel": "chapter 1",
+        "continuationMode": "sequential",
+        "suggestedTitle": "Kids in the Kitchen",
+        "confidence": "high",
+        "recommendedHorizon": "few_days",
+        "assumptions": [
+            "Stay inside the explicit chapter 1 range.",
+        ],
+        "detectedChunks": [
+            "chapter 1",
+            "chapter 2",
+        ],
+        "followUpQuestion": None,
+        "needsConfirmation": False,
+    }
+
+
+def _artifact(title: str = "Kids in the Kitchen") -> dict:
     return {
         "title": title,
-        "description": "A bounded math plan for the current week.",
-        "subjects": ["Math"],
-        "horizon": "current_week",
+        "description": "A bounded life-skills opening plan.",
+        "subjects": ["Life Skills"],
+        "horizon": "few_days",
         "rationale": [
-            "The source clearly names three weekday tasks.",
-            "The scope stays inside the current week.",
+            "Use only the explicit chapter 1 opening range.",
+            "Keep the launch bounded before later continuation.",
         ],
         "document": {
-            "Math": {
-                "Current week fractions and decimals": [
-                    "Fractions practice",
-                    "Decimal review",
-                    "Percent game",
+            "Life Skills": {
+                "Chapter 1": [
+                    "Kitchen setup",
+                    "Tools and safety",
+                    "First simple prep",
                 ]
             }
         },
         "units": [
             {
-                "title": "Current week fractions and decimals",
-                "description": "A short week plan built from the provided assignments.",
+                "title": "Chapter 1",
+                "description": "A short opening range built from the explicit entry.",
                 "estimatedWeeks": 1,
                 "estimatedSessions": 3,
                 "lessons": [
                     {
-                        "title": "Fractions practice",
-                        "description": "Work through the Monday fractions task.",
-                        "subject": "Math",
-                        "estimatedMinutes": 35,
+                        "title": "Kitchen setup",
+                        "description": "Open with the setup lesson.",
+                        "subject": "Life Skills",
+                        "estimatedMinutes": 30,
                         "materials": [],
-                        "objectives": ["Practice fraction reasoning"],
-                        "linkedSkillTitles": ["Fractions practice"],
+                        "objectives": ["Identify the kitchen setup basics"],
+                        "linkedSkillTitles": ["Kitchen setup"],
                     },
                     {
-                        "title": "Decimal review",
-                        "description": "Review decimals in the middle of the week.",
-                        "subject": "Math",
-                        "estimatedMinutes": 35,
+                        "title": "Tools and safety",
+                        "description": "Continue inside the same opening range.",
+                        "subject": "Life Skills",
+                        "estimatedMinutes": 30,
                         "materials": [],
-                        "objectives": ["Review decimal understanding"],
-                        "linkedSkillTitles": ["Decimal review"],
+                        "objectives": ["Practice kitchen safety steps"],
+                        "linkedSkillTitles": ["Tools and safety"],
                     },
                     {
-                        "title": "Percent game",
-                        "description": "Use a short game to rehearse percents.",
-                        "subject": "Math",
-                        "estimatedMinutes": 35,
+                        "title": "First simple prep",
+                        "description": "Close the opening range with a simple task.",
+                        "subject": "Life Skills",
+                        "estimatedMinutes": 30,
                         "materials": [],
-                        "objectives": ["Practice percent thinking"],
-                        "linkedSkillTitles": ["Percent game"],
+                        "objectives": ["Complete the first bounded prep task"],
+                        "linkedSkillTitles": ["First simple prep"],
                     },
                 ],
             }
         ],
         "progression": None,
-        "suggestedSessionMinutes": 35,
+        "suggestedSessionMinutes": 30,
     }
 
 
@@ -97,23 +118,23 @@ def _envelope() -> dict:
         "input": {
             "learnerName": "Iris",
             "requestedRoute": "topic",
-            "routedRoute": "weekly_plan",
-            "sourceKind": "weekly_assignments",
-            "sourceScale": "medium",
-            "sliceStrategy": "current_week_only",
-            "sliceNotes": ["Use the Monday, Wednesday, and Friday assignments only."],
-            "chosenHorizon": "current_week",
-            "sourceText": "Monday: fractions practice\nWednesday: decimal review\nFriday: percent game",
+            "routedRoute": "outline",
+            "sourceKind": "comprehensive_source",
+            "entryStrategy": "explicit_range",
+            "entryLabel": "chapter 1",
+            "continuationMode": "sequential",
+            "chosenHorizon": "few_days",
+            "sourceText": "Chapter 1: Kitchen setup\nChapter 2: Breakfast basics",
             "sourcePackages": [
                 {
                     "id": "ipkg-1",
-                    "title": "Week 1 upload",
+                    "title": "Cooking workbook",
                     "modality": "file",
-                    "summary": "File · Monday fractions practice",
+                    "summary": "Workbook pages for kitchen routines",
                     "extractionStatus": "ready",
                     "assetCount": 1,
                     "assetIds": ["asset-1"],
-                    "detectedChunks": ["Monday: fractions practice"],
+                    "detectedChunks": ["chapter 1"],
                     "sourceFingerprint": "fp-1",
                 }
             ],
@@ -121,23 +142,16 @@ def _envelope() -> dict:
                 {
                     "assetId": "asset-1",
                     "packageId": "ipkg-1",
-                    "title": "Week 1 upload",
+                    "title": "Cooking workbook",
                     "modality": "pdf",
-                    "fileName": "week-1.pdf",
+                    "fileName": "cooking-workbook.pdf",
                     "mimeType": "application/pdf",
-                    "fileUrl": "https://example.com/week-1.pdf",
+                    "fileUrl": "https://example.com/cooking-workbook.pdf",
                 }
             ],
-            "titleCandidate": "Monday/Wednesday/Friday math practice plan",
-            "detectedChunks": [
-                "Monday: fractions practice",
-                "Wednesday: decimal review",
-                "Friday: percent game",
-            ],
-            "assumptions": [
-                "The source is a short multi-day assignment list.",
-                "We should keep the plan inside the current week.",
-            ],
+            "titleCandidate": "Workbook launch",
+            "detectedChunks": ["chapter 1", "chapter 2"],
+            "assumptions": ["Stay inside the explicit chapter 1 range."],
         },
         "app_context": {
             "product": "homeschool-v2",
@@ -146,7 +160,7 @@ def _envelope() -> dict:
     }
 
 
-def test_bounded_plan_prompt_preview_includes_guardrails():
+def test_bounded_plan_prompt_preview_threads_explicit_source_fields():
     payload = BoundedPlanGenerationRequest.model_validate(_envelope()["input"])
 
     preview = BoundedPlanGenerateSkill().build_prompt_preview(
@@ -159,22 +173,21 @@ def test_bounded_plan_prompt_preview_includes_guardrails():
         ),
     )
 
-    assert "today" in preview.system_prompt
-    assert "current_week" in preview.system_prompt
-    assert "Do not invent a semester" in preview.system_prompt
-    assert "Routed route: weekly_plan" in preview.user_prompt
-    assert "Source scale: medium" in preview.user_prompt
-    assert "Slice strategy: current_week_only" in preview.user_prompt
-    assert "Use the Monday, Wednesday, and Friday assignments only." in preview.user_prompt
-    assert "Chosen horizon: current_week" in preview.user_prompt
-    assert "Source packages:" in preview.user_prompt
-    assert "Week 1 upload" in preview.user_prompt
-    assert "Attached source files:" in preview.user_prompt
-    assert "week-1.pdf" in preview.user_prompt
-    assert "The first lesson or day must be immediately teachable and ready to open as day 1." in preview.user_prompt
-    assert "If the source is large, generate only the bounded initial slice" in preview.user_prompt
-    assert "The `document` field is required." in preview.user_prompt
-    assert "subject -> unit title -> ordered lesson title list" in preview.user_prompt
+    assert "single_day" in preview.system_prompt
+    assert "few_days" in preview.system_prompt
+    assert "starter_module" in preview.system_prompt
+    assert "Requested route: topic" in preview.user_prompt
+    assert "Routed route: outline" in preview.user_prompt
+    assert "Source kind: comprehensive_source" in preview.user_prompt
+    assert "Entry strategy: explicit_range" in preview.user_prompt
+    assert "Entry label: chapter 1" in preview.user_prompt
+    assert "Continuation mode: sequential" in preview.user_prompt
+    assert "Chosen horizon: few_days" in preview.user_prompt
+    assert "Detected chunks:" in preview.user_prompt
+    assert "Assumptions:" in preview.user_prompt
+    assert "Cooking workbook" in preview.user_prompt
+    assert "The first lesson or day must be immediately teachable" in preview.user_prompt
+    assert "If the entry strategy is `explicit_range`, stay inside that range." in preview.user_prompt
 
 
 def test_bounded_plan_builds_openai_file_message_blocks():
@@ -194,7 +207,7 @@ def test_bounded_plan_builds_openai_file_message_blocks():
     assert content[0]["type"] == "text"
     assert content[1] == {
         "type": "input_file",
-        "file_url": "https://example.com/week-1.pdf",
+        "file_url": "https://example.com/cooking-workbook.pdf",
     }
 
 
@@ -214,10 +227,8 @@ def test_bounded_plan_execute_rejects_invalid_artifact(monkeypatch, tmp_path: Pa
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-
     with pytest.raises(ContractValidationError):
-        engine.execute("bounded_plan_generate", _envelope())
+        AgentEngine(build_skill_registry()).execute("bounded_plan_generate", _envelope())
 
 
 def test_bounded_plan_execute_accepts_valid_artifact(monkeypatch, tmp_path: Path):
@@ -236,11 +247,11 @@ def test_bounded_plan_execute_accepts_valid_artifact(monkeypatch, tmp_path: Path
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute("bounded_plan_generate", _envelope())
+    result = AgentEngine(build_skill_registry()).execute("bounded_plan_generate", _envelope())
 
-    assert result.artifact["horizon"] == "current_week"
-    assert result.artifact["units"][0]["lessons"][0]["title"] == "Fractions practice"
+    assert result.artifact["horizon"] == "few_days"
+    assert result.artifact["units"][0]["title"] == "Chapter 1"
+    assert result.artifact["units"][0]["lessons"][0]["title"] == "Kitchen setup"
 
 
 def test_bounded_plan_execute_backfills_document_from_units(monkeypatch, tmp_path: Path):
@@ -261,15 +272,14 @@ def test_bounded_plan_execute_backfills_document_from_units(monkeypatch, tmp_pat
         ),
     )
 
-    engine = AgentEngine(build_skill_registry())
-    result = engine.execute("bounded_plan_generate", _envelope())
+    result = AgentEngine(build_skill_registry()).execute("bounded_plan_generate", _envelope())
 
     assert result.artifact["document"] == {
-        "Math": {
-            "Current week fractions and decimals": [
-                "Fractions practice",
-                "Decimal review",
-                "Percent game",
+        "Life Skills": {
+            "Chapter 1": [
+                "Kitchen setup",
+                "Tools and safety",
+                "First simple prep",
             ]
         }
     }

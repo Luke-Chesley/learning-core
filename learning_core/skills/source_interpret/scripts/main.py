@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 
 from learning_core.contracts.source_interpret import (
-    SourceInterpretationHorizon,
+    SourceContinuationMode,
+    SourceEntryStrategy,
     SourceInterpretationArtifact,
+    SourceInterpretationHorizon,
     SourceInterpretationRequest,
 )
 from learning_core.observability.traces import PromptPreview
@@ -18,12 +20,33 @@ from learning_core.skills.prompt_utils import (
 
 
 _RECOMMENDED_HORIZON_BY_SOURCE_KIND: dict[str, SourceInterpretationHorizon] = {
-    "single_day_material": "today",
-    "weekly_assignments": "current_week",
-    "sequence_outline": "next_few_days",
+    "bounded_material": "single_day",
+    "timeboxed_plan": "one_week",
+    "structured_sequence": "few_days",
+    "comprehensive_source": "one_week",
     "topic_seed": "starter_module",
-    "manual_shell": "starter_week",
-    "ambiguous": "today",
+    "shell_request": "starter_module",
+    "ambiguous": "single_day",
+}
+
+_ENTRY_STRATEGY_BY_SOURCE_KIND: dict[str, SourceEntryStrategy] = {
+    "bounded_material": "use_as_is",
+    "timeboxed_plan": "timebox_start",
+    "structured_sequence": "sequential_start",
+    "comprehensive_source": "section_start",
+    "topic_seed": "scaffold_only",
+    "shell_request": "scaffold_only",
+    "ambiguous": "scaffold_only",
+}
+
+_CONTINUATION_MODE_BY_SOURCE_KIND: dict[str, SourceContinuationMode] = {
+    "bounded_material": "none",
+    "timeboxed_plan": "timebox",
+    "structured_sequence": "sequential",
+    "comprehensive_source": "sequential",
+    "topic_seed": "manual_review",
+    "shell_request": "manual_review",
+    "ambiguous": "manual_review",
 }
 
 
@@ -40,7 +63,6 @@ class SourceInterpretSkill(StructuredOutputSkill):
     def build_user_prompt(self, payload: SourceInterpretationRequest, context) -> str:
         lines = [
             f"Requested route: {payload.requestedRoute}",
-            f"User horizon intent: {payload.userHorizonIntent}",
             f"Input modalities: {', '.join(payload.inputModalities) if payload.inputModalities else 'none'}",
             f"Asset refs: {len(payload.assetRefs)}",
             f"Title candidate: {payload.titleCandidate or 'None provided'}",
@@ -67,7 +89,7 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "",
                 "Interpret the source only.",
                 "When attached source files are present, treat them as the authoritative source and use the raw or extracted text as supporting note context.",
-                "Do not generate curriculum, lesson steps, activities, or pacing beyond the recommended bounded horizon.",
+                "Do not generate curriculum, lesson steps, activities, or pacing beyond the recommended initial planning horizon.",
                 "Return only valid JSON.",
             ]
         )
@@ -92,21 +114,35 @@ class SourceInterpretSkill(StructuredOutputSkill):
 
         repaired = dict(raw_artifact)
         source_kind = repaired.get("sourceKind")
+        if not isinstance(source_kind, str):
+            return None
+
+        if repaired.get("entryStrategy") is None and source_kind in _ENTRY_STRATEGY_BY_SOURCE_KIND:
+            repaired["entryStrategy"] = _ENTRY_STRATEGY_BY_SOURCE_KIND[source_kind]
+
+        if repaired.get("continuationMode") is None and source_kind in _CONTINUATION_MODE_BY_SOURCE_KIND:
+            repaired["continuationMode"] = _CONTINUATION_MODE_BY_SOURCE_KIND[source_kind]
+
         if (
             repaired.get("recommendedHorizon") is None
-            and isinstance(source_kind, str)
             and source_kind in _RECOMMENDED_HORIZON_BY_SOURCE_KIND
         ):
-            repaired["recommendedHorizon"] = self._infer_recommended_horizon(
-                payload,
-                source_kind,
+            repaired["recommendedHorizon"] = _RECOMMENDED_HORIZON_BY_SOURCE_KIND[source_kind]
+
+        if repaired.get("entryLabel") is None:
+            repaired["entryLabel"] = None
+
+        if repaired.get("followUpQuestion") is None:
+            repaired["followUpQuestion"] = None
+
+        confidence = repaired.get("confidence")
+        if repaired.get("needsConfirmation") is None:
+            repaired["needsConfirmation"] = bool(
+                repaired.get("followUpQuestion")
+                or confidence == "low"
+                or source_kind == "ambiguous"
             )
 
-        if repaired.get("needsConfirmation") is None and repaired.get("followUpQuestion"):
-            repaired["needsConfirmation"] = True
-
-        if repaired.get("sliceNotes") is None:
-            repaired["sliceNotes"] = []
         if repaired.get("assumptions") is None:
             repaired["assumptions"] = []
         if repaired.get("detectedChunks") is None:
@@ -129,10 +165,10 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "- The previous response was invalid.",
                 "- Return only one corrected JSON object.",
                 "- Every response must include all required keys.",
-                "- `recommendedHorizon` is required and may never be omitted.",
-                "- If the source is weak or ambiguous, choose a conservative horizon instead of omitting the field.",
+                "- `recommendedHorizon`, `entryStrategy`, and `continuationMode` are required and may never be omitted.",
+                "- If the source is weak or ambiguous, choose conservative values instead of omitting required fields.",
                 '- Invalid example: {"sourceKind":"topic_seed","suggestedTitle":"Chess","confidence":"high"}',
-                '- Valid example: {"sourceKind":"topic_seed","sourceScale":null,"sliceStrategy":"manual_shell_only","sliceNotes":[],"suggestedTitle":"Chess","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":[],"followUpQuestion":null,"needsConfirmation":false}',
+                '- Valid example: {"sourceKind":"topic_seed","entryStrategy":"scaffold_only","entryLabel":null,"continuationMode":"manual_review","suggestedTitle":"Teach chess openings","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":[],"followUpQuestion":null,"needsConfirmation":false}',
             ]
         )
         user_prompt = "\n".join(
@@ -148,12 +184,3 @@ class SourceInterpretSkill(StructuredOutputSkill):
             ]
         )
         return PromptPreview(system_prompt=system_prompt, user_prompt=user_prompt)
-
-    def _infer_recommended_horizon(
-        self,
-        payload: SourceInterpretationRequest,
-        source_kind: str,
-    ) -> SourceInterpretationHorizon:
-        if payload.userHorizonIntent == "today_only":
-            return "today"
-        return _RECOMMENDED_HORIZON_BY_SOURCE_KIND[source_kind]
