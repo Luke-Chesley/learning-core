@@ -28,6 +28,13 @@ SourceEntryStrategy = Literal[
     "scaffold_only",
 ]
 SourceContinuationMode = Literal["none", "sequential", "timebox", "manual_review"]
+SourceDeliveryPattern = Literal[
+    "task_first",
+    "skill_first",
+    "concept_first",
+    "timeboxed",
+    "mixed",
+]
 SourceInterpretationHorizon = Literal[
     "single_day",
     "few_days",
@@ -85,6 +92,7 @@ class SourceInterpretationArtifact(StrictModel):
     entryStrategy: SourceEntryStrategy
     entryLabel: str | None = None
     continuationMode: SourceContinuationMode
+    deliveryPattern: SourceDeliveryPattern
     suggestedTitle: str
     confidence: SourceInterpretationConfidence
     recommendedHorizon: SourceInterpretationHorizon

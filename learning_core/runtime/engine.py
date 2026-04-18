@@ -310,6 +310,7 @@ class AgentEngine:
                     "entryStrategy": interpretation["entryStrategy"],
                     "entryLabel": interpretation.get("entryLabel"),
                     "continuationMode": interpretation["continuationMode"],
+                    "deliveryPattern": interpretation["deliveryPattern"],
                     "recommendedHorizon": interpretation["recommendedHorizon"],
                     "sourceText": source_request.get("extractedText") or source_request.get("rawText") or "",
                     "sourcePackages": source_request.get("sourcePackages", []),

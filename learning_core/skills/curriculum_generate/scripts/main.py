@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumGenerationRequest
-from learning_core.contracts.progression import ProgressionGenerationRequest
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.skills.curriculum_common import build_skill_catalog_from_document
+from learning_core.skills.curriculum_common import build_progression_request_from_artifact
 from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
 from learning_core.skills.prompt_utils import (
     append_user_authored_context,
@@ -14,6 +13,40 @@ from learning_core.skills.prompt_utils import (
     format_curriculum_transcript,
     format_source_files,
 )
+
+
+def _list_opening_lessons(artifact: CurriculumArtifact):
+    opening_ref_set = set(artifact.launchPlan.openingLessonRefs)
+    return [
+        lesson
+        for unit in artifact.units
+        for lesson in unit.lessons
+        if lesson.lessonRef in opening_ref_set
+    ]
+
+
+def _requires_task_first_retry(
+    payload: CurriculumGenerationRequest,
+    artifact: CurriculumArtifact,
+) -> bool:
+    if payload.requestMode != "source_entry" or payload.deliveryPattern != "task_first":
+        return False
+    opening_lessons = _list_opening_lessons(artifact)
+    if not opening_lessons:
+        return False
+    return not any(lesson.lessonType == "task" for lesson in opening_lessons)
+
+
+def _build_task_first_retry_notes(existing_notes: list[str] | None = None) -> list[str]:
+    notes = list(existing_notes or [])
+    notes.extend(
+        [
+            "This source is task_first. The opening arc must include a real source task within the first 1 to 3 lessons unless setup or safety truly blocks it.",
+            "Keep setup, orientation, and rationale compressed into minimal support instead of the primary opener.",
+            "Ensure launchPlan.openingLessonRefs includes at least one lessonType of task.",
+        ]
+    )
+    return notes
 
 
 class CurriculumGenerateSkill(StructuredOutputSkill):
@@ -43,6 +76,7 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     f"Entry strategy: {payload.entryStrategy}",
                     f"Entry label: {payload.entryLabel or 'None provided'}",
                     f"Continuation mode: {payload.continuationMode}",
+                    f"Delivery pattern: {payload.deliveryPattern}",
                     f"Recommended horizon: {payload.recommendedHorizon}",
                     "",
                     "Assumptions:",
@@ -67,6 +101,17 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     payload.sourceText or "",
                 ]
             )
+            if payload.correctionNotes:
+                lines.extend(
+                    [
+                        "",
+                        "Correction notes for this retry:",
+                        *[
+                            f"{index + 1}. {note}"
+                            for index, note in enumerate(payload.correctionNotes)
+                        ],
+                    ]
+                )
         else:
             lines.extend(
                 [
@@ -144,15 +189,33 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             payload=payload,
             context=context,
         )
-        skill_catalog = build_skill_catalog_from_document(artifact.document)
-        if skill_catalog:
-            progression_skill = ProgressionGenerateSkill()
-            progression_payload = ProgressionGenerationRequest(
-                learnerName=payload.learnerName,
-                sourceTitle=artifact.source.title,
-                sourceSummary=artifact.source.summary,
-                skillCatalog=skill_catalog,
+        if _requires_task_first_retry(payload, artifact):
+            retry_payload = payload.model_copy(
+                update={
+                    "correctionNotes": _build_task_first_retry_notes(payload.correctionNotes),
+                }
             )
+            artifact, lineage, trace = engine.run_structured_output(
+                skill=self,
+                payload=retry_payload,
+                context=context,
+            )
+            if _requires_task_first_retry(retry_payload, artifact):
+                raise ValueError(
+                    "task_first source_entry generation must include a task lesson in launchPlan.openingLessonRefs."
+                )
+
+        progression_payload = build_progression_request_from_artifact(
+            artifact,
+            learner_name=payload.learnerName,
+            request_mode=payload.requestMode,
+            source_kind=payload.sourceKind,
+            delivery_pattern=payload.deliveryPattern,
+            entry_strategy=payload.entryStrategy,
+            continuation_mode=payload.continuationMode,
+        )
+        if progression_payload.skillCatalog:
+            progression_skill = ProgressionGenerateSkill()
             progression_context = RuntimeContext.create(
                 operation_name="progression_generate",
                 request_id=context.request_id,

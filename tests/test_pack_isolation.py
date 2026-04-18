@@ -37,7 +37,7 @@ _VALID_ARTIFACT = {
     "purpose": "Testing pack isolation.",
     "activityKind": "guided_practice",
     "linkedObjectiveIds": [],
-    "linkedSkillTitles": [],
+    "linkedSkillLabels": [],
     "estimatedMinutes": 10,
     "interactionMode": "digital",
     "components": [

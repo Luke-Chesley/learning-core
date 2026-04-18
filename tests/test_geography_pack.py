@@ -130,7 +130,7 @@ def _map_activity(widget: dict) -> ActivityArtifact:
             "purpose": "Use the map to identify California.",
             "activityKind": "guided_practice",
             "linkedObjectiveIds": [],
-            "linkedSkillTitles": ["regions"],
+            "linkedSkillLabels": ["regions"],
             "estimatedMinutes": 10,
             "interactionMode": "digital",
             "components": [
@@ -249,7 +249,7 @@ def test_geography_request_gets_geography_tools(mock_build_runtime, mock_agent_l
                 "purpose": "Use a map widget.",
                 "activityKind": "guided_practice",
                 "linkedObjectiveIds": [],
-                "linkedSkillTitles": ["California map"],
+                "linkedSkillLabels": ["California map"],
                 "estimatedMinutes": 10,
                 "interactionMode": "digital",
                 "components": [{"type": "paragraph", "id": "intro", "text": "Select the state."}],

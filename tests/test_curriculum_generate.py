@@ -20,6 +20,7 @@ def _source_entry_payload() -> CurriculumGenerationRequest:
             "entryStrategy": "section_start",
             "entryLabel": "chapter 1",
             "continuationMode": "sequential",
+            "deliveryPattern": "concept_first",
             "recommendedHorizon": "one_week",
             "sourceText": "Chapter 1 introduces the Nile and early settlements.",
             "sourcePackages": [
@@ -84,6 +85,7 @@ def test_curriculum_generate_prompt_preview_mentions_source_entry_fields():
 
     assert "Request mode: source_entry" in preview.user_prompt
     assert "Source kind: comprehensive_source" in preview.user_prompt
+    assert "Delivery pattern: concept_first" in preview.user_prompt
     assert "Attached source files:" in preview.user_prompt
     assert "egypt-reader.pdf" in preview.user_prompt
     assert "Primary source text:" in preview.user_prompt

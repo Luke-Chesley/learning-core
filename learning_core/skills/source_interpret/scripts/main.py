@@ -3,10 +3,7 @@ from __future__ import annotations
 import json
 
 from learning_core.contracts.source_interpret import (
-    SourceContinuationMode,
-    SourceEntryStrategy,
     SourceInterpretationArtifact,
-    SourceInterpretationHorizon,
     SourceInterpretationRequest,
 )
 from learning_core.observability.traces import PromptPreview
@@ -17,37 +14,6 @@ from learning_core.skills.prompt_utils import (
     build_openai_file_blocks,
     format_source_files,
 )
-
-
-_RECOMMENDED_HORIZON_BY_SOURCE_KIND: dict[str, SourceInterpretationHorizon] = {
-    "bounded_material": "single_day",
-    "timeboxed_plan": "one_week",
-    "structured_sequence": "few_days",
-    "comprehensive_source": "one_week",
-    "topic_seed": "starter_module",
-    "shell_request": "starter_module",
-    "ambiguous": "single_day",
-}
-
-_ENTRY_STRATEGY_BY_SOURCE_KIND: dict[str, SourceEntryStrategy] = {
-    "bounded_material": "use_as_is",
-    "timeboxed_plan": "timebox_start",
-    "structured_sequence": "sequential_start",
-    "comprehensive_source": "section_start",
-    "topic_seed": "scaffold_only",
-    "shell_request": "scaffold_only",
-    "ambiguous": "scaffold_only",
-}
-
-_CONTINUATION_MODE_BY_SOURCE_KIND: dict[str, SourceContinuationMode] = {
-    "bounded_material": "none",
-    "timeboxed_plan": "timebox",
-    "structured_sequence": "sequential",
-    "comprehensive_source": "sequential",
-    "topic_seed": "manual_review",
-    "shell_request": "manual_review",
-    "ambiguous": "manual_review",
-}
 
 
 def _collect_grounded_chunks(values: list[str], chunk: str | None) -> None:
@@ -132,7 +98,7 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "",
                 "Interpret the source only.",
                 "When attached source files are present, treat them as the authoritative source and use the raw or extracted text as supporting note context.",
-                "Do not generate curriculum, lesson steps, activities, or pacing beyond the recommended initial planning horizon.",
+                "This is not a planning step. Do not generate curriculum, lesson steps, activities, pacing, or delivery plans.",
                 "Return only valid JSON.",
             ]
         )
@@ -157,20 +123,9 @@ class SourceInterpretSkill(StructuredOutputSkill):
 
         repaired = dict(raw_artifact)
         source_kind = repaired.get("sourceKind")
+        confidence = repaired.get("confidence")
         if not isinstance(source_kind, str):
             return None
-
-        if repaired.get("entryStrategy") is None and source_kind in _ENTRY_STRATEGY_BY_SOURCE_KIND:
-            repaired["entryStrategy"] = _ENTRY_STRATEGY_BY_SOURCE_KIND[source_kind]
-
-        if repaired.get("continuationMode") is None and source_kind in _CONTINUATION_MODE_BY_SOURCE_KIND:
-            repaired["continuationMode"] = _CONTINUATION_MODE_BY_SOURCE_KIND[source_kind]
-
-        if (
-            repaired.get("recommendedHorizon") is None
-            and source_kind in _RECOMMENDED_HORIZON_BY_SOURCE_KIND
-        ):
-            repaired["recommendedHorizon"] = _RECOMMENDED_HORIZON_BY_SOURCE_KIND[source_kind]
 
         if repaired.get("entryLabel") is None:
             repaired["entryLabel"] = None
@@ -178,13 +133,8 @@ class SourceInterpretSkill(StructuredOutputSkill):
         if repaired.get("followUpQuestion") is None:
             repaired["followUpQuestion"] = None
 
-        confidence = repaired.get("confidence")
         if repaired.get("needsConfirmation") is None:
-            repaired["needsConfirmation"] = bool(
-                repaired.get("followUpQuestion")
-                or confidence == "low"
-                or source_kind == "ambiguous"
-            )
+            repaired["needsConfirmation"] = bool(confidence == "low" or source_kind == "ambiguous")
 
         if repaired.get("assumptions") is None:
             repaired["assumptions"] = []
@@ -208,10 +158,12 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "- The previous response was invalid.",
                 "- Return only one corrected JSON object.",
                 "- Every response must include all required keys.",
-                "- `recommendedHorizon`, `entryStrategy`, and `continuationMode` are required and may never be omitted.",
-                "- If the source is weak or ambiguous, choose conservative values instead of omitting required fields.",
+                "- `recommendedHorizon`, `entryStrategy`, `continuationMode`, and `deliveryPattern` are required and may never be omitted.",
+                "- Do not infer missing enum fields from sourceKind using fallback defaults. Repair only nullables, assumptions, detectedChunks, and needsConfirmation when allowed.",
+                "- If the source is weak or ambiguous, choose conservative grounded values instead of omitting required fields.",
+                "- This skill is interpretation-only, not planning.",
                 '- Invalid example: {"sourceKind":"topic_seed","suggestedTitle":"Chess","confidence":"high"}',
-                '- Valid example: {"sourceKind":"topic_seed","entryStrategy":"scaffold_only","entryLabel":null,"continuationMode":"manual_review","suggestedTitle":"Teach chess openings","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":["Teach chess openings"],"followUpQuestion":null,"needsConfirmation":false}',
+                '- Valid example: {"sourceKind":"topic_seed","entryStrategy":"scaffold_only","entryLabel":null,"continuationMode":"manual_review","deliveryPattern":"mixed","suggestedTitle":"Teach chess openings","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":["Teach chess openings"],"followUpQuestion":null,"needsConfirmation":false}',
             ]
         )
         user_prompt = "\n".join(

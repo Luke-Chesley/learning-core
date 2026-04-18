@@ -12,7 +12,7 @@ def _activity_with_components(components):
             "purpose": "Use the board as the main evidence and submit the move.",
             "activityKind": "guided_practice",
             "linkedObjectiveIds": [],
-            "linkedSkillTitles": ["best move"],
+            "linkedSkillLabels": ["best move"],
             "estimatedMinutes": 8,
             "interactionMode": "digital",
             "components": components,

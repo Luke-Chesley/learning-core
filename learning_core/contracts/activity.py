@@ -684,7 +684,7 @@ class ActivityArtifact(StrictModel):
     purpose: str
     activityKind: ActivityKind
     linkedObjectiveIds: list[str] = Field(default_factory=list)
-    linkedSkillTitles: list[str] = Field(default_factory=list)
+    linkedSkillLabels: list[str] = Field(default_factory=list)
     estimatedMinutes: int = Field(gt=0)
     interactionMode: InteractionMode
     components: list[ActivityComponent] = Field(min_length=1)

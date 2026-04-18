@@ -51,19 +51,23 @@ Return JSON only with this exact shape:
     },
     "units": [
       {
+        "unitRef": "string",
         "title": "string",
         "description": "string",
         "estimatedWeeks": 1,
         "estimatedSessions": 5,
         "lessons": [
           {
+            "unitRef": "string",
+            "lessonRef": "string",
+            "lessonType": "task | skill_support | concept | setup | reflection | assessment",
             "title": "string",
             "description": "string",
             "subject": "string or omitted",
             "estimatedMinutes": 30,
             "materials": ["string"],
             "objectives": ["string"],
-            "linkedSkillTitles": ["string"]
+            "linkedSkillRefs": ["string"]
           }
         ]
       }

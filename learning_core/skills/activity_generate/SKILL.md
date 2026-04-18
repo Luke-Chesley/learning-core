@@ -18,7 +18,7 @@ Output a single JSON object that exactly matches the ActivitySpec schema (schema
   "purpose": string,
   "activityKind": one of [guided_practice, retrieval, demonstration, simulation, discussion_capture, reflection, performance_task, project_step, observation, assessment_check, collaborative, offline_real_world],
   "linkedObjectiveIds": string[],
-  "linkedSkillTitles": string[],
+  "linkedSkillLabels": string[],
   "estimatedMinutes": number,
   "interactionMode": "digital" | "offline" | "hybrid",
   "components": ComponentSpec[],

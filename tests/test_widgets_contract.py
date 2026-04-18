@@ -215,7 +215,7 @@ def test_activity_artifact_accepts_interactive_widget_component():
             "purpose": "Play the best move from the position.",
             "activityKind": "guided_practice",
             "linkedObjectiveIds": [],
-            "linkedSkillTitles": ["best move"],
+            "linkedSkillLabels": ["best move"],
             "estimatedMinutes": 8,
             "interactionMode": "digital",
             "components": [
@@ -262,7 +262,7 @@ def test_activity_artifact_rejects_legacy_top_level_chess_component():
                 "purpose": "Rejected legacy component.",
                 "activityKind": "guided_practice",
                 "linkedObjectiveIds": [],
-                "linkedSkillTitles": ["best move"],
+                "linkedSkillLabels": ["best move"],
                 "estimatedMinutes": 8,
                 "interactionMode": "digital",
                 "components": [

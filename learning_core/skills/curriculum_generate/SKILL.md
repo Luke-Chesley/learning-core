@@ -13,11 +13,13 @@ Core job:
 - Always include a `launchPlan`.
 - The durable curriculum and the launch window are not the same thing.
 - `launchPlan` defines the bounded opening window for onboarding, planning, progression, and day 1.
+- Final curriculum artifacts must use canonical refs, not dangling title strings.
+- You may reason in a draft title-based form internally, but the JSON you return must resolve every lesson and launch-plan link to refs.
 
 Request-mode rules:
 
 1. `source_entry`
-- Treat `sourceKind`, `entryStrategy`, `entryLabel`, `continuationMode`, `recommendedHorizon`, `sourceText`, `sourcePackages`, `sourceFiles`, `detectedChunks`, and `assumptions` as the primary grounding.
+- Treat `sourceKind`, `entryStrategy`, `entryLabel`, `continuationMode`, `deliveryPattern`, `recommendedHorizon`, `sourceText`, `sourcePackages`, `sourceFiles`, `detectedChunks`, and `assumptions` as the primary grounding.
 - If attached source files are present, treat those files as the primary source and use text fields as supporting context.
 - Use `requestedRoute` and `routedRoute` only as routing context, not as the main curricular truth.
 
@@ -48,6 +50,13 @@ Entry strategy rules:
 - `timebox_start`: begin at the first bounded time window.
 - `scaffold_only`: build a bounded scaffold instead of pretending the source is richer than it is.
 
+Delivery-pattern rules:
+- `task_first`: let early lessons foreground doing and applying.
+- `skill_first`: let early lessons foreground direct skill practice.
+- `concept_first`: let early lessons foreground explanation and understanding before application.
+- `timeboxed`: preserve the source's own bounded cadence.
+- `mixed`: use a pragmatic blend that stays faithful to the source.
+
 2. `conversation_intake`
 - Treat `messages`, `requirementHints`, `pacingExpectations`, `granularityGuidance`, and `correctionNotes` as the primary grounding.
 - Build from stated goals, learner needs, timeframe, pacing, constraints, and teaching style.
@@ -74,7 +83,8 @@ Shared generation rules:
 Launch-plan rules:
 - Always return `launchPlan`.
 - `launchPlan.recommendedHorizon` is the bounded opening horizon, not the total curriculum length.
-- `openingLessonCount` should reflect the opening window that day-1 scheduling should expose first.
+- `openingLessonRefs` should list the exact opening lesson refs that day-1 scheduling should expose first.
+- `openingSkillRefs` should list the exact skill refs introduced or exercised in that opening window.
 - `scopeSummary` should explain the opening window in plain operational language.
 - `initialSliceUsed` should be true when the opening uses an initial bounded slice of a broader source.
 - `initialSliceLabel` should name that opening slice when useful, such as `chapter 1`, `week 1`, or `pages 1-12`.
@@ -122,20 +132,24 @@ Return JSON with this shape:
       "estimatedSessions": 5,
       "lessons": [
         {
+          "unitRef": "unit:1:foundations",
+          "lessonRef": "unit:1:foundations/lesson:1:notice-patterns",
+          "lessonType": "task | skill_support | concept | setup | reflection | assessment",
           "title": "string",
           "description": "string",
           "subject": "string or omitted",
           "estimatedMinutes": 30,
           "materials": ["string"],
           "objectives": ["string"],
-          "linkedSkillTitles": ["string"]
+          "linkedSkillRefs": ["skill:domain/strand/goal-group/skill"]
         }
       ]
     }
   ],
   "launchPlan": {
     "recommendedHorizon": "single_day | few_days | one_week | two_weeks | starter_module",
-    "openingLessonCount": 3,
+    "openingLessonRefs": ["unit:1:foundations/lesson:1:notice-patterns"],
+    "openingSkillRefs": ["skill:domain/strand/goal-group/skill"],
     "scopeSummary": "string",
     "initialSliceUsed": true,
     "initialSliceLabel": "string or null",

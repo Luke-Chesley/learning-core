@@ -98,7 +98,7 @@ def _artifact_from_example_set(example_set: ChessBuiltExampleSet) -> dict:
         "purpose": "Use validated chess examples for move, block, and capture.",
         "activityKind": "guided_practice",
         "linkedObjectiveIds": [],
-        "linkedSkillTitles": ["Escape check"],
+        "linkedSkillLabels": ["Escape check"],
         "estimatedMinutes": 12,
         "interactionMode": "digital",
         "components": components,

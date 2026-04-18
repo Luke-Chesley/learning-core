@@ -114,7 +114,7 @@ def _artifact_from_examples(example_set: ChessBuiltExampleSet) -> ActivityArtifa
             "purpose": "Choose the right response to check.",
             "activityKind": "guided_practice",
             "linkedObjectiveIds": [],
-            "linkedSkillTitles": ["Find the best move"],
+            "linkedSkillLabels": ["Find the best move"],
             "estimatedMinutes": 12,
             "interactionMode": "digital",
             "components": [

@@ -13,7 +13,7 @@ _ACTIVITY_SPEC = {
     "purpose": "Practice one focused skill.",
     "activityKind": "guided_practice",
     "linkedObjectiveIds": [],
-    "linkedSkillTitles": ["targeted practice"],
+    "linkedSkillLabels": ["targeted practice"],
     "estimatedMinutes": 10,
     "interactionMode": "digital",
     "components": [

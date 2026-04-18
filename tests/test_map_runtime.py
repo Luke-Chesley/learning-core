@@ -139,7 +139,7 @@ def test_activity_feedback_map_widget_uses_deterministic_path():
         "purpose": "Select California.",
         "activityKind": "guided_practice",
         "linkedObjectiveIds": [],
-        "linkedSkillTitles": ["regions"],
+        "linkedSkillLabels": ["regions"],
         "estimatedMinutes": 10,
         "interactionMode": "digital",
         "components": [

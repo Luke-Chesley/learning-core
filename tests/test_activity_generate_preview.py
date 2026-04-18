@@ -47,7 +47,7 @@ _VALID_ARTIFACT = {
     "purpose": "Practice identifying digit place values in 5-digit numbers.",
     "activityKind": "guided_practice",
     "linkedObjectiveIds": [],
-    "linkedSkillTitles": ["place value"],
+    "linkedSkillLabels": ["place value"],
     "estimatedMinutes": 15,
     "interactionMode": "digital",
     "components": [
@@ -89,7 +89,7 @@ _VALID_ARTIFACT_WITH_NULLS = {
     "purpose": "Practice identifying digit place values in 5-digit numbers.",
     "activityKind": "guided_practice",
     "linkedObjectiveIds": [],
-    "linkedSkillTitles": ["place value"],
+    "linkedSkillLabels": ["place value"],
     "estimatedMinutes": 15,
     "interactionMode": "digital",
     "components": [
@@ -142,7 +142,7 @@ _VALID_CHESS_ARTIFACT = {
     "purpose": "Choose the best move from the board position.",
     "activityKind": "guided_practice",
     "linkedObjectiveIds": [],
-    "linkedSkillTitles": ["best move"],
+    "linkedSkillLabels": ["best move"],
     "estimatedMinutes": 10,
     "interactionMode": "digital",
     "components": [
@@ -345,7 +345,7 @@ def _artifact_from_validated_examples(example_set: dict) -> dict:
         "purpose": "Compose around validated chess examples.",
         "activityKind": "guided_practice",
         "linkedObjectiveIds": [],
-        "linkedSkillTitles": ["escape check"],
+        "linkedSkillLabels": ["escape check"],
         "estimatedMinutes": 15,
         "interactionMode": "digital",
         "components": components,

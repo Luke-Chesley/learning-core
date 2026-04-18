@@ -49,7 +49,7 @@ def _activity_context_text(artifact: ActivityArtifact, component: InteractiveWid
     pieces = [
         artifact.title,
         artifact.purpose or "",
-        " ".join(artifact.linkedSkillTitles),
+        " ".join(artifact.linkedSkillLabels),
         _all_visible_text(component, widget),
     ]
     return " ".join(value.strip() for value in pieces if value and value.strip())

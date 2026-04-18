@@ -9,6 +9,7 @@ from learning_core.contracts.progression import ProgressionArtifact
 from learning_core.contracts.source_interpret import (
     RequestedIntakeRoute,
     SourceContinuationMode,
+    SourceDeliveryPattern,
     SourceEntryStrategy,
     SourceInputFile,
     SourceKind,
@@ -76,16 +77,27 @@ class CurriculumPacing(StrictModel):
 
 
 class CurriculumLesson(StrictModel):
+    unitRef: str
+    lessonRef: str
+    lessonType: Literal[
+        "task",
+        "skill_support",
+        "concept",
+        "setup",
+        "reflection",
+        "assessment",
+    ]
     title: str
     description: str
     subject: str | None = None
     estimatedMinutes: int | None = None
     materials: list[str] = Field(default_factory=list)
     objectives: list[str] = Field(default_factory=list)
-    linkedSkillTitles: list[str] = Field(default_factory=list)
+    linkedSkillRefs: list[str] = Field(default_factory=list)
 
 
 class CurriculumUnit(StrictModel):
+    unitRef: str
     title: str
     description: str
     estimatedWeeks: int | None = None
@@ -95,13 +107,20 @@ class CurriculumUnit(StrictModel):
 
 class CurriculumLaunchPlan(StrictModel):
     recommendedHorizon: SourceInterpretationHorizon
-    openingLessonCount: int = Field(ge=1)
+    openingLessonRefs: list[str] = Field(default_factory=list)
+    openingSkillRefs: list[str] = Field(default_factory=list)
     scopeSummary: str
     initialSliceUsed: bool
     initialSliceLabel: str | None = None
     entryStrategy: SourceEntryStrategy | None = None
     entryLabel: str | None = None
     continuationMode: SourceContinuationMode | None = None
+
+    @model_validator(mode="after")
+    def validate_opening_refs(self) -> "CurriculumLaunchPlan":
+        if not self.openingLessonRefs:
+            raise ValueError("launchPlan requires at least one openingLessonRef.")
+        return self
 
 
 class CurriculumArtifact(StrictModel):
@@ -112,6 +131,82 @@ class CurriculumArtifact(StrictModel):
     units: list[CurriculumUnit] = Field(default_factory=list)
     launchPlan: CurriculumLaunchPlan
     progression: ProgressionArtifact | None = None
+
+    @model_validator(mode="after")
+    def validate_refs(self) -> "CurriculumArtifact":
+        unit_refs = {unit.unitRef for unit in self.units}
+        if len(unit_refs) != len(self.units):
+            raise ValueError("CurriculumArtifact requires unique unitRef values.")
+
+        lesson_refs: set[str] = set()
+        skill_refs: set[str] = set()
+
+        def collect_skill_refs(node: dict[str, Any], path: list[str] | None = None) -> None:
+            current_path = path or []
+            for title, value in node.items():
+                next_path = [*current_path, title]
+                if isinstance(value, str):
+                    skill_refs.add("skill:" + "/".join(segment.strip().lower().replace(" ", "-") for segment in next_path))
+                    continue
+                if isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, str):
+                            skill_refs.add(
+                                "skill:"
+                                + "/".join(
+                                    segment.strip().lower().replace(" ", "-")
+                                    for segment in [*next_path, item]
+                                )
+                            )
+                    continue
+                if isinstance(value, dict):
+                    collect_skill_refs(value, next_path)
+
+        collect_skill_refs(self.document)
+
+        for unit in self.units:
+            for lesson in unit.lessons:
+                if lesson.unitRef != unit.unitRef:
+                    raise ValueError(
+                        f'Lesson "{lesson.title}" unitRef must match parent unitRef.'
+                    )
+                if lesson.lessonRef in lesson_refs:
+                    raise ValueError("CurriculumArtifact requires unique lessonRef values.")
+                lesson_refs.add(lesson.lessonRef)
+                missing_skill_refs = [
+                    skill_ref
+                    for skill_ref in lesson.linkedSkillRefs
+                    if skill_ref not in skill_refs
+                ]
+                if missing_skill_refs:
+                    raise ValueError(
+                        "CurriculumArtifact lesson contains unresolved linkedSkillRefs: "
+                        + ", ".join(sorted(missing_skill_refs))
+                    )
+
+        missing_opening_lessons = [
+            lesson_ref
+            for lesson_ref in self.launchPlan.openingLessonRefs
+            if lesson_ref not in lesson_refs
+        ]
+        if missing_opening_lessons:
+            raise ValueError(
+                "CurriculumArtifact launchPlan contains unresolved openingLessonRefs: "
+                + ", ".join(sorted(missing_opening_lessons))
+            )
+
+        missing_opening_skills = [
+            skill_ref
+            for skill_ref in self.launchPlan.openingSkillRefs
+            if skill_ref not in skill_refs
+        ]
+        if missing_opening_skills:
+            raise ValueError(
+                "CurriculumArtifact launchPlan contains unresolved openingSkillRefs: "
+                + ", ".join(sorted(missing_opening_skills))
+            )
+
+        return self
 
 
 class CurriculumIntakeRequest(StrictModel):
@@ -130,6 +225,7 @@ class CurriculumGenerationRequest(StrictModel):
     entryStrategy: SourceEntryStrategy | None = None
     entryLabel: str | None = None
     continuationMode: SourceContinuationMode | None = None
+    deliveryPattern: SourceDeliveryPattern | None = None
     recommendedHorizon: SourceInterpretationHorizon | None = None
     sourceText: str | None = None
     sourcePackages: list[SourcePackageContext] | None = None
@@ -151,6 +247,7 @@ class CurriculumGenerationRequest(StrictModel):
                 "sourceKind": self.sourceKind,
                 "entryStrategy": self.entryStrategy,
                 "continuationMode": self.continuationMode,
+                "deliveryPattern": self.deliveryPattern,
                 "recommendedHorizon": self.recommendedHorizon,
                 "sourceText": self.sourceText,
                 "sourcePackages": self.sourcePackages,
@@ -170,7 +267,6 @@ class CurriculumGenerationRequest(StrictModel):
                 "requirementHints": self.requirementHints,
                 "pacingExpectations": self.pacingExpectations,
                 "granularityGuidance": self.granularityGuidance,
-                "correctionNotes": self.correctionNotes,
             }
             populated_forbidden = [
                 name for name, value in forbidden_fields.items() if value is not None
@@ -199,6 +295,7 @@ class CurriculumGenerationRequest(StrictModel):
             "entryStrategy": self.entryStrategy,
             "entryLabel": self.entryLabel,
             "continuationMode": self.continuationMode,
+            "deliveryPattern": self.deliveryPattern,
             "recommendedHorizon": self.recommendedHorizon,
             "sourceText": self.sourceText,
             "sourcePackages": self.sourcePackages,

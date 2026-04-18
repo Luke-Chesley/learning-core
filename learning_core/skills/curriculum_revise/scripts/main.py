@@ -6,7 +6,7 @@ from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.skills.curriculum_common import build_skill_catalog_from_document
+from learning_core.skills.curriculum_common import build_progression_request_from_artifact
 from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
 from learning_core.skills.prompt_utils import append_user_authored_context, format_curriculum_transcript
 
@@ -76,16 +76,17 @@ class CurriculumReviseSkill(StructuredOutputSkill):
         )
         artifact: CurriculumArtifact | None = turn.artifact
         if artifact is not None:
-            skill_catalog = build_skill_catalog_from_document(artifact.document)
-            if skill_catalog:
+            progression_payload = build_progression_request_from_artifact(
+                artifact,
+                learner_name=payload.learnerName,
+                request_mode="curriculum_revision",
+                source_kind=None,
+                entry_strategy=artifact.launchPlan.entryStrategy,
+                continuation_mode=artifact.launchPlan.continuationMode,
+                revision_request=payload.currentRequest,
+            )
+            if progression_payload.skillCatalog:
                 progression_skill = ProgressionReviseSkill()
-                progression_payload = ProgressionRevisionRequest(
-                    learnerName=payload.learnerName,
-                    sourceTitle=artifact.source.title,
-                    sourceSummary=artifact.source.summary,
-                    skillCatalog=skill_catalog,
-                    revisionRequest=payload.currentRequest,
-                )
                 progression_context = RuntimeContext.create(
                     operation_name="progression_revise",
                     request_id=context.request_id,

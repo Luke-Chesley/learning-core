@@ -208,7 +208,7 @@ def _build_user_prompt(
 
     if payload.linked_skill_titles:
         lines.append("")
-        lines.append("Linked skill titles (use these in linkedSkillTitles field):")
+        lines.append("Linked skill labels (use these in linkedSkillLabels field):")
         lines.append(", ".join(payload.linked_skill_titles))
 
     if payload.standard_ids:

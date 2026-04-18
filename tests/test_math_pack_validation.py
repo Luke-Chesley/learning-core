@@ -16,7 +16,7 @@ def _activity_with_components(components):
             "purpose": "Practice algebra skills.",
             "activityKind": "guided_practice",
             "linkedObjectiveIds": [],
-            "linkedSkillTitles": ["algebra"],
+            "linkedSkillLabels": ["algebra"],
             "estimatedMinutes": 8,
             "interactionMode": "digital",
             "components": components,

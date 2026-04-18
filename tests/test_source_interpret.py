@@ -23,6 +23,7 @@ def _artifact(
     entry_strategy: str = "timebox_start",
     entry_label: str | None = "week 1",
     continuation_mode: str = "timebox",
+    delivery_pattern: str = "timeboxed",
     recommended_horizon: str = "one_week",
     **overrides,
 ) -> dict:
@@ -31,6 +32,7 @@ def _artifact(
         "entryStrategy": entry_strategy,
         "entryLabel": entry_label,
         "continuationMode": continuation_mode,
+        "deliveryPattern": delivery_pattern,
         "suggestedTitle": "Week plan: Fractions and decimals",
         "confidence": "high",
         "recommendedHorizon": recommended_horizon,
@@ -314,7 +316,7 @@ def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
 
 
-def test_source_interpret_repairs_missing_required_fields(monkeypatch, tmp_path: Path):
+def test_source_interpret_rejects_missing_required_enum_fields(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     invalid_artifact = {
         "sourceKind": "comprehensive_source",
@@ -337,19 +339,8 @@ def test_source_interpret_repairs_missing_required_fields(monkeypatch, tmp_path:
         ),
     )
 
-    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
-
-    assert result.artifact["sourceKind"] == "comprehensive_source"
-    assert result.artifact["entryStrategy"] == "section_start"
-    assert result.artifact["continuationMode"] == "sequential"
-    assert result.artifact["recommendedHorizon"] == "one_week"
-    assert result.artifact["detectedChunks"] == [
-        "Monday: fractions practice",
-        "Wednesday: decimal review",
-        "Friday: percent game",
-    ]
-    assert result.trace.agent_trace is not None
-    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "deterministic_repair"
+    with pytest.raises(ContractValidationError):
+        AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
 
 
 def test_source_interpret_retries_with_repair_prompt_on_validation_error(
@@ -425,7 +416,8 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
             },
             "launchPlan": {
                 "recommendedHorizon": "one_week",
-                "openingLessonCount": 1,
+                "openingLessonRefs": ["lesson:kitchen-setup"],
+                "openingSkillRefs": ["skill:life-skills/chapter-1/kitchen-setup"],
                 "scopeSummary": "Start with chapter 1 only and keep the rest for later.",
                 "initialSliceUsed": True,
                 "initialSliceLabel": "chapter 1",
@@ -436,9 +428,21 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
             "document": {"Life Skills": {"Chapter 1": ["Kitchen setup"]}},
             "units": [
                 {
+                    "unitRef": "unit:chapter-1",
                     "title": "Chapter 1",
                     "description": "Source-entry launch unit",
-                    "lessons": [{"title": "Kitchen setup", "description": "Get ready to cook."}],
+                    "lessons": [
+                        {
+                            "unitRef": "unit:chapter-1",
+                            "lessonRef": "lesson:kitchen-setup",
+                            "lessonType": "setup",
+                            "title": "Kitchen setup",
+                            "description": "Get ready to cook.",
+                            "materials": [],
+                            "objectives": [],
+                            "linkedSkillRefs": ["skill:life-skills/chapter-1/kitchen-setup"],
+                        }
+                    ],
                 }
             ],
             "progression": None,
@@ -475,6 +479,7 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                     "entryStrategy": "explicit_range",
                     "entryLabel": "chapter 1",
                     "continuationMode": "sequential",
+                    "deliveryPattern": "task_first",
                     "suggestedTitle": "Kids in the Kitchen",
                     "confidence": "high",
                     "recommendedHorizon": "one_week",
@@ -518,6 +523,7 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
     assert curriculum_call["input"]["routedRoute"] == "outline"
     assert curriculum_call["input"]["sourceKind"] == "comprehensive_source"
     assert curriculum_call["input"]["entryStrategy"] == "explicit_range"
+    assert curriculum_call["input"]["deliveryPattern"] == "task_first"
     assert curriculum_call["input"]["entryLabel"] == "chapter 1"
     assert curriculum_call["input"]["continuationMode"] == "sequential"
     assert curriculum_call["input"]["recommendedHorizon"] == "one_week"

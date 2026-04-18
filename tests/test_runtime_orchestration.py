@@ -14,6 +14,7 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
             "entryStrategy": "explicit_range",
             "entryLabel": "pages 1-12",
             "continuationMode": "sequential",
+            "deliveryPattern": "skill_first",
             "suggestedTitle": "Workbook launch",
             "confidence": "high",
             "recommendedHorizon": "few_days",
@@ -69,7 +70,8 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
             },
             "launchPlan": {
                 "recommendedHorizon": "few_days",
-                "openingLessonCount": 3,
+                "openingLessonRefs": ["lesson-1", "lesson-2", "lesson-3"],
+                "openingSkillRefs": [],
                 "scopeSummary": "Stay inside the explicit assigned range.",
                 "initialSliceUsed": True,
                 "initialSliceLabel": "pages 1-12",
