@@ -26,7 +26,6 @@ Added first-class response-type modules under `learning_core/response_types/` fo
 - `progression_artifact`
 - `intake_turn`
 - `source_interpretation`
-- `bounded_plan`
 - `summary`
 - `widget_transition`
 

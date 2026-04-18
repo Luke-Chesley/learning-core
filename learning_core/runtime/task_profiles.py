@@ -39,7 +39,6 @@ TASK_PROFILE_REGISTRY: dict[str, TaskProfileDefinition] = {
         TaskProfileDefinition("proposal_generation", "proposal", "single_pass", "generation", approval_required=True),
         TaskProfileDefinition("session_synthesis", "evaluation", "single_pass", "generation"),
         TaskProfileDefinition("source_interpret", "source_interpretation", "single_pass", "generation"),
-        TaskProfileDefinition("weekly_expansion", "bounded_plan", "single_pass", "generation"),
     )
 }
 
@@ -47,7 +46,6 @@ TASK_PROFILE_REGISTRY: dict[str, TaskProfileDefinition] = {
 OPERATION_RUNTIME_MAP: dict[str, OperationRuntimeDefinition] = {
     "activity_feedback": OperationRuntimeDefinition("activity_feedback", "activity_evaluation", "activity_feedback", "activity_evaluation", "skill_execute"),
     "activity_generate": OperationRuntimeDefinition("activity_generate", "adaptive_or_bounded_activity_generation", "activity_spec", "activity_generation", "skill_execute"),
-    "bounded_plan_generate": OperationRuntimeDefinition("bounded_plan_generate", "weekly_expansion", "bounded_plan", "weekly_expansion", "structured"),
     "copilot_chat": OperationRuntimeDefinition("copilot_chat", "interactive_assistance", "summary", "interactive_assistance", "text"),
     "curriculum_generate": OperationRuntimeDefinition("curriculum_generate", "long_horizon_planning", "curriculum_artifact", "long_horizon_planning", "skill_execute"),
     "curriculum_intake": OperationRuntimeDefinition("curriculum_intake", "intake_dialogue", "intake_turn", "curriculum_intake", "structured"),

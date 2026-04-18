@@ -36,7 +36,7 @@ This is exactly the kind of flow your onboarding/product activation needs, but i
 ## New Internal Profiles To Add
 
 - `source_interpret`
-- `bounded_plan_generate`
+- `curriculum_generate`
 - `generate_from_source`
 
 These can be implemented as runtime-level orchestrations over existing or new lower-level task profiles.
@@ -95,9 +95,9 @@ The best first orchestration is the activation flow discussed in product plannin
 
 - parent gives typed, pasted, imaged, or file-based source material
 - runtime interprets it
-- runtime generates a bounded day plan or week plan depending on source sufficiency
-- runtime returns a lesson draft immediately
-- runtime optionally chains activity generation after lesson success
+- runtime generates a source-entry curriculum launch grounded in that interpretation
+- runtime returns a typed curriculum artifact with launch planning metadata
+- runtime optionally chains session or activity generation after the launch is accepted
 
 This is a good fit because it is highly visible, product-critical, and naturally bounded.
 

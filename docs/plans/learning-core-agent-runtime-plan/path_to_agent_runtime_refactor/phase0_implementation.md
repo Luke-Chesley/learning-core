@@ -20,7 +20,6 @@ Lock the migration boundary for the shared agent runtime refactor before code mo
 - `learning_core/contracts/curriculum.py`
 - `learning_core/contracts/progression.py`
 - `learning_core/contracts/source_interpret.py`
-- `learning_core/contracts/bounded_plan.py`
 - `learning_core/contracts/copilot.py`
 - `learning_core/contracts/activity_feedback.py`
 - `learning_core/contracts/widget_transition.py`
@@ -77,7 +76,6 @@ learning_core/
 | Current operation | Task profile | Response type | Initial workflow card |
 | --- | --- | --- | --- |
 | `source_interpret` | `source_interpret` | `source_interpretation` | `source_interpret` |
-| `bounded_plan_generate` | `weekly_expansion` | `bounded_plan` | `weekly_expansion` |
 | `session_generate` | `bounded_day_generation` | `lesson_draft` | `bounded_day_generation` |
 | `activity_generate` | `adaptive_or_bounded_activity_generation` | `activity_spec` | `activity_generation` |
 | `activity_feedback` | `activity_evaluation` | `evaluation` | `activity_evaluation` |

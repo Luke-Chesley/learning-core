@@ -1,6 +1,6 @@
 # Source Taxonomy Model
 
-This note captures the `learning-core` side of the taxonomy refactor used by `source_interpret` and `bounded_plan_generate`.
+This note captures the `learning-core` side of the taxonomy refactor used by `source_interpret` and `curriculum_generate`.
 
 ## Source Interpret Contract
 
@@ -35,6 +35,19 @@ The canonical `sourceKind` values are:
 - `starter_module`
 
 It is a launch recommendation, not a promise about total curriculum size.
+
+## curriculum_generate
+
+`curriculum_generate` is the only curriculum-creation skill.
+
+- `requestMode: "source_entry"` is used for source-first flows after `source_interpret`
+- `requestMode: "conversation_intake"` is used for regular curriculum creation without source interpretation
+
+Both modes return one durable curriculum artifact with `launchPlan`.
+
+- For `comprehensive_source`, the curriculum should reflect the broader source in teachable order.
+- `launchPlan` defines the bounded opening arc and day-1 handoff.
+- Weak inputs should stay small; strong sources should not collapse into a shallow launch week.
 
 ## No User Horizon Choice
 

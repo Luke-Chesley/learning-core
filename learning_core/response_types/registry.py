@@ -3,7 +3,6 @@ from __future__ import annotations
 from learning_core.response_types.activity_feedback import ACTIVITY_FEEDBACK_RESPONSE_TYPE
 from learning_core.response_types.activity_spec import ACTIVITY_SPEC_RESPONSE_TYPE
 from learning_core.response_types.base import ResponseTypeDefinition
-from learning_core.response_types.bounded_plan import BOUNDED_PLAN_RESPONSE_TYPE
 from learning_core.response_types.curriculum_artifact import CURRICULUM_ARTIFACT_RESPONSE_TYPE
 from learning_core.response_types.curriculum_revision_turn import CURRICULUM_REVISION_TURN_RESPONSE_TYPE
 from learning_core.response_types.evaluation import EVALUATION_RESPONSE_TYPE
@@ -21,7 +20,6 @@ RESPONSE_TYPE_REGISTRY: dict[str, ResponseTypeDefinition] = {
     for definition in (
         ACTIVITY_FEEDBACK_RESPONSE_TYPE,
         ACTIVITY_SPEC_RESPONSE_TYPE,
-        BOUNDED_PLAN_RESPONSE_TYPE,
         CURRICULUM_ARTIFACT_RESPONSE_TYPE,
         CURRICULUM_REVISION_TURN_RESPONSE_TYPE,
         EVALUATION_RESPONSE_TYPE,

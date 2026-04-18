@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from learning_core.contracts.curriculum import CurriculumGenerationRequest, CurriculumIntakeArtifact
+from learning_core.contracts.curriculum import CurriculumIntakeArtifact, CurriculumIntakeRequest
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.prompt_utils import append_user_authored_context, format_curriculum_transcript
@@ -8,7 +8,7 @@ from learning_core.skills.prompt_utils import append_user_authored_context, form
 
 class CurriculumIntakeSkill(StructuredOutputSkill):
     name = "curriculum_intake"
-    input_model = CurriculumGenerationRequest
+    input_model = CurriculumIntakeRequest
     output_model = CurriculumIntakeArtifact
     policy = ExecutionPolicy(
         skill_name="curriculum_intake",
@@ -17,7 +17,7 @@ class CurriculumIntakeSkill(StructuredOutputSkill):
         max_tokens=4096,
     )
 
-    def build_user_prompt(self, payload: CurriculumGenerationRequest, context) -> str:
+    def build_user_prompt(self, payload: CurriculumIntakeRequest, context) -> str:
         lines = [
             f"Active learner: {payload.learnerName}",
             "",

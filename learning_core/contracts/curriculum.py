@@ -2,11 +2,19 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from learning_core.contracts.base import StrictModel
 from learning_core.contracts.progression import ProgressionArtifact
-from learning_core.contracts.source_interpret import SourceInputFile, SourcePackageContext
+from learning_core.contracts.source_interpret import (
+    RequestedIntakeRoute,
+    SourceContinuationMode,
+    SourceEntryStrategy,
+    SourceInputFile,
+    SourceKind,
+    SourcePackageContext,
+    SourceInterpretationHorizon,
+)
 
 
 class CurriculumChatMessage(StrictModel):
@@ -85,24 +93,126 @@ class CurriculumUnit(StrictModel):
     lessons: list[CurriculumLesson] = Field(default_factory=list)
 
 
+class CurriculumLaunchPlan(StrictModel):
+    recommendedHorizon: SourceInterpretationHorizon
+    openingLessonCount: int = Field(ge=1)
+    scopeSummary: str
+    initialSliceUsed: bool
+    initialSliceLabel: str | None = None
+    entryStrategy: SourceEntryStrategy | None = None
+    entryLabel: str | None = None
+    continuationMode: SourceContinuationMode | None = None
+
+
 class CurriculumArtifact(StrictModel):
     source: CurriculumDraftSummary
     intakeSummary: str
     pacing: CurriculumPacing
     document: dict[str, Any]
     units: list[CurriculumUnit] = Field(default_factory=list)
+    launchPlan: CurriculumLaunchPlan
     progression: ProgressionArtifact | None = None
+
+
+class CurriculumIntakeRequest(StrictModel):
+    learnerName: str
+    messages: list[CurriculumChatMessage] = Field(default_factory=list)
+    requirementHints: CurriculumCapturedRequirements | None = None
 
 
 class CurriculumGenerationRequest(StrictModel):
     learnerName: str
-    messages: list[CurriculumChatMessage] = Field(default_factory=list)
+    titleCandidate: str | None = None
+    requestMode: Literal["source_entry", "conversation_intake"]
+    requestedRoute: RequestedIntakeRoute | None = None
+    routedRoute: RequestedIntakeRoute | None = None
+    sourceKind: SourceKind | None = None
+    entryStrategy: SourceEntryStrategy | None = None
+    entryLabel: str | None = None
+    continuationMode: SourceContinuationMode | None = None
+    recommendedHorizon: SourceInterpretationHorizon | None = None
+    sourceText: str | None = None
+    sourcePackages: list[SourcePackageContext] | None = None
+    sourceFiles: list[SourceInputFile] | None = None
+    detectedChunks: list[str] | None = None
+    assumptions: list[str] | None = None
+    messages: list[CurriculumChatMessage] | None = None
     requirementHints: CurriculumCapturedRequirements | None = None
     pacingExpectations: CurriculumPacingExpectations | None = None
-    granularityGuidance: list[str] = Field(default_factory=list)
-    correctionNotes: list[str] = Field(default_factory=list)
-    sourcePackages: list[SourcePackageContext] = Field(default_factory=list)
-    sourceFiles: list[SourceInputFile] = Field(default_factory=list)
+    granularityGuidance: list[str] | None = None
+    correctionNotes: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_mode_fields(self) -> "CurriculumGenerationRequest":
+        if self.requestMode == "source_entry":
+            required_fields = {
+                "requestedRoute": self.requestedRoute,
+                "routedRoute": self.routedRoute,
+                "sourceKind": self.sourceKind,
+                "entryStrategy": self.entryStrategy,
+                "continuationMode": self.continuationMode,
+                "recommendedHorizon": self.recommendedHorizon,
+                "sourceText": self.sourceText,
+                "sourcePackages": self.sourcePackages,
+                "sourceFiles": self.sourceFiles,
+                "detectedChunks": self.detectedChunks,
+                "assumptions": self.assumptions,
+            }
+            missing = [name for name, value in required_fields.items() if value is None]
+            if missing:
+                raise ValueError(
+                    "source_entry requests require: " + ", ".join(sorted(missing))
+                )
+            if not self.sourceText or not self.sourceText.strip():
+                raise ValueError("source_entry requests require non-empty sourceText.")
+            forbidden_fields = {
+                "messages": self.messages,
+                "requirementHints": self.requirementHints,
+                "pacingExpectations": self.pacingExpectations,
+                "granularityGuidance": self.granularityGuidance,
+                "correctionNotes": self.correctionNotes,
+            }
+            populated_forbidden = [
+                name for name, value in forbidden_fields.items() if value is not None
+            ]
+            if populated_forbidden:
+                raise ValueError(
+                    "source_entry requests do not allow: "
+                    + ", ".join(sorted(populated_forbidden))
+                )
+            return self
+
+        required_conversation_fields = {
+            "messages": self.messages,
+        }
+        missing = [name for name, value in required_conversation_fields.items() if value is None]
+        if missing:
+            raise ValueError(
+                "conversation_intake requests require: " + ", ".join(sorted(missing))
+            )
+        if not self.messages:
+            raise ValueError("conversation_intake requests require at least one message.")
+        forbidden_fields = {
+            "sourceKind": self.sourceKind,
+            "entryStrategy": self.entryStrategy,
+            "entryLabel": self.entryLabel,
+            "continuationMode": self.continuationMode,
+            "recommendedHorizon": self.recommendedHorizon,
+            "sourceText": self.sourceText,
+            "sourcePackages": self.sourcePackages,
+            "sourceFiles": self.sourceFiles,
+            "detectedChunks": self.detectedChunks,
+            "assumptions": self.assumptions,
+        }
+        populated_forbidden = [
+            name for name, value in forbidden_fields.items() if value is not None
+        ]
+        if populated_forbidden:
+            raise ValueError(
+                "conversation_intake requests do not allow: "
+                + ", ".join(sorted(populated_forbidden))
+            )
+        return self
 
 
 class CurriculumRevisionRequest(StrictModel):

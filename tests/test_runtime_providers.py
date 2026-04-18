@@ -26,7 +26,7 @@ def test_openai_service_tier_from_env(monkeypatch):
     assert runtime.max_tokens_source == "LEARNING_CORE_MAX_TOKENS"
 
 
-def test_openai_service_tier_omits_flex_for_heavy_generation_tasks(monkeypatch):
+def test_openai_service_tier_omits_flex_for_curriculum_generate(monkeypatch):
     monkeypatch.setenv("LEARNING_CORE_PROVIDER", "openai")
     monkeypatch.setenv("LEARNING_CORE_DEFAULT_TEMPERATURE", "0.2")
     monkeypatch.setenv("LEARNING_CORE_MAX_TOKENS", "4096")
@@ -35,7 +35,7 @@ def test_openai_service_tier_omits_flex_for_heavy_generation_tasks(monkeypatch):
     monkeypatch.setenv("OPENAI_SERVICE_TIER", "flex")
 
     runtime = build_model_runtime(
-        task_name="bounded_plan_generate",
+        task_name="curriculum_generate",
         task_kind="generation",
         temperature=None,
         max_tokens=None,

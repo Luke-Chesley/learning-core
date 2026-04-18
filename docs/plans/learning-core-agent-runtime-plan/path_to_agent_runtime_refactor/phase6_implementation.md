@@ -11,13 +11,13 @@ Added `AgentEngine.execute_generate_from_source(...)` as an internal orchestrati
 Current bounded chain:
 
 1. `source_interpret`
-2. `bounded_plan_generate`
+2. `curriculum_generate`
 
 The helper:
 
 - keeps the public operation API unchanged
 - reuses the same kernel-routed operations internally
-- returns a typed `bounded_plan_generate` response
+- returns a typed `curriculum_generate` response
 - records orchestration substeps in `trace.agent_trace`
 
 ## Why this is the right first orchestration

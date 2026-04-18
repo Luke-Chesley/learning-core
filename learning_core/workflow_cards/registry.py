@@ -5,7 +5,6 @@ from typing import Any, Callable
 from learning_core.observability.traces import PromptPreview
 from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill
 from learning_core.skills.activity_feedback.scripts.main import ActivityFeedbackSkill
-from learning_core.skills.bounded_plan_generate.scripts.main import BoundedPlanGenerateSkill
 from learning_core.skills.copilot_chat.scripts.main import CopilotChatSkill
 from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
 from learning_core.skills.curriculum_intake.scripts.main import CurriculumIntakeSkill
@@ -121,13 +120,6 @@ WORKFLOW_CARD_REGISTRY: dict[str, WorkflowCardDefinition] = {
         supported_task_profiles=("source_interpret",),
         supported_response_types=("source_interpretation",),
         prompt_preview_builder=_skill_prompt_preview_builder(SourceInterpretSkill),
-        pack_categories=("domain",),
-    ),
-    "weekly_expansion": WorkflowCardDefinition(
-        name="weekly_expansion",
-        supported_task_profiles=("weekly_expansion",),
-        supported_response_types=("bounded_plan",),
-        prompt_preview_builder=_skill_prompt_preview_builder(BoundedPlanGenerateSkill),
         pack_categories=("domain",),
     ),
     "widget_transition": WorkflowCardDefinition(

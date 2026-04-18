@@ -29,60 +29,99 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
     def build_user_prompt(self, payload: CurriculumGenerationRequest, context) -> str:
         lines = [
             f"Active learner: {payload.learnerName}",
-            "",
-            "Current requirement hints:",
-            payload.requirementHints.model_dump_json(indent=2) if payload.requirementHints else "{}",
-            "",
-            "Pacing expectations inferred from the conversation:",
-            payload.pacingExpectations.model_dump_json(indent=2) if payload.pacingExpectations else "{}",
+            f"Request mode: {payload.requestMode}",
+            f"Title candidate: {payload.titleCandidate or 'None provided'}",
+            f"Requested route: {payload.requestedRoute or 'None provided'}",
+            f"Routed route: {payload.routedRoute or 'None provided'}",
         ]
 
-        if payload.granularityGuidance:
+        if payload.requestMode == "source_entry":
             lines.extend(
                 [
                     "",
-                    "Granularity guidance:",
-                    *[f"{index + 1}. {note}" for index, note in enumerate(payload.granularityGuidance)],
-                ]
-            )
-
-        lines.extend(
-            [
-                "",
-                "Conversation transcript:",
-                format_curriculum_transcript(payload.messages),
-            ]
-        )
-
-        if payload.sourcePackages:
-            lines.extend(
-                [
+                    f"Source kind: {payload.sourceKind}",
+                    f"Entry strategy: {payload.entryStrategy}",
+                    f"Entry label: {payload.entryLabel or 'None provided'}",
+                    f"Continuation mode: {payload.continuationMode}",
+                    f"Recommended horizon: {payload.recommendedHorizon}",
+                    "",
+                    "Assumptions:",
+                    (payload.assumptions or []) and "\n".join(
+                        f"- {value}" for value in (payload.assumptions or [])
+                    )
+                    or "- None provided",
+                    "",
+                    "Detected chunks:",
+                    (payload.detectedChunks or []) and "\n".join(
+                        f"- {value}" for value in (payload.detectedChunks or [])
+                    )
+                    or "- None provided",
                     "",
                     "Source packages:",
                     payload.model_dump_json(indent=2, include={"sourcePackages"}),
-                ]
-            )
-
-        if payload.sourceFiles:
-            lines.extend(
-                [
                     "",
                     "Attached source files:",
-                    format_source_files(payload.sourceFiles),
+                    format_source_files(payload.sourceFiles or []),
+                    "",
+                    "Primary source text:",
+                    payload.sourceText or "",
                 ]
             )
-
-        if payload.correctionNotes:
+        else:
             lines.extend(
                 [
                     "",
-                    "Correction notes for this retry:",
-                    *[f"{index + 1}. {note}" for index, note in enumerate(payload.correctionNotes)],
+                    "Current requirement hints:",
+                    payload.requirementHints.model_dump_json(indent=2)
+                    if payload.requirementHints
+                    else "{}",
+                    "",
+                    "Pacing expectations inferred from the conversation:",
+                    payload.pacingExpectations.model_dump_json(indent=2)
+                    if payload.pacingExpectations
+                    else "{}",
                 ]
             )
 
+            if payload.granularityGuidance:
+                lines.extend(
+                    [
+                        "",
+                        "Granularity guidance:",
+                        *[
+                            f"{index + 1}. {note}"
+                            for index, note in enumerate(payload.granularityGuidance)
+                        ],
+                    ]
+                )
+
+            lines.extend(
+                [
+                    "",
+                    "Conversation transcript:",
+                    format_curriculum_transcript(payload.messages or []),
+                ]
+            )
+
+            if payload.correctionNotes:
+                lines.extend(
+                    [
+                        "",
+                        "Correction notes for this retry:",
+                        *[
+                            f"{index + 1}. {note}"
+                            for index, note in enumerate(payload.correctionNotes)
+                        ],
+                    ]
+                )
+
         append_user_authored_context(lines, context)
-        lines.extend(["", "Generate the core curriculum artifact."])
+        lines.extend(
+            [
+                "",
+                "Return the durable curriculum artifact plus launchPlan.",
+            ]
+        )
         return "\n".join(lines)
 
     def build_user_message_content(
@@ -94,9 +133,10 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
         provider: str | None = None,
     ) -> str | list[dict]:
         prompt = prompt_text if prompt_text is not None else self.build_user_prompt(payload, context)
-        if provider != "openai" or not payload.sourceFiles:
+        source_files = payload.sourceFiles or []
+        if provider != "openai" or payload.requestMode != "source_entry" or not source_files:
             return prompt
-        return [{"type": "text", "text": prompt}, *build_openai_file_blocks(payload.sourceFiles)]
+        return [{"type": "text", "text": prompt}, *build_openai_file_blocks(source_files)]
 
     def execute(self, engine, payload: CurriculumGenerationRequest, context: RuntimeContext) -> SkillExecutionResult[CurriculumArtifact]:
         artifact, lineage, trace = engine.run_structured_output(

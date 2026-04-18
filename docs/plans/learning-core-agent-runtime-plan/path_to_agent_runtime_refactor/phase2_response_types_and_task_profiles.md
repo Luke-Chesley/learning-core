@@ -72,7 +72,6 @@ Create a central `learning_core/runtime/task_profiles.py` or similar registry.
 - `source_interpret`
 - `long_horizon_planning`
 - `bounded_day_generation`
-- `weekly_expansion`
 - `adaptive_or_bounded_activity_generation`
 - `activity_evaluation`
 - `session_synthesis`

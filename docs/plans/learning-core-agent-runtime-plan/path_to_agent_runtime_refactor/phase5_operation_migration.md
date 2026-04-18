@@ -46,7 +46,7 @@ Why:
 
 Why:
 
-- these are important, but they may need more rethinking around `source_interpret`, bounded planning, and revision flows
+- these are important, but they may need more rethinking around `source_interpret`, source-entry curriculum flows, and revision flows
 - they should migrate after the runtime is already proven
 
 ### Wave 4

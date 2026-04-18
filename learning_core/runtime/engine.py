@@ -33,10 +33,20 @@ class AgentEngine:
         skill,
         model_runtime,
         payload,
-        provider_messages: list[dict[str, object]],
+        provider_messages: list[dict[str, object]] | None = None,
+        prompt_preview: PromptPreview | None = None,
         response_mode: str,
         structured_output_method: str | None = None,
     ) -> dict:
+        if provider_messages is None:
+            if prompt_preview is None:
+                raise ValueError(
+                    "provider_messages or prompt_preview is required to build the provider request payload."
+                )
+            provider_messages = [
+                {"role": "system", "content": prompt_preview.system_prompt},
+                {"role": "user", "content": prompt_preview.user_prompt},
+            ]
         provider_request_kind = "text_completion"
         if response_mode == "structured":
             provider_request_kind = (
@@ -288,18 +298,19 @@ class AgentEngine:
             "shell_request": "manual_shell",
             "ambiguous": requested_route or "manual_shell",
         }[source_kind]
-        bounded_plan_result = self.execute(
-            "bounded_plan_generate",
+        curriculum_result = self.execute(
+            "curriculum_generate",
             {
                 "input": {
                     "learnerName": source_request.get("learnerName") or envelope.app_context.learner_id or "Learner",
+                    "requestMode": "source_entry",
                     "requestedRoute": requested_route or routed_route,
                     "routedRoute": routed_route,
                     "sourceKind": interpretation["sourceKind"],
                     "entryStrategy": interpretation["entryStrategy"],
                     "entryLabel": interpretation.get("entryLabel"),
                     "continuationMode": interpretation["continuationMode"],
-                    "chosenHorizon": interpretation["recommendedHorizon"],
+                    "recommendedHorizon": interpretation["recommendedHorizon"],
                     "sourceText": source_request.get("extractedText") or source_request.get("rawText") or "",
                     "sourcePackages": source_request.get("sourcePackages", []),
                     "sourceFiles": source_request.get("sourceFiles", []),
@@ -313,8 +324,8 @@ class AgentEngine:
                 "request_id": envelope.request_id,
             },
         )
-        existing_trace = bounded_plan_result.trace.agent_trace or {}
-        bounded_plan_result.trace.agent_trace = {
+        existing_trace = curriculum_result.trace.agent_trace or {}
+        curriculum_result.trace.agent_trace = {
             **existing_trace,
             "orchestration_profile": "generate_from_source",
             "substeps": [
@@ -323,12 +334,12 @@ class AgentEngine:
                     "artifact": source_result.artifact,
                 },
                 {
-                    "operation_name": "bounded_plan_generate",
-                    "artifact": bounded_plan_result.artifact,
+                    "operation_name": "curriculum_generate",
+                    "artifact": curriculum_result.artifact,
                 },
             ],
         }
-        return bounded_plan_result
+        return curriculum_result
 
     def run_structured_output(self, *, skill, payload, context: RuntimeContext):
         preview = skill.build_prompt_preview(payload, context)

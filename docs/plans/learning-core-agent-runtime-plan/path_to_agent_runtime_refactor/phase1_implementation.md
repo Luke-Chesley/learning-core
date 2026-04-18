@@ -59,7 +59,7 @@ The first clean pilot path is the structured-output family:
 
 - `session_generate`
 - `source_interpret`
-- `bounded_plan_generate`
+- `curriculum_intake`
 
 These now flow through:
 
@@ -86,7 +86,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest \
   tests/test_skill_registry.py \
   tests/test_session_generate_lesson_shape.py \
   tests/test_source_interpret.py \
-  tests/test_bounded_plan_generate.py
+  tests/test_curriculum_generate.py
 ```
 
 Result:

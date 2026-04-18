@@ -48,7 +48,7 @@ That means:
 5. Support frontend-triggered flows where the frontend specifies context, intent, and output needs without `learning-core` becoming homeschool-specific.
 6. Prepare for future internal chaining such as:
    - source interpretation
-   - bounded plan generation
+   - source-entry curriculum generation
    - session generation
    - activity generation
    - evaluation
@@ -98,7 +98,7 @@ learning_core/
   workflow_cards/
     onboarding_intake/
     bounded_day_generation/
-    weekly_expansion/
+    long_horizon_planning/
     session_synthesis/
     reporting/
   packs/

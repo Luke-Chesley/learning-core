@@ -57,7 +57,7 @@ learning_core/
       card.py
       prompt.md
       policy.py
-    weekly_expansion/
+    long_horizon_planning/
       card.py
       prompt.md
       policy.py
@@ -108,7 +108,7 @@ Every workflow card should declare:
 And later:
 
 - `onboarding_intake`
-- `weekly_expansion`
+- `long_horizon_planning`
 
 ## Pack Rules
 

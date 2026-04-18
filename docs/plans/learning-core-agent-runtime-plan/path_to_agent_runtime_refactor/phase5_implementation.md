@@ -18,7 +18,6 @@ These operations now use the kernel plus the shared structured-output provider p
 
 - `session_generate`
 - `source_interpret`
-- `bounded_plan_generate`
 - `curriculum_intake`
 - `progression_generate`
 - `progression_revise`

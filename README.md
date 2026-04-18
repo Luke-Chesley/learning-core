@@ -87,10 +87,6 @@ learning_core/
       SKILL.md
       scripts/
         main.py
-    bounded_plan_generate/
-      SKILL.md
-      scripts/
-        main.py
     activity_generate/
       SKILL.md
       packs/
@@ -159,16 +155,22 @@ learning_core/
 - `POST /v1/operations/{operation_name}/execute`
 
 Internal orchestration helpers live behind the engine and are not the main public API.
-The first bounded chain currently available is `generate_from_source`, which composes:
+The first internal source-entry chain currently available is `generate_from_source`, which composes:
 
 1. `source_interpret`
-2. `bounded_plan_generate`
+2. `curriculum_generate`
+
+`curriculum_generate` is the single curriculum-creation skill. It supports two explicit request modes:
+
+- `source_entry`: source-first generation grounded in `source_interpret` output plus source text, packages, and files
+- `conversation_intake`: conversation-first generation grounded in learner messages, goals, and pacing hints
+
+The output is always one durable curriculum artifact plus `launchPlan`. `launchPlan` bounds the opening window for onboarding, planning, progression, and day 1; it does not collapse comprehensive sources into a shallow launch-week artifact.
 
 Current first-class operations:
 
 - `activity_feedback`
 - `activity_generate`
-- `bounded_plan_generate`
 - `widget_transition`
 - `session_generate`
 - `source_interpret`

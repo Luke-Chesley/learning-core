@@ -381,38 +381,63 @@ def test_source_interpret_retries_with_repair_prompt_on_validation_error(
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "validation_repair"
 
 
-def test_generate_from_source_threads_new_interpretation_fields_into_bounded_plan(monkeypatch, tmp_path: Path):
+def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_generate(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     captured_requests: list[tuple[str, dict]] = []
-    bounded_response = engine_module.OperationExecuteResponse(
-        operation_name="bounded_plan_generate",
+    curriculum_response = engine_module.OperationExecuteResponse(
+        operation_name="curriculum_generate",
         artifact={
-            "title": "Kids in the Kitchen",
-            "description": "A bounded opening plan",
-            "subjects": ["Life Skills"],
-            "horizon": "one_week",
-            "rationale": ["Start with chapter 1 only."],
+            "source": {
+                "title": "Kids in the Kitchen",
+                "description": "A source-entry launch",
+                "subjects": ["Life Skills"],
+                "gradeLevels": [],
+                "academicYear": None,
+                "summary": "Start with chapter 1 only.",
+                "teachingApproach": "Hands-on cooking routines",
+                "successSignals": [],
+                "parentNotes": [],
+                "rationale": ["Honor the explicit chapter 1 request."],
+            },
+            "intakeSummary": "Generated from source entry.",
+            "pacing": {
+                "totalWeeks": 1,
+                "sessionsPerWeek": 3,
+                "sessionMinutes": 25,
+                "totalSessions": 3,
+                "coverageStrategy": "Stay inside the initial launch slice.",
+                "coverageNotes": [],
+            },
+            "launchPlan": {
+                "recommendedHorizon": "one_week",
+                "openingLessonCount": 1,
+                "scopeSummary": "Start with chapter 1 only and keep the rest for later.",
+                "initialSliceUsed": True,
+                "initialSliceLabel": "chapter 1",
+                "entryStrategy": "explicit_range",
+                "entryLabel": "chapter 1",
+                "continuationMode": "sequential",
+            },
             "document": {"Life Skills": {"Chapter 1": ["Kitchen setup"]}},
             "units": [
                 {
                     "title": "Chapter 1",
-                    "description": "Bounded opening unit",
+                    "description": "Source-entry launch unit",
                     "lessons": [{"title": "Kitchen setup", "description": "Get ready to cook."}],
                 }
             ],
             "progression": None,
-            "suggestedSessionMinutes": 25,
         },
         lineage=ExecutionLineage(
-            operation_name="bounded_plan_generate",
-            skill_name="bounded_plan_generate",
+            operation_name="curriculum_generate",
+            skill_name="curriculum_generate",
             skill_version="test",
             provider="test",
             model="test",
         ),
         trace=ExecutionTrace(
             request_id="req-123",
-            operation_name="bounded_plan_generate",
+            operation_name="curriculum_generate",
             allowed_tools=[],
             prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
             request_envelope=engine_module.OperationEnvelope.model_validate(
@@ -464,22 +489,25 @@ def test_generate_from_source_threads_new_interpretation_fields_into_bounded_pla
                 ),
                 prompt_preview=PromptPreview(system_prompt="", user_prompt=""),
             )
-        if operation_name == "bounded_plan_generate":
-            return bounded_response
+        if operation_name == "curriculum_generate":
+            return curriculum_response
         raise AssertionError(f"Unexpected operation: {operation_name}")
 
     monkeypatch.setattr(engine_module.AgentEngine, "execute", fake_execute, raising=True)
 
     result = AgentEngine(build_skill_registry()).execute_generate_from_source(_envelope())
 
-    bounded_call = next(data for name, data in captured_requests if name == "bounded_plan_generate")
-    assert bounded_call["input"]["requestedRoute"] == "topic"
-    assert bounded_call["input"]["routedRoute"] == "outline"
-    assert bounded_call["input"]["sourceKind"] == "comprehensive_source"
-    assert bounded_call["input"]["entryStrategy"] == "explicit_range"
-    assert bounded_call["input"]["entryLabel"] == "chapter 1"
-    assert bounded_call["input"]["continuationMode"] == "sequential"
-    assert bounded_call["input"]["chosenHorizon"] == "one_week"
-    assert bounded_call["input"]["detectedChunks"] == ["chapter 1", "chapter 2"]
-    assert bounded_call["input"]["assumptions"] == ["Honor the explicit chapter 1 request."]
-    assert result.artifact["horizon"] == "one_week"
+    curriculum_call = next(data for name, data in captured_requests if name == "curriculum_generate")
+    assert curriculum_call["input"]["requestMode"] == "source_entry"
+    assert curriculum_call["input"]["requestedRoute"] == "topic"
+    assert curriculum_call["input"]["routedRoute"] == "outline"
+    assert curriculum_call["input"]["sourceKind"] == "comprehensive_source"
+    assert curriculum_call["input"]["entryStrategy"] == "explicit_range"
+    assert curriculum_call["input"]["entryLabel"] == "chapter 1"
+    assert curriculum_call["input"]["continuationMode"] == "sequential"
+    assert curriculum_call["input"]["recommendedHorizon"] == "one_week"
+    assert curriculum_call["input"]["titleCandidate"] == "Week 1"
+    assert curriculum_call["input"]["detectedChunks"] == ["chapter 1", "chapter 2"]
+    assert curriculum_call["input"]["assumptions"] == ["Honor the explicit chapter 1 request."]
+    assert result.operation_name == "curriculum_generate"
+    assert result.artifact["launchPlan"]["recommendedHorizon"] == "one_week"
