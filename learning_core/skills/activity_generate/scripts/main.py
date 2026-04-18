@@ -587,12 +587,16 @@ class ActivityGenerateSkill(SkillDefinition):
             user_prompt=_build_user_prompt(payload, context, pack_selection, planning_results),
         )
 
+        provider_messages = [
+            {"role": "system", "content": preview.system_prompt},
+            {"role": "user", "content": preview.user_prompt},
+        ]
         provider_request = engine._provider_request_payload(
             context=context,
             skill=self,
             model_runtime=model_runtime,
             payload=payload,
-            prompt_preview=preview,
+            provider_messages=provider_messages,
             response_mode="agent",
         )
 
