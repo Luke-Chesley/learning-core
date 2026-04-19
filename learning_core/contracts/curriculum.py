@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import Field, model_validator
@@ -140,24 +141,48 @@ class CurriculumArtifact(StrictModel):
 
         lesson_refs: set[str] = set()
         skill_refs: set[str] = set()
+        normalized_skill_refs: set[str] = set()
+
+        def normalize_ref_segment(value: str) -> str:
+            normalized = value.strip().lower()
+            normalized = normalized.replace("’", "").replace("'", "")
+            normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
+            normalized = re.sub(r"-{2,}", "-", normalized)
+            return normalized.strip("-")
+
+        def normalize_skill_ref(skill_ref: str) -> str:
+            prefix = "skill:"
+            body = skill_ref[len(prefix) :] if skill_ref.startswith(prefix) else skill_ref
+            normalized_parts = [
+                normalize_ref_segment(part)
+                for part in body.split("/")
+                if normalize_ref_segment(part)
+            ]
+            return prefix + "/".join(normalized_parts)
 
         def collect_skill_refs(node: dict[str, Any], path: list[str] | None = None) -> None:
             current_path = path or []
             for title, value in node.items():
                 next_path = [*current_path, title]
                 if isinstance(value, str):
-                    skill_refs.add("skill:" + "/".join(segment.strip().lower().replace(" ", "-") for segment in next_path))
+                    skill_ref = "skill:" + "/".join(
+                        segment.strip().lower().replace(" ", "-") for segment in next_path
+                    )
+                    skill_refs.add(skill_ref)
+                    normalized_skill_refs.add(normalize_skill_ref(skill_ref))
                     continue
                 if isinstance(value, list):
                     for item in value:
                         if isinstance(item, str):
-                            skill_refs.add(
+                            skill_ref = (
                                 "skill:"
                                 + "/".join(
                                     segment.strip().lower().replace(" ", "-")
                                     for segment in [*next_path, item]
                                 )
                             )
+                            skill_refs.add(skill_ref)
+                            normalized_skill_refs.add(normalize_skill_ref(skill_ref))
                     continue
                 if isinstance(value, dict):
                     collect_skill_refs(value, next_path)
@@ -176,7 +201,7 @@ class CurriculumArtifact(StrictModel):
                 missing_skill_refs = [
                     skill_ref
                     for skill_ref in lesson.linkedSkillRefs
-                    if skill_ref not in skill_refs
+                    if normalize_skill_ref(skill_ref) not in normalized_skill_refs
                 ]
                 if missing_skill_refs:
                     raise ValueError(
@@ -198,7 +223,7 @@ class CurriculumArtifact(StrictModel):
         missing_opening_skills = [
             skill_ref
             for skill_ref in self.launchPlan.openingSkillRefs
-            if skill_ref not in skill_refs
+            if normalize_skill_ref(skill_ref) not in normalized_skill_refs
         ]
         if missing_opening_skills:
             raise ValueError(

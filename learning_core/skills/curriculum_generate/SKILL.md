@@ -67,6 +67,20 @@ Shared generation rules:
 - Create a durable curriculum, not just a launch-week artifact.
 - The first lessons must be immediately teachable.
 - Later units should preserve continuation naturally.
+- Every unit must include a unique `unitRef`.
+- Every lesson must include:
+  - `unitRef`
+  - `lessonRef`
+  - `lessonType`
+  - `linkedSkillRefs`
+- Every `lesson.unitRef` must exactly match its parent unit's `unitRef`.
+- Every `launchPlan.openingLessonRefs` entry must exactly match a returned lesson ref.
+- Every `launchPlan.openingSkillRefs` entry must exactly match a skill ref implied by the returned `document`.
+- Every `linkedSkillRefs` entry must exactly match a skill ref implied by the returned `document`.
+- Do not invent shortened, paraphrased, or group-level refs.
+- Skill refs must point to skill leaves, not just domain, strand, or goal-group paths.
+- Derive canonical skill refs from the final `document` using the full path:
+  - `skill:<domain>/<strand>/<goal-group>/<skill>`
 - Do not over-decompose weak sources.
 - Do not generate fake semester-scale detail from weak input.
 - Do not collapse whole books, textbooks, workbooks, or long PDFs into one shallow week.
@@ -92,6 +106,20 @@ Launch-plan rules:
 - For conversation-only requests, `entryStrategy`, `entryLabel`, and `continuationMode` may be null when there is no source-driven entry model.
 
 Return JSON with this shape:
+{
+  "source": { ... },
+  "intakeSummary": "string",
+  "pacing": { ... },
+  "document": { ... },
+  "units": [ ... ],
+  "launchPlan": { ... }
+}
+
+Important top-level structure rule:
+- `document` is one top-level field and must contain only the curriculum tree.
+- `units` must be outside `document`.
+- `launchPlan` must be outside `document`.
+
 {
   "source": {
     "title": "string",
@@ -159,3 +187,14 @@ Return JSON with this shape:
     "continuationMode": "none | sequential | timebox | manual_review | null"
   }
 }
+
+Important ref example:
+- If `document` contains:
+  - domain: `Montessori Foundations`
+  - strand: `Introduction and Readiness`
+  - goal group: `Family purpose of cooking together`
+  - skill: `Explain why cooking with children builds independence, confidence, and participation`
+- Then the linked ref must be:
+  - `skill:montessori-foundations/introduction-and-readiness/family-purpose-of-cooking-together/explain-why-cooking-with-children-builds-independence-confidence-and-participation`
+- Not:
+  - `skill:montessori-foundations/introduction-and-readiness/family-purpose-of-cooking-together`

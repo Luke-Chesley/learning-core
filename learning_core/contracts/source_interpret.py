@@ -97,7 +97,7 @@ class SourceInterpretationArtifact(StrictModel):
     confidence: SourceInterpretationConfidence
     recommendedHorizon: SourceInterpretationHorizon
     assumptions: list[str]
-    detectedChunks: list[str] = Field(min_length=1, max_length=6)
+    detectedChunks: list[str] = Field(min_length=1, max_length=20)
     followUpQuestion: str | None = None
     needsConfirmation: bool
 
