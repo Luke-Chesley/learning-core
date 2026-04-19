@@ -116,6 +116,10 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    curriculum_update_propose/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_revise/
       SKILL.md
       scripts/
@@ -128,6 +132,10 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    launch_plan_generate/
+      SKILL.md
+      scripts/
+        main.py
     session_generate/
       SKILL.md
       scripts/
@@ -137,10 +145,6 @@ learning_core/
       scripts/
         main.py
     session_evaluate/
-      SKILL.md
-      scripts/
-        main.py
-    curriculum_update_propose/
       SKILL.md
       scripts/
         main.py
@@ -165,7 +169,7 @@ The first internal source-entry chain currently available is `generate_from_sour
 - `source_entry`: source-first generation grounded in `source_interpret` output plus source text, packages, and files
 - `conversation_intake`: conversation-first generation grounded in learner messages, goals, and pacing hints
 
-The output is always one durable curriculum artifact plus `launchPlan`. `launchPlan` bounds the opening window for onboarding, planning, progression, and day 1; it does not collapse comprehensive sources into a shallow launch-week artifact.
+The output is always one durable curriculum artifact. Opening-slice selection is handled separately by `launch_plan_generate`.
 
 Current first-class operations:
 
@@ -178,10 +182,10 @@ Current first-class operations:
 - `copilot_chat`
 - `curriculum_generate`
 - `curriculum_revise`
+- `launch_plan_generate`
 - `progression_generate`
 - `progression_revise`
 - `session_evaluate`
-- `curriculum_update_propose`
 
 ## Design Rules
 

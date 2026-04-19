@@ -36,7 +36,6 @@ TASK_PROFILE_REGISTRY: dict[str, TaskProfileDefinition] = {
         TaskProfileDefinition("intake_dialogue", "intake_turn", "single_pass", "chat"),
         TaskProfileDefinition("interactive_assistance", "summary", "text", "chat"),
         TaskProfileDefinition("long_horizon_planning", "curriculum_artifact", "skill_execute", "generation", latency_class="background", allow_chaining=True),
-        TaskProfileDefinition("proposal_generation", "proposal", "single_pass", "generation", approval_required=True),
         TaskProfileDefinition("session_synthesis", "evaluation", "single_pass", "generation"),
         TaskProfileDefinition("source_interpret", "source_interpretation", "single_pass", "generation"),
     )
@@ -50,7 +49,6 @@ OPERATION_RUNTIME_MAP: dict[str, OperationRuntimeDefinition] = {
     "curriculum_generate": OperationRuntimeDefinition("curriculum_generate", "long_horizon_planning", "curriculum_artifact", "long_horizon_planning", "skill_execute"),
     "curriculum_intake": OperationRuntimeDefinition("curriculum_intake", "intake_dialogue", "intake_turn", "curriculum_intake", "structured"),
     "curriculum_revise": OperationRuntimeDefinition("curriculum_revise", "artifact_revision", "curriculum_artifact_revision", "artifact_revision", "skill_execute"),
-    "curriculum_update_propose": OperationRuntimeDefinition("curriculum_update_propose", "proposal_generation", "proposal", "proposal_generation", "structured"),
     "launch_plan_generate": OperationRuntimeDefinition("launch_plan_generate", "long_horizon_planning", "launch_plan_artifact", "launch_plan_generation", "structured"),
     "progression_generate": OperationRuntimeDefinition("progression_generate", "long_horizon_planning", "progression_artifact", "progression_generation", "structured"),
     "progression_revise": OperationRuntimeDefinition("progression_revise", "artifact_revision", "progression_artifact", "progression_revision", "structured"),

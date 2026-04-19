@@ -21,10 +21,10 @@ def test_other_skills_are_structured_output_skills():
         "curriculum_intake",
         "curriculum_generate",
         "curriculum_revise",
+        "launch_plan_generate",
         "progression_generate",
         "progression_revise",
         "session_evaluate",
-        "curriculum_update_propose",
     }
     for name in deterministic_operations:
         skill = registry.get(name)

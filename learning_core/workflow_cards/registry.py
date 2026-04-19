@@ -9,7 +9,6 @@ from learning_core.skills.copilot_chat.scripts.main import CopilotChatSkill
 from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
 from learning_core.skills.curriculum_intake.scripts.main import CurriculumIntakeSkill
 from learning_core.skills.curriculum_revise.scripts.main import CurriculumReviseSkill
-from learning_core.skills.curriculum_update_propose.scripts.main import CurriculumUpdateProposeSkill
 from learning_core.skills.launch_plan_generate.scripts.main import LaunchPlanGenerateSkill
 from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
 from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
@@ -107,13 +106,6 @@ WORKFLOW_CARD_REGISTRY: dict[str, WorkflowCardDefinition] = {
         supported_task_profiles=("long_horizon_planning",),
         supported_response_types=("progression_artifact",),
         prompt_preview_builder=_skill_prompt_preview_builder(ProgressionGenerateSkill),
-        pack_categories=("domain",),
-    ),
-    "proposal_generation": WorkflowCardDefinition(
-        name="proposal_generation",
-        supported_task_profiles=("proposal_generation",),
-        supported_response_types=("proposal",),
-        prompt_preview_builder=_skill_prompt_preview_builder(CurriculumUpdateProposeSkill),
         pack_categories=("domain",),
     ),
     "session_synthesis": WorkflowCardDefinition(
