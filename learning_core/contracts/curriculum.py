@@ -6,16 +6,15 @@ from typing import Any, Literal
 from pydantic import Field, model_validator
 
 from learning_core.contracts.base import StrictModel
-from learning_core.contracts.progression import ProgressionArtifact
 from learning_core.contracts.source_interpret import (
     RequestedIntakeRoute,
     SourceContinuationMode,
     SourceDeliveryPattern,
     SourceEntryStrategy,
     SourceInputFile,
+    SourceInterpretationHorizon,
     SourceKind,
     SourcePackageContext,
-    SourceInterpretationHorizon,
 )
 
 
@@ -77,51 +76,13 @@ class CurriculumPacing(StrictModel):
     coverageNotes: list[str] = Field(default_factory=list)
 
 
-class CurriculumLesson(StrictModel):
-    unitRef: str
-    lessonRef: str
-    lessonType: Literal[
-        "task",
-        "skill_support",
-        "concept",
-        "setup",
-        "reflection",
-        "assessment",
-    ]
-    title: str
-    description: str
-    subject: str | None = None
-    estimatedMinutes: int | None = None
-    materials: list[str] = Field(default_factory=list)
-    objectives: list[str] = Field(default_factory=list)
-    linkedSkillRefs: list[str] = Field(default_factory=list)
-
-
 class CurriculumUnit(StrictModel):
     unitRef: str
     title: str
     description: str
     estimatedWeeks: int | None = None
     estimatedSessions: int | None = None
-    lessons: list[CurriculumLesson] = Field(default_factory=list)
-
-
-class CurriculumLaunchPlan(StrictModel):
-    recommendedHorizon: SourceInterpretationHorizon
-    openingLessonRefs: list[str] = Field(default_factory=list)
-    openingSkillRefs: list[str] = Field(default_factory=list)
-    scopeSummary: str
-    initialSliceUsed: bool
-    initialSliceLabel: str | None = None
-    entryStrategy: SourceEntryStrategy | None = None
-    entryLabel: str | None = None
-    continuationMode: SourceContinuationMode | None = None
-
-    @model_validator(mode="after")
-    def validate_opening_refs(self) -> "CurriculumLaunchPlan":
-        if not self.openingLessonRefs:
-            raise ValueError("launchPlan requires at least one openingLessonRef.")
-        return self
+    skillRefs: list[str] = Field(default_factory=list)
 
 
 def normalize_ref_segment(value: str) -> str:
@@ -197,22 +158,12 @@ def build_document_skill_ref_aliases(document: dict[str, Any]) -> tuple[dict[str
     return aliases, ambiguous
 
 
-def resolve_document_skill_ref(document: dict[str, Any], skill_ref: str) -> str | None:
-    aliases, ambiguous = build_document_skill_ref_aliases(document)
-    normalized_ref = normalize_skill_ref(skill_ref)
-    if normalized_ref in ambiguous:
-        return None
-    return aliases.get(normalized_ref)
-
-
 class CurriculumArtifact(StrictModel):
     source: CurriculumDraftSummary
     intakeSummary: str
     pacing: CurriculumPacing
     document: dict[str, Any]
     units: list[CurriculumUnit] = Field(default_factory=list)
-    launchPlan: CurriculumLaunchPlan
-    progression: ProgressionArtifact | None = None
 
     @model_validator(mode="after")
     def validate_refs(self) -> "CurriculumArtifact":
@@ -220,7 +171,6 @@ class CurriculumArtifact(StrictModel):
         if len(unit_refs) != len(self.units):
             raise ValueError("CurriculumArtifact requires unique unitRef values.")
 
-        lesson_refs: set[str] = set()
         document_skill_aliases, ambiguous_skill_refs = build_document_skill_ref_aliases(self.document)
 
         def canonicalize_skill_refs(skill_refs: list[str]) -> tuple[list[str], list[str]]:
@@ -229,7 +179,9 @@ class CurriculumArtifact(StrictModel):
             seen: set[str] = set()
             for skill_ref in skill_refs:
                 normalized_ref = normalize_skill_ref(skill_ref)
-                leaf_ref = normalize_ref_segment(skill_ref.split("/")[-1] if "/" in skill_ref else skill_ref)
+                leaf_ref = normalize_ref_segment(
+                    skill_ref.split("/")[-1] if "/" in skill_ref else skill_ref
+                )
                 if normalized_ref in ambiguous_skill_refs or leaf_ref in ambiguous_skill_refs:
                     missing.append(skill_ref)
                     continue
@@ -243,56 +195,24 @@ class CurriculumArtifact(StrictModel):
             return canonicalized, missing
 
         for unit in self.units:
-            for lesson in unit.lessons:
-                if lesson.unitRef != unit.unitRef:
-                    raise ValueError(
-                        f'Lesson "{lesson.title}" unitRef must match parent unitRef.'
-                    )
-                if lesson.lessonRef in lesson_refs:
-                    raise ValueError("CurriculumArtifact requires unique lessonRef values.")
-                lesson_refs.add(lesson.lessonRef)
-                canonical_linked_refs, missing_skill_refs = canonicalize_skill_refs(lesson.linkedSkillRefs)
-                lesson.linkedSkillRefs = canonical_linked_refs
-                if missing_skill_refs:
-                    raise ValueError(
-                        "CurriculumArtifact lesson contains unresolved linkedSkillRefs: "
-                        + ", ".join(sorted(missing_skill_refs))
-                    )
-
-        missing_opening_lessons = [
-            lesson_ref
-            for lesson_ref in self.launchPlan.openingLessonRefs
-            if lesson_ref not in lesson_refs
-        ]
-        if missing_opening_lessons:
-            raise ValueError(
-                "CurriculumArtifact launchPlan contains unresolved openingLessonRefs: "
-                + ", ".join(sorted(missing_opening_lessons))
-            )
-
-        canonical_opening_skill_refs, missing_opening_skills = canonicalize_skill_refs(
-            self.launchPlan.openingSkillRefs
-        )
-        self.launchPlan.openingSkillRefs = canonical_opening_skill_refs
-        if missing_opening_skills:
-            raise ValueError(
-                "CurriculumArtifact launchPlan contains unresolved openingSkillRefs: "
-                + ", ".join(sorted(missing_opening_skills))
-            )
+            canonical_skill_refs, missing_skill_refs = canonicalize_skill_refs(unit.skillRefs)
+            unit.skillRefs = canonical_skill_refs
+            if missing_skill_refs:
+                raise ValueError(
+                    "CurriculumArtifact unit contains unresolved skillRefs: "
+                    + ", ".join(sorted(missing_skill_refs))
+                )
+            if not unit.skillRefs:
+                raise ValueError(f'CurriculumArtifact unit "{unit.title}" requires at least one skillRef.')
 
         return self
-
-
-class CurriculumIntakeRequest(StrictModel):
-    learnerName: str
-    messages: list[CurriculumChatMessage] = Field(default_factory=list)
-    requirementHints: CurriculumCapturedRequirements | None = None
 
 
 class CurriculumGenerationRequest(StrictModel):
     learnerName: str
     titleCandidate: str | None = None
     requestMode: Literal["source_entry", "conversation_intake"]
+
     requestedRoute: RequestedIntakeRoute | None = None
     routedRoute: RequestedIntakeRoute | None = None
     sourceKind: SourceKind | None = None
@@ -302,20 +222,21 @@ class CurriculumGenerationRequest(StrictModel):
     deliveryPattern: SourceDeliveryPattern | None = None
     recommendedHorizon: SourceInterpretationHorizon | None = None
     sourceText: str | None = None
-    sourcePackages: list[SourcePackageContext] | None = None
-    sourceFiles: list[SourceInputFile] | None = None
-    detectedChunks: list[str] | None = None
-    assumptions: list[str] | None = None
-    messages: list[CurriculumChatMessage] | None = None
-    requirementHints: CurriculumCapturedRequirements | None = None
+    sourcePackages: list[SourcePackageContext] = Field(default_factory=list)
+    sourceFiles: list[SourceInputFile] = Field(default_factory=list)
+    detectedChunks: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+
+    messages: list[CurriculumChatMessage] = Field(default_factory=list)
+    requirementHints: dict[str, Any] | None = None
     pacingExpectations: CurriculumPacingExpectations | None = None
-    granularityGuidance: list[str] | None = None
-    correctionNotes: list[str] | None = None
+    granularityGuidance: list[str] = Field(default_factory=list)
+    correctionNotes: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_mode_fields(self) -> "CurriculumGenerationRequest":
+    def validate_request_mode(self) -> "CurriculumGenerationRequest":
         if self.requestMode == "source_entry":
-            required_fields = {
+            required_source_fields = {
                 "requestedRoute": self.requestedRoute,
                 "routedRoute": self.routedRoute,
                 "sourceKind": self.sourceKind,
@@ -324,73 +245,21 @@ class CurriculumGenerationRequest(StrictModel):
                 "deliveryPattern": self.deliveryPattern,
                 "recommendedHorizon": self.recommendedHorizon,
                 "sourceText": self.sourceText,
-                "sourcePackages": self.sourcePackages,
-                "sourceFiles": self.sourceFiles,
-                "detectedChunks": self.detectedChunks,
-                "assumptions": self.assumptions,
             }
-            missing = [name for name, value in required_fields.items() if value is None]
+            missing = [name for name, value in required_source_fields.items() if value in (None, "")]
             if missing:
                 raise ValueError(
-                    "source_entry requests require: " + ", ".join(sorted(missing))
+                    "source_entry curriculum generation requires: " + ", ".join(sorted(missing))
                 )
-            if not self.sourceText or not self.sourceText.strip():
-                raise ValueError("source_entry requests require non-empty sourceText.")
-            forbidden_fields = {
-                "messages": self.messages,
-                "requirementHints": self.requirementHints,
-                "pacingExpectations": self.pacingExpectations,
-                "granularityGuidance": self.granularityGuidance,
-            }
-            populated_forbidden = [
-                name for name, value in forbidden_fields.items() if value is not None
-            ]
-            if populated_forbidden:
-                raise ValueError(
-                    "source_entry requests do not allow: "
-                    + ", ".join(sorted(populated_forbidden))
-                )
-            return self
-
-        required_conversation_fields = {
-            "messages": self.messages,
-        }
-        missing = [name for name, value in required_conversation_fields.items() if value is None]
-        if missing:
-            raise ValueError(
-                "conversation_intake requests require: " + ", ".join(sorted(missing))
-            )
-        if not self.messages:
-            raise ValueError("conversation_intake requests require at least one message.")
-        forbidden_fields = {
-            "requestedRoute": self.requestedRoute,
-            "routedRoute": self.routedRoute,
-            "sourceKind": self.sourceKind,
-            "entryStrategy": self.entryStrategy,
-            "entryLabel": self.entryLabel,
-            "continuationMode": self.continuationMode,
-            "deliveryPattern": self.deliveryPattern,
-            "recommendedHorizon": self.recommendedHorizon,
-            "sourceText": self.sourceText,
-            "sourcePackages": self.sourcePackages,
-            "sourceFiles": self.sourceFiles,
-            "detectedChunks": self.detectedChunks,
-            "assumptions": self.assumptions,
-        }
-        populated_forbidden = [
-            name for name, value in forbidden_fields.items() if value is not None
-        ]
-        if populated_forbidden:
-            raise ValueError(
-                "conversation_intake requests do not allow: "
-                + ", ".join(sorted(populated_forbidden))
-            )
+        else:
+            if not self.messages:
+                raise ValueError("conversation_intake curriculum generation requires messages.")
         return self
 
 
 class CurriculumRevisionRequest(StrictModel):
     learnerName: str
-    currentCurriculum: dict[str, Any]
+    currentCurriculum: dict[str, Any] | None = None
     currentRequest: str | None = None
     messages: list[CurriculumChatMessage] = Field(default_factory=list)
     correctionNotes: list[str] = Field(default_factory=list)
@@ -402,22 +271,10 @@ class CurriculumRevisionTurn(StrictModel):
     changeSummary: list[str] = Field(default_factory=list)
     artifact: CurriculumArtifact | None = None
 
-
-class CurriculumUpdateProposalChange(StrictModel):
-    path: str
-    changeType: Literal["add", "remove", "replace", "resequence"]
-    rationale: str
-
-
-class CurriculumUpdateProposalArtifact(StrictModel):
-    schemaVersion: Literal["1"]
-    summary: str
-    rationale: list[str] = Field(default_factory=list)
-    proposedChanges: list[CurriculumUpdateProposalChange] = Field(default_factory=list)
-
-
-class CurriculumUpdateProposalRequest(StrictModel):
-    evaluationSummary: str
-    curriculumTitle: str | None = None
-    progressionTitle: str | None = None
-    constraints: list[str] = Field(default_factory=list)
+    @model_validator(mode="after")
+    def validate_action_payload(self) -> "CurriculumRevisionTurn":
+        if self.action == "apply" and self.artifact is None:
+            raise ValueError('artifact is required when action is "apply".')
+        if self.action == "clarify" and self.artifact is not None:
+            raise ValueError('artifact must be omitted when action is "clarify".')
+        return self

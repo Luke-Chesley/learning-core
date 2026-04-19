@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from learning_core.contracts.base import StrictModel
 from learning_core.contracts.source_interpret import (
     SourceContinuationMode,
     SourceDeliveryPattern,
     SourceEntryStrategy,
-    SourceInterpretationHorizon,
     SourceKind,
 )
 
@@ -40,37 +39,17 @@ class SkillCatalogItem(StrictModel):
     ordinal: int | None = None
 
 
-ProgressionLessonType = Literal[
-    "task",
-    "skill_support",
-    "concept",
-    "setup",
-    "reflection",
-    "assessment",
-]
-ProgressionDeliveryPattern = SourceDeliveryPattern
-ProgressionRequestMode = Literal["source_entry", "conversation_intake", "curriculum_revision"]
-
-
-class ProgressionLessonAnchor(StrictModel):
-    lessonRef: str
+class ProgressionUnitAnchor(StrictModel):
     unitRef: str
     title: str
-    lessonType: ProgressionLessonType
+    description: str
     orderIndex: int = Field(ge=1)
-    linkedSkillRefs: list[str] = Field(default_factory=list)
+    estimatedWeeks: int | None = None
+    estimatedSessions: int | None = None
+    skillRefs: list[str] = Field(default_factory=list)
 
 
-class ProgressionLaunchPlan(StrictModel):
-    recommendedHorizon: SourceInterpretationHorizon
-    scopeSummary: str
-    initialSliceUsed: bool
-    initialSliceLabel: str | None = None
-    entryStrategy: SourceEntryStrategy | None = None
-    entryLabel: str | None = None
-    continuationMode: SourceContinuationMode | None = None
-    openingLessonRefs: list[str] = Field(default_factory=list)
-    openingSkillRefs: list[str] = Field(default_factory=list)
+ProgressionRequestMode = Literal["source_entry", "conversation_intake", "curriculum_revision"]
 
 
 class ProgressionBasisRequest(StrictModel):
@@ -79,12 +58,17 @@ class ProgressionBasisRequest(StrictModel):
     sourceSummary: str | None = None
     requestMode: ProgressionRequestMode | None = None
     sourceKind: SourceKind | None = None
-    deliveryPattern: ProgressionDeliveryPattern | None = None
+    deliveryPattern: SourceDeliveryPattern | None = None
     entryStrategy: SourceEntryStrategy | None = None
     continuationMode: SourceContinuationMode | None = None
-    launchPlan: ProgressionLaunchPlan | None = None
     skillCatalog: list[SkillCatalogItem] = Field(default_factory=list)
-    lessonAnchors: list[ProgressionLessonAnchor] = Field(default_factory=list)
+    unitAnchors: list[ProgressionUnitAnchor] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_basis(self) -> "ProgressionBasisRequest":
+        if not self.skillCatalog:
+            raise ValueError("progression_generate requires a non-empty skillCatalog.")
+        return self
 
 
 class ProgressionGenerationRequest(ProgressionBasisRequest):

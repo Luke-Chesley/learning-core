@@ -10,6 +10,7 @@ from learning_core.skills.curriculum_generate.scripts.main import CurriculumGene
 from learning_core.skills.curriculum_intake.scripts.main import CurriculumIntakeSkill
 from learning_core.skills.curriculum_revise.scripts.main import CurriculumReviseSkill
 from learning_core.skills.curriculum_update_propose.scripts.main import CurriculumUpdateProposeSkill
+from learning_core.skills.launch_plan_generate.scripts.main import LaunchPlanGenerateSkill
 from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
 from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
 from learning_core.skills.session_evaluate.scripts.main import SessionEvaluateSkill
@@ -90,8 +91,15 @@ WORKFLOW_CARD_REGISTRY: dict[str, WorkflowCardDefinition] = {
     "long_horizon_planning": WorkflowCardDefinition(
         name="long_horizon_planning",
         supported_task_profiles=("long_horizon_planning",),
-        supported_response_types=("curriculum_artifact", "progression_artifact"),
+        supported_response_types=("curriculum_artifact", "progression_artifact", "launch_plan_artifact"),
         prompt_preview_builder=_skill_prompt_preview_builder(CurriculumGenerateSkill),
+        pack_categories=("domain",),
+    ),
+    "launch_plan_generation": WorkflowCardDefinition(
+        name="launch_plan_generation",
+        supported_task_profiles=("long_horizon_planning",),
+        supported_response_types=("launch_plan_artifact",),
+        prompt_preview_builder=_skill_prompt_preview_builder(LaunchPlanGenerateSkill),
         pack_categories=("domain",),
     ),
     "progression_generation": WorkflowCardDefinition(

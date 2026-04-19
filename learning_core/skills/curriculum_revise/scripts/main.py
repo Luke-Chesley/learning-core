@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumRevisionRequest, CurriculumRevisionTurn
-from learning_core.contracts.progression import ProgressionRevisionRequest
-from learning_core.runtime.context import RuntimeContext
+from learning_core.contracts.curriculum import CurriculumRevisionRequest, CurriculumRevisionTurn
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
-from learning_core.skills.curriculum_common import build_progression_request_from_artifact
-from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
 from learning_core.skills.prompt_utils import append_user_authored_context, format_curriculum_transcript
 
 
@@ -17,7 +13,7 @@ class CurriculumReviseSkill(StructuredOutputSkill):
     output_model = CurriculumRevisionTurn
     policy = ExecutionPolicy(
         skill_name="curriculum_revise",
-        skill_version="2026-04-09",
+        skill_version="2026-04-19",
         max_tokens=12000,
     )
 
@@ -43,14 +39,9 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- Decide whether the change is a split, rename, targeted adjust, or broader rewrite.",
                 "- Preserve unchanged branches unless the parent explicitly asked for a broader rewrite.",
                 "- Keep the canonical tree shape: domain -> strand -> goal group -> skill.",
-                "- For split requests, replace the target skill with sibling skills under the same parent.",
-                "- Do not wrap the old skill as a new parent unless explicitly requested.",
-                "- Do not invent a new goal group unless explicitly requested.",
-                "- For rename requests, keep the structure the same and change wording only.",
-                "- For targeted adjust requests, keep the change local unless a broader rewrite is requested.",
-                "- Preserve teachable granularity while keeping the tree coherent and free of taxonomy noise.",
-                "- If a branch is too broad for the learner or pacing, split it into sibling skills rather than compressing multiple procedures into one leaf.",
-                "- Return the full revised artifact when action is \"apply\".",
+                "- Preserve teachable granularity while keeping the tree coherent.",
+                "- Units should remain coarse curriculum groupings, not lesson plans.",
+                "- Return the full revised curriculum artifact when action is \"apply\".",
                 "- If the request is too vague to apply safely, ask one precise clarification question.",
             ]
         )
@@ -68,40 +59,12 @@ class CurriculumReviseSkill(StructuredOutputSkill):
         lines.extend(["", "Respond with either one clarification question or the full revised curriculum artifact."])
         return "\n".join(lines)
 
-    def execute(self, engine, payload: CurriculumRevisionRequest, context: RuntimeContext) -> SkillExecutionResult[CurriculumRevisionTurn]:
+    def execute(self, engine, payload: CurriculumRevisionRequest, context) -> SkillExecutionResult[CurriculumRevisionTurn]:
         turn, lineage, trace = engine.run_structured_output(
             skill=self,
             payload=payload,
             context=context,
         )
-        artifact: CurriculumArtifact | None = turn.artifact
-        if artifact is not None:
-            progression_payload = build_progression_request_from_artifact(
-                artifact,
-                learner_name=payload.learnerName,
-                request_mode="curriculum_revision",
-                source_kind=None,
-                entry_strategy=artifact.launchPlan.entryStrategy,
-                continuation_mode=artifact.launchPlan.continuationMode,
-                revision_request=payload.currentRequest,
-            )
-            if progression_payload.skillCatalog:
-                progression_skill = ProgressionReviseSkill()
-                progression_context = RuntimeContext.create(
-                    operation_name="progression_revise",
-                    request_id=context.request_id,
-                    app_context=context.app_context,
-                    presentation_context=context.presentation_context,
-                    user_authored_context=context.user_authored_context,
-                )
-                progression_artifact, _, _ = engine.run_structured_output(
-                    skill=progression_skill,
-                    payload=progression_payload,
-                    context=progression_context,
-                )
-                updated_artifact = artifact.model_copy(update={"progression": progression_artifact})
-                turn = turn.model_copy(update={"artifact": updated_artifact})
-
         return SkillExecutionResult(
             artifact=turn,
             lineage=lineage,

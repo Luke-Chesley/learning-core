@@ -414,38 +414,15 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                 "coverageStrategy": "Stay inside the initial launch slice.",
                 "coverageNotes": [],
             },
-            "launchPlan": {
-                "recommendedHorizon": "one_week",
-                "openingLessonRefs": ["lesson:kitchen-setup"],
-                "openingSkillRefs": ["skill:life-skills/chapter-1/kitchen-setup"],
-                "scopeSummary": "Start with chapter 1 only and keep the rest for later.",
-                "initialSliceUsed": True,
-                "initialSliceLabel": "chapter 1",
-                "entryStrategy": "explicit_range",
-                "entryLabel": "chapter 1",
-                "continuationMode": "sequential",
-            },
             "document": {"Life Skills": {"Chapter 1": ["Kitchen setup"]}},
             "units": [
                 {
                     "unitRef": "unit:chapter-1",
                     "title": "Chapter 1",
                     "description": "Source-entry launch unit",
-                    "lessons": [
-                        {
-                            "unitRef": "unit:chapter-1",
-                            "lessonRef": "lesson:kitchen-setup",
-                            "lessonType": "setup",
-                            "title": "Kitchen setup",
-                            "description": "Get ready to cook.",
-                            "materials": [],
-                            "objectives": [],
-                            "linkedSkillRefs": ["skill:life-skills/chapter-1/kitchen-setup"],
-                        }
-                    ],
-                }
+                    "skillRefs": ["skill:life-skills/chapter-1/kitchen-setup"],
+                },
             ],
-            "progression": None,
         },
         lineage=ExecutionLineage(
             operation_name="curriculum_generate",

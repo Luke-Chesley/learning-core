@@ -68,17 +68,6 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                 "coverageStrategy": "Launch inside the interpreted opening slice.",
                 "coverageNotes": [],
             },
-            "launchPlan": {
-                "recommendedHorizon": "few_days",
-                "openingLessonRefs": ["lesson-1", "lesson-2", "lesson-3"],
-                "openingSkillRefs": [],
-                "scopeSummary": "Stay inside the explicit assigned range.",
-                "initialSliceUsed": True,
-                "initialSliceLabel": "pages 1-12",
-                "entryStrategy": "explicit_range",
-                "entryLabel": "pages 1-12",
-                "continuationMode": "sequential",
-            },
             "document": {
                 "Math": {
                     "Pages 1-12": [
@@ -88,8 +77,20 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                     ]
                 }
             },
-            "units": [],
-            "progression": None,
+            "units": [
+                {
+                    "unitRef": "unit:1:pages-1-12",
+                    "title": "Pages 1-12",
+                    "description": "Work through the opening workbook range in order.",
+                    "estimatedWeeks": 1,
+                    "estimatedSessions": 3,
+                    "skillRefs": [
+                        "skill:math/pages-1-12/warm-up-from-page-1",
+                        "skill:math/pages-1-12/guided-practice-from-pages-2-6",
+                        "skill:math/pages-1-12/independent-practice-from-pages-7-12",
+                    ],
+                }
+            ],
         },
         lineage=ExecutionLineage(
             operation_name="curriculum_generate",
@@ -141,7 +142,7 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
     )
 
     assert result.operation_name == "curriculum_generate"
-    assert result.artifact["launchPlan"]["recommendedHorizon"] == "few_days"
+    assert result.artifact["units"][0]["skillRefs"][0] == "skill:math/pages-1-12/warm-up-from-page-1"
     assert result.trace.agent_trace["orchestration_profile"] == "generate_from_source"
     assert [step["operation_name"] for step in result.trace.agent_trace["substeps"]] == [
         "source_interpret",

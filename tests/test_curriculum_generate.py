@@ -210,29 +210,11 @@ def test_curriculum_artifact_canonicalizes_resolvable_skill_refs():
                     "unitRef": "unit:1:intro",
                     "title": "Intro",
                     "description": "Desc",
-                    "lessons": [
-                        {
-                            "unitRef": "unit:1:intro",
-                            "lessonRef": "unit:1:intro/lesson:1:measure",
-                            "lessonType": "skill_support",
-                            "title": "Measure",
-                            "description": "Desc",
-                            "linkedSkillRefs": [
-                                "skill:montessori-kitchen-independence/kitchen-skills/strength-and-precision-skills/measure-dry-ingredients-accurately",
-                            ],
-                        }
+                    "skillRefs": [
+                        "skill:montessori-kitchen-independence/kitchen-skills/strength-and-precision-skills/measure-dry-ingredients-accurately",
                     ],
-                }
+                },
             ],
-            "launchPlan": {
-                "recommendedHorizon": "two_weeks",
-                "openingLessonRefs": ["unit:1:intro/lesson:1:measure"],
-                "openingSkillRefs": [
-                    "skill:montessori-kitchen-independence/kitchen-skills/strength-and-precision-skills/measure-dry-ingredients-accurately",
-                ],
-                "scopeSummary": "Scope",
-                "initialSliceUsed": True,
-            },
         }
     )
 
@@ -240,5 +222,4 @@ def test_curriculum_artifact_canonicalizes_resolvable_skill_refs():
         "skill:montessori-kitchen-independence/kitchen-skills/"
         "preparation-and-heat-skills/measure-dry-ingredients-accurately"
     )
-    assert artifact.units[0].lessons[0].linkedSkillRefs == [canonical_ref]
-    assert artifact.launchPlan.openingSkillRefs == [canonical_ref]
+    assert artifact.units[0].skillRefs == [canonical_ref]

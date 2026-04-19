@@ -19,6 +19,7 @@ def test_registry_contains_required_operations():
         "session_generate",
         "curriculum_generate",
         "curriculum_revise",
+        "launch_plan_generate",
         "progression_generate",
         "progression_revise",
         "session_evaluate",

@@ -51,6 +51,7 @@ OPERATION_RUNTIME_MAP: dict[str, OperationRuntimeDefinition] = {
     "curriculum_intake": OperationRuntimeDefinition("curriculum_intake", "intake_dialogue", "intake_turn", "curriculum_intake", "structured"),
     "curriculum_revise": OperationRuntimeDefinition("curriculum_revise", "artifact_revision", "curriculum_artifact_revision", "artifact_revision", "skill_execute"),
     "curriculum_update_propose": OperationRuntimeDefinition("curriculum_update_propose", "proposal_generation", "proposal", "proposal_generation", "structured"),
+    "launch_plan_generate": OperationRuntimeDefinition("launch_plan_generate", "long_horizon_planning", "launch_plan_artifact", "launch_plan_generation", "structured"),
     "progression_generate": OperationRuntimeDefinition("progression_generate", "long_horizon_planning", "progression_artifact", "progression_generation", "structured"),
     "progression_revise": OperationRuntimeDefinition("progression_revise", "artifact_revision", "progression_artifact", "progression_revision", "structured"),
     "session_evaluate": OperationRuntimeDefinition("session_evaluate", "session_synthesis", "evaluation", "session_synthesis", "structured"),

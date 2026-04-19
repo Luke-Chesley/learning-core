@@ -33,6 +33,7 @@ def test_list_operations_includes_required_cutover_operations():
         "session_generate",
         "curriculum_generate",
         "curriculum_revise",
+        "launch_plan_generate",
         "progression_generate",
         "progression_revise",
         "session_evaluate",
