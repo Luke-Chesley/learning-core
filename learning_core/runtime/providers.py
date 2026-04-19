@@ -7,6 +7,7 @@ from functools import lru_cache
 from langchain_anthropic import ChatAnthropic
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from openai import OpenAI
 
 from learning_core.runtime.env import load_runtime_env
 from learning_core.runtime.errors import ConfigurationError
@@ -173,6 +174,11 @@ def _build_openai_client(
         timeout=None,
         use_responses_api=True,
     )
+
+
+@lru_cache(maxsize=4)
+def build_openai_files_client(api_key: str) -> OpenAI:
+    return OpenAI(api_key=api_key)
 
 
 @lru_cache(maxsize=32)

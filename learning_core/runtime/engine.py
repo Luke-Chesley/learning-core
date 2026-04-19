@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import os
 import re
@@ -14,7 +16,7 @@ from learning_core.observability.provider_logs import write_provider_exchange_lo
 from learning_core.runtime.agent_kernel import AgentKernel
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.errors import ContractValidationError, ProviderExecutionError
-from learning_core.runtime.providers import build_model_runtime
+from learning_core.runtime.providers import build_model_runtime, build_openai_files_client
 from learning_core.runtime.request_normalization import normalize_runtime_request
 from learning_core.runtime.registry import SkillRegistry
 from learning_core.runtime.tooling import ToolRegistry
@@ -25,6 +27,86 @@ class AgentEngine:
         self.skill_registry = skill_registry
         self.tool_registry = tool_registry or ToolRegistry()
         self.kernel = AgentKernel()
+
+    def _upload_openai_input_file(self, block: dict[str, object]) -> dict[str, object]:
+        file_data = block.get("file_data")
+        if not isinstance(file_data, str) or not file_data:
+            return block
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key is None or not api_key.strip():
+            raise ProviderExecutionError("OPENAI_API_KEY is required for file input uploads.")
+
+        if "," in file_data:
+            _, encoded_payload = file_data.split(",", 1)
+        else:
+            encoded_payload = file_data
+
+        try:
+            file_bytes = base64.b64decode(encoded_payload, validate=True)
+        except (ValueError, binascii.Error) as error:
+            raise ProviderExecutionError("Invalid Base64 file_data in OpenAI input_file block.") from error
+
+        filename = block.get("filename")
+        upload_name = filename if isinstance(filename, str) and filename.strip() else "input-file"
+        client = build_openai_files_client(api_key.strip())
+        uploaded = client.files.create(
+            file=(upload_name, file_bytes),
+            purpose="user_data",
+        )
+        return {
+            "type": "input_file",
+            "file_id": uploaded.id,
+        }
+
+    def _normalize_openai_message_content(self, content: object) -> object:
+        if not isinstance(content, list):
+            return content
+
+        normalized: list[object] = []
+        changed = False
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "input_file":
+                normalized_item = self._upload_openai_input_file(item)
+                normalized.append(normalized_item)
+                changed = changed or normalized_item is not item
+                continue
+
+            normalized.append(item)
+
+        return normalized if changed else content
+
+    def _prepare_provider_messages(
+        self,
+        *,
+        provider: str,
+        messages: list[object],
+        serialized: list[dict[str, object]],
+    ) -> tuple[list[object], list[dict[str, object]]]:
+        if provider != "openai":
+            return messages, serialized
+
+        normalized_messages = []
+        normalized_serialized = []
+        changed = False
+
+        for message, payload in zip(messages, serialized, strict=True):
+            payload_content = payload.get("content")
+            normalized_content = self._normalize_openai_message_content(payload_content)
+            changed = changed or normalized_content is not payload_content
+            normalized_serialized.append({**payload, "content": normalized_content})
+
+            if isinstance(message, HumanMessage):
+                message_content = self._normalize_openai_message_content(message.content)
+                changed = changed or message_content is not message.content
+                normalized_messages.append(HumanMessage(content=message_content))
+            else:
+                normalized_messages.append(message)
+
+        if not changed:
+            return messages, serialized
+
+        return normalized_messages, normalized_serialized
 
     def _provider_request_payload(
         self,
@@ -103,7 +185,11 @@ class AgentEngine:
             {"role": "system", "content": prompt_preview.system_prompt},
             {"role": "user", "content": user_content},
         ]
-        return messages, serialized
+        return self._prepare_provider_messages(
+            provider=provider,
+            messages=messages,
+            serialized=serialized,
+        )
 
     def _structured_output_method_for_provider(self, provider: str) -> str | None:
         # GPT-5.4-mini is currently more reliable with JSON mode than with

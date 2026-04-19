@@ -104,6 +104,39 @@ class _RepairFallbackClient:
         return _FakeTextResponse(json.dumps(self.repaired_artifact))
 
 
+class _CapturingStructuredInvoker:
+    def __init__(self, artifact: dict, calls: list[object]) -> None:
+        self.artifact = artifact
+        self.calls = calls
+
+    def invoke(self, messages):
+        self.calls.append(messages)
+        return self.artifact
+
+
+class _CapturingClient:
+    def __init__(self, artifact: dict, calls: list[object]) -> None:
+        self.artifact = artifact
+        self.calls = calls
+
+    def with_structured_output(self, _output_model, **_kwargs):
+        return _CapturingStructuredInvoker(self.artifact, self.calls)
+
+
+class _FakeFilesApi:
+    def __init__(self, uploads: list[dict[str, object]]) -> None:
+        self.uploads = uploads
+
+    def create(self, *, file, purpose):
+        self.uploads.append({"file": file, "purpose": purpose})
+        return type("UploadedFile", (), {"id": "file-uploaded-123"})()
+
+
+class _FakeOpenAIFileClient:
+    def __init__(self, uploads: list[dict[str, object]]) -> None:
+        self.files = _FakeFilesApi(uploads)
+
+
 def _envelope() -> dict:
     return {
         "input": {
@@ -248,6 +281,56 @@ def test_source_interpret_execute_accepts_valid_artifact(monkeypatch, tmp_path: 
     assert result.artifact["entryStrategy"] == "timebox_start"
     assert result.artifact["continuationMode"] == "timebox"
     assert result.artifact["recommendedHorizon"] == "one_week"
+
+
+def test_source_interpret_uploads_file_data_and_uses_file_id_for_openai(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    captured_messages: list[object] = []
+    uploads: list[dict[str, object]] = []
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-source-interpret",
+            client=_CapturingClient(_artifact(), captured_messages),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+    monkeypatch.setattr(
+        engine_module,
+        "build_openai_files_client",
+        lambda _api_key: _FakeOpenAIFileClient(uploads),
+    )
+
+    envelope = _envelope()
+    envelope["input"]["sourceFiles"] = [
+        {
+            "assetId": "asset-1",
+            "packageId": "ipkg-1",
+            "title": "Week 1 upload",
+            "modality": "pdf",
+            "fileName": "week-1.pdf",
+            "mimeType": "application/pdf",
+            "fileData": "data:application/pdf;base64,ZmFrZS1wZGY=",
+        }
+    ]
+
+    AgentEngine(build_skill_registry()).execute("source_interpret", envelope)
+
+    assert uploads[0]["purpose"] == "user_data"
+    assert uploads[0]["file"] == ("week-1.pdf", b"fake-pdf")
+
+    user_message = captured_messages[0][1]
+    assert isinstance(user_message.content, list)
+    assert user_message.content[1] == {
+        "type": "input_file",
+        "file_id": "file-uploaded-123",
+    }
 
 
 def test_source_interpret_execute_accepts_comprehensive_source_whole_book_artifact(
