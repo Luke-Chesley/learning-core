@@ -126,6 +126,7 @@ Return JSON with this shape:
   },
   "units": [
     {
+      "unitRef": "unit:1:foundations",
       "title": "string",
       "description": "string",
       "estimatedWeeks": 1,
