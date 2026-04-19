@@ -19,10 +19,9 @@ from learning_core.contracts.curriculum import (
     CurriculumGenerationRequest,
     CurriculumRevisionTurn,
     CurriculumRevisionRequest,
-    CurriculumUpdateProposalArtifact,
-    CurriculumUpdateProposalRequest,
 )
 from learning_core.contracts.evaluation import EvaluationArtifact, SessionEvaluationRequest
+from learning_core.contracts.launch_plan import LaunchPlanArtifact, LaunchPlanGenerationRequest
 from learning_core.contracts.lesson_draft import LESSON_SHAPE_VALUES, LessonShape, StructuredLessonDraft
 from learning_core.contracts.progression import (
     ProgressionArtifact,
@@ -56,9 +55,9 @@ __all__ = [
     "CurriculumGenerationRequest",
     "CurriculumRevisionRequest",
     "CurriculumRevisionTurn",
-    "CurriculumUpdateProposalArtifact",
-    "CurriculumUpdateProposalRequest",
     "EvaluationArtifact",
+    "LaunchPlanArtifact",
+    "LaunchPlanGenerationRequest",
     "LESSON_SHAPE_VALUES",
     "LessonShape",
     "OperationDescriptor",

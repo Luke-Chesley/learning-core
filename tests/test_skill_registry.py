@@ -23,7 +23,6 @@ def test_registry_contains_required_operations():
         "progression_generate",
         "progression_revise",
         "session_evaluate",
-        "curriculum_update_propose",
         "curriculum_intake",
         "copilot_chat",
     }.issubset(operation_names)

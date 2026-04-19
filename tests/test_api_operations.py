@@ -37,7 +37,6 @@ def test_list_operations_includes_required_cutover_operations():
         "progression_generate",
         "progression_revise",
         "session_evaluate",
-        "curriculum_update_propose",
         "curriculum_intake",
         "copilot_chat",
     }.issubset(operation_names)

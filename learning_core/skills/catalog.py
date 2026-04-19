@@ -7,7 +7,6 @@ from learning_core.skills.copilot_chat.scripts.main import CopilotChatSkill
 from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
 from learning_core.skills.curriculum_intake.scripts.main import CurriculumIntakeSkill
 from learning_core.skills.curriculum_revise.scripts.main import CurriculumReviseSkill
-from learning_core.skills.curriculum_update_propose.scripts.main import CurriculumUpdateProposeSkill
 from learning_core.skills.launch_plan_generate.scripts.main import LaunchPlanGenerateSkill
 from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
 from learning_core.skills.progression_revise.scripts.main import ProgressionReviseSkill
@@ -70,10 +69,6 @@ def build_skill_registry() -> SkillRegistry:
     registry.register(
         "session_evaluate",
         SessionEvaluateSkill(),
-    )
-    registry.register(
-        "curriculum_update_propose",
-        CurriculumUpdateProposeSkill(),
     )
 
     return registry
