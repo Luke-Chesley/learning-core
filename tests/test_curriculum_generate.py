@@ -119,6 +119,35 @@ def test_curriculum_generate_builds_openai_file_message_blocks_for_source_entry(
     }
 
 
+def test_curriculum_generate_builds_openai_file_url_message_blocks_for_source_entry():
+    payload_data = _source_entry_payload().model_dump()
+    payload_data["sourceFiles"] = [
+        {
+            "assetId": "asset-1",
+            "packageId": "ipkg-1",
+            "title": "Ancient Egypt reader",
+            "modality": "pdf",
+            "fileName": "egypt-reader.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/egypt-reader.pdf",
+        }
+    ]
+    payload = CurriculumGenerationRequest.model_validate(payload_data)
+
+    content = CurriculumGenerateSkill().build_user_message_content(
+        payload,
+        _context(),
+        provider="openai",
+    )
+
+    assert isinstance(content, list)
+    assert content[0]["type"] == "text"
+    assert content[1] == {
+        "type": "input_file",
+        "file_url": "https://example.com/egypt-reader.pdf",
+    }
+
+
 def test_curriculum_generate_does_not_attach_files_for_conversation_mode():
     content = CurriculumGenerateSkill().build_user_message_content(
         _conversation_payload(),
