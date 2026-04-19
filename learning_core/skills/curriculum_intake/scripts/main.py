@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from learning_core.contracts.curriculum import CurriculumIntakeArtifact, CurriculumIntakeRequest
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
@@ -22,7 +24,7 @@ class CurriculumIntakeSkill(StructuredOutputSkill):
             f"Active learner: {payload.learnerName}",
             "",
             "Current requirement hints:",
-            payload.requirementHints.model_dump_json(indent=2) if payload.requirementHints else "{}",
+            json.dumps(payload.requirementHints or {}, indent=2),
             "",
             "Conversation transcript:",
             format_curriculum_transcript(payload.messages),

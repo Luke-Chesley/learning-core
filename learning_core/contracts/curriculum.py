@@ -46,6 +46,12 @@ class CurriculumIntakeArtifact(StrictModel):
     state: CurriculumIntakeState
 
 
+class CurriculumIntakeRequest(StrictModel):
+    learnerName: str
+    messages: list[CurriculumChatMessage] = Field(default_factory=list)
+    requirementHints: dict[str, Any] | None = None
+
+
 class CurriculumPacingExpectations(StrictModel):
     totalWeeks: int | None = None
     sessionsPerWeek: int | None = None

@@ -16,6 +16,7 @@ from learning_core.contracts.responses import (
 from learning_core.contracts.curriculum import (
     CurriculumArtifact,
     CurriculumIntakeArtifact,
+    CurriculumIntakeRequest,
     CurriculumGenerationRequest,
     CurriculumRevisionTurn,
     CurriculumRevisionRequest,
@@ -52,6 +53,7 @@ __all__ = [
     "CopilotChatRequest",
     "CurriculumArtifact",
     "CurriculumIntakeArtifact",
+    "CurriculumIntakeRequest",
     "CurriculumGenerationRequest",
     "CurriculumRevisionRequest",
     "CurriculumRevisionTurn",
