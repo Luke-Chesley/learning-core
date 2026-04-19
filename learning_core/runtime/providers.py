@@ -47,6 +47,7 @@ _OPENAI_FLEX_UNSTABLE_TASKS = {
     "activity_generate",
     "curriculum_generate",
     "launch_plan_generate",
+    "progression_generate",
     "source_interpret",
     "session_generate",
 }
