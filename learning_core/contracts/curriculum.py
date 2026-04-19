@@ -124,6 +124,87 @@ class CurriculumLaunchPlan(StrictModel):
         return self
 
 
+def normalize_ref_segment(value: str) -> str:
+    normalized = value.strip().lower()
+    normalized = normalized.replace("’", "").replace("'", "")
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
+    normalized = re.sub(r"-{2,}", "-", normalized)
+    return normalized.strip("-")
+
+
+def normalize_skill_ref(skill_ref: str) -> str:
+    prefix = "skill:"
+    body = skill_ref[len(prefix) :] if skill_ref.startswith(prefix) else skill_ref
+    normalized_parts = [
+        normalize_ref_segment(part)
+        for part in body.split("/")
+        if normalize_ref_segment(part)
+    ]
+    return prefix + "/".join(normalized_parts)
+
+
+def iter_document_skill_entries(
+    node: dict[str, Any],
+    path: list[str] | None = None,
+) -> list[tuple[str, list[str], str]]:
+    entries: list[tuple[str, list[str], str]] = []
+    current_path = path or []
+    for title, value in node.items():
+        next_path = [*current_path, title]
+        if isinstance(value, str):
+            canonical_ref = "skill:" + "/".join(
+                normalize_ref_segment(segment) for segment in next_path
+            )
+            entries.append((canonical_ref, next_path, title))
+            continue
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, str):
+                    item_path = [*next_path, item]
+                    canonical_ref = "skill:" + "/".join(
+                        normalize_ref_segment(segment) for segment in item_path
+                    )
+                    entries.append((canonical_ref, item_path, item))
+            continue
+        if isinstance(value, dict):
+            entries.extend(iter_document_skill_entries(value, next_path))
+    return entries
+
+
+def build_document_skill_ref_aliases(document: dict[str, Any]) -> tuple[dict[str, str], set[str]]:
+    aliases: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    leaf_aliases: dict[str, str] = {}
+    ambiguous_leaf_aliases: set[str] = set()
+    for canonical_ref, path, title in iter_document_skill_entries(document):
+        normalized_ref = normalize_skill_ref(canonical_ref)
+        existing = aliases.get(normalized_ref)
+        if existing and existing != canonical_ref:
+            ambiguous.add(normalized_ref)
+            aliases.pop(normalized_ref, None)
+        elif normalized_ref not in ambiguous:
+            aliases[normalized_ref] = canonical_ref
+        leaf_alias = normalize_ref_segment(title or path[-1])
+        existing_leaf = leaf_aliases.get(leaf_alias)
+        if existing_leaf and existing_leaf != canonical_ref:
+            ambiguous_leaf_aliases.add(leaf_alias)
+            leaf_aliases.pop(leaf_alias, None)
+        elif leaf_alias not in ambiguous_leaf_aliases:
+            leaf_aliases[leaf_alias] = canonical_ref
+    for leaf_alias, canonical_ref in leaf_aliases.items():
+        if leaf_alias not in ambiguous_leaf_aliases and leaf_alias not in aliases:
+            aliases[leaf_alias] = canonical_ref
+    return aliases, ambiguous
+
+
+def resolve_document_skill_ref(document: dict[str, Any], skill_ref: str) -> str | None:
+    aliases, ambiguous = build_document_skill_ref_aliases(document)
+    normalized_ref = normalize_skill_ref(skill_ref)
+    if normalized_ref in ambiguous:
+        return None
+    return aliases.get(normalized_ref)
+
+
 class CurriculumArtifact(StrictModel):
     source: CurriculumDraftSummary
     intakeSummary: str
@@ -140,54 +221,26 @@ class CurriculumArtifact(StrictModel):
             raise ValueError("CurriculumArtifact requires unique unitRef values.")
 
         lesson_refs: set[str] = set()
-        skill_refs: set[str] = set()
-        normalized_skill_refs: set[str] = set()
+        document_skill_aliases, ambiguous_skill_refs = build_document_skill_ref_aliases(self.document)
 
-        def normalize_ref_segment(value: str) -> str:
-            normalized = value.strip().lower()
-            normalized = normalized.replace("’", "").replace("'", "")
-            normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
-            normalized = re.sub(r"-{2,}", "-", normalized)
-            return normalized.strip("-")
-
-        def normalize_skill_ref(skill_ref: str) -> str:
-            prefix = "skill:"
-            body = skill_ref[len(prefix) :] if skill_ref.startswith(prefix) else skill_ref
-            normalized_parts = [
-                normalize_ref_segment(part)
-                for part in body.split("/")
-                if normalize_ref_segment(part)
-            ]
-            return prefix + "/".join(normalized_parts)
-
-        def collect_skill_refs(node: dict[str, Any], path: list[str] | None = None) -> None:
-            current_path = path or []
-            for title, value in node.items():
-                next_path = [*current_path, title]
-                if isinstance(value, str):
-                    skill_ref = "skill:" + "/".join(
-                        segment.strip().lower().replace(" ", "-") for segment in next_path
-                    )
-                    skill_refs.add(skill_ref)
-                    normalized_skill_refs.add(normalize_skill_ref(skill_ref))
+        def canonicalize_skill_refs(skill_refs: list[str]) -> tuple[list[str], list[str]]:
+            canonicalized: list[str] = []
+            missing: list[str] = []
+            seen: set[str] = set()
+            for skill_ref in skill_refs:
+                normalized_ref = normalize_skill_ref(skill_ref)
+                leaf_ref = normalize_ref_segment(skill_ref.split("/")[-1] if "/" in skill_ref else skill_ref)
+                if normalized_ref in ambiguous_skill_refs or leaf_ref in ambiguous_skill_refs:
+                    missing.append(skill_ref)
                     continue
-                if isinstance(value, list):
-                    for item in value:
-                        if isinstance(item, str):
-                            skill_ref = (
-                                "skill:"
-                                + "/".join(
-                                    segment.strip().lower().replace(" ", "-")
-                                    for segment in [*next_path, item]
-                                )
-                            )
-                            skill_refs.add(skill_ref)
-                            normalized_skill_refs.add(normalize_skill_ref(skill_ref))
+                canonical_ref = document_skill_aliases.get(normalized_ref) or document_skill_aliases.get(leaf_ref)
+                if not canonical_ref:
+                    missing.append(skill_ref)
                     continue
-                if isinstance(value, dict):
-                    collect_skill_refs(value, next_path)
-
-        collect_skill_refs(self.document)
+                if canonical_ref not in seen:
+                    canonicalized.append(canonical_ref)
+                    seen.add(canonical_ref)
+            return canonicalized, missing
 
         for unit in self.units:
             for lesson in unit.lessons:
@@ -198,11 +251,8 @@ class CurriculumArtifact(StrictModel):
                 if lesson.lessonRef in lesson_refs:
                     raise ValueError("CurriculumArtifact requires unique lessonRef values.")
                 lesson_refs.add(lesson.lessonRef)
-                missing_skill_refs = [
-                    skill_ref
-                    for skill_ref in lesson.linkedSkillRefs
-                    if normalize_skill_ref(skill_ref) not in normalized_skill_refs
-                ]
+                canonical_linked_refs, missing_skill_refs = canonicalize_skill_refs(lesson.linkedSkillRefs)
+                lesson.linkedSkillRefs = canonical_linked_refs
                 if missing_skill_refs:
                     raise ValueError(
                         "CurriculumArtifact lesson contains unresolved linkedSkillRefs: "
@@ -220,11 +270,10 @@ class CurriculumArtifact(StrictModel):
                 + ", ".join(sorted(missing_opening_lessons))
             )
 
-        missing_opening_skills = [
-            skill_ref
-            for skill_ref in self.launchPlan.openingSkillRefs
-            if normalize_skill_ref(skill_ref) not in normalized_skill_refs
-        ]
+        canonical_opening_skill_refs, missing_opening_skills = canonicalize_skill_refs(
+            self.launchPlan.openingSkillRefs
+        )
+        self.launchPlan.openingSkillRefs = canonical_opening_skill_refs
         if missing_opening_skills:
             raise ValueError(
                 "CurriculumArtifact launchPlan contains unresolved openingSkillRefs: "

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from learning_core.contracts.curriculum import CurriculumGenerationRequest
+from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumGenerationRequest
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
 from learning_core.runtime.context import RuntimeContext
 from learning_core.skills.curriculum_generate.scripts.main import CurriculumGenerateSkill
@@ -181,3 +181,64 @@ def test_curriculum_generate_rejects_route_fields_in_conversation_mode():
                 "messages": [{"role": "user", "content": "Teach fractions."}],
             }
         )
+
+
+def test_curriculum_artifact_canonicalizes_resolvable_skill_refs():
+    artifact = CurriculumArtifact.model_validate(
+        {
+            "source": {
+                "title": "Kitchen Skills",
+                "description": "Desc",
+                "summary": "Summary",
+                "teachingApproach": "Approach",
+            },
+            "intakeSummary": "Summary",
+            "pacing": {
+                "coverageStrategy": "Strategy",
+            },
+            "document": {
+                "Montessori Kitchen Independence": {
+                    "Kitchen Skills": {
+                        "Preparation and heat skills": [
+                            "Measure dry ingredients accurately",
+                        ],
+                    },
+                },
+            },
+            "units": [
+                {
+                    "unitRef": "unit:1:intro",
+                    "title": "Intro",
+                    "description": "Desc",
+                    "lessons": [
+                        {
+                            "unitRef": "unit:1:intro",
+                            "lessonRef": "unit:1:intro/lesson:1:measure",
+                            "lessonType": "skill_support",
+                            "title": "Measure",
+                            "description": "Desc",
+                            "linkedSkillRefs": [
+                                "skill:montessori-kitchen-independence/kitchen-skills/strength-and-precision-skills/measure-dry-ingredients-accurately",
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "launchPlan": {
+                "recommendedHorizon": "two_weeks",
+                "openingLessonRefs": ["unit:1:intro/lesson:1:measure"],
+                "openingSkillRefs": [
+                    "skill:montessori-kitchen-independence/kitchen-skills/strength-and-precision-skills/measure-dry-ingredients-accurately",
+                ],
+                "scopeSummary": "Scope",
+                "initialSliceUsed": True,
+            },
+        }
+    )
+
+    canonical_ref = (
+        "skill:montessori-kitchen-independence/kitchen-skills/"
+        "preparation-and-heat-skills/measure-dry-ingredients-accurately"
+    )
+    assert artifact.units[0].lessons[0].linkedSkillRefs == [canonical_ref]
+    assert artifact.launchPlan.openingSkillRefs == [canonical_ref]
