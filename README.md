@@ -116,6 +116,10 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    curriculum_update_propose/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_revise/
       SKILL.md
       scripts/
@@ -182,7 +186,6 @@ Current first-class operations:
 - `progression_generate`
 - `progression_revise`
 - `session_evaluate`
-- `launch_plan_generate`
 
 ## Design Rules
 
