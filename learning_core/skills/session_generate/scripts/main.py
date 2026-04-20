@@ -93,7 +93,7 @@ class SessionGenerateSkill(StructuredOutputSkill):
     output_model = SessionPlanArtifact
     policy = ExecutionPolicy(
         skill_name="session_generate",
-        skill_version="2026-04-09",
+        skill_version="2026-04-20",
         max_tokens=8000,
     )
 
@@ -161,6 +161,13 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 f"- Keep the lesson genuinely teachable within about {total_minutes} minutes.",
                 "- Do not inflate a bounded request into a generic 45-minute lesson unless the source clearly requires it.",
                 "- Prefer fewer, clearer blocks over filler transitions or repeated review.",
+                "",
+                "Teacher guidance rules:",
+                "- Assume the adult may be capable but not topic-expert unless the request clearly says otherwise.",
+                "- teacher_action must be concrete enough that a non-expert adult could run the block without outside prep.",
+                "- When a block depends on specialized vocabulary or a domain-specific move, briefly define or model it inside teacher_action on first use.",
+                "- learner_action should describe what the learner actually says, points to, writes, builds, or practices.",
+                "- check_for should tell the adult what to hear, see, or collect as evidence.",
             ]
         )
 

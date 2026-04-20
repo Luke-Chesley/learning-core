@@ -48,6 +48,10 @@ Rules:
 - Include at least one visible check: a check_for_understanding or reflection block, or a check_for field on any block.
 - Do not follow a rigid pedagogical script. Choose only the blocks that fit this lesson.
 - Keep all text short and operational. No paragraphs. No narrative. No filler.
+- Assume the adult may be capable but not topic-expert unless the request clearly says otherwise.
+- `teacher_action` must be runnable by a non-expert adult: define unfamiliar terms on first use and include a concrete example cue when the teacher would otherwise need outside knowledge.
+- `learner_action` should describe observable learner behavior, not abstract outcomes.
+- `check_for` should tell the adult exactly what to hear, see, or collect as evidence.
 - Align blocks to the provided route items and objectives without forcing route order as a script.
 - If total time is tight, mark lower-priority blocks as optional:true.
 - Adaptations are short, actionable, and ready to use during live teaching.
