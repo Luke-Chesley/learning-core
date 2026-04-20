@@ -239,6 +239,41 @@ def test_source_interpret_builds_openai_file_message_blocks():
     }
 
 
+def test_source_interpret_builds_openai_image_message_blocks():
+    payload_data = _envelope()["input"]
+    payload_data["inputModalities"] = ["image"]
+    payload_data["sourceFiles"] = [
+        {
+            "assetId": "asset-1",
+            "packageId": "ipkg-1",
+            "title": "Week 1 upload",
+            "modality": "image",
+            "fileName": "week-1.png",
+            "mimeType": "image/png",
+            "fileData": "data:image/png;base64,ZmFrZS1pbWFnZQ==",
+        }
+    ]
+    payload = SourceInterpretationRequest.model_validate(payload_data)
+
+    content = SourceInterpretSkill().build_user_message_content(
+        payload,
+        RuntimeContext.create(
+            operation_name="source_interpret",
+            app_context=AppContext(product="homeschool-v2", surface="onboarding"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+        provider="openai",
+    )
+
+    assert isinstance(content, list)
+    assert content[0]["type"] == "text"
+    assert content[1] == {
+        "type": "input_image",
+        "image_url": "data:image/png;base64,ZmFrZS1pbWFnZQ==",
+    }
+
+
 def test_source_interpret_execute_rejects_invalid_source_kind(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     monkeypatch.setattr(
