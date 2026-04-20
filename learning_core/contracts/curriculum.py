@@ -93,6 +93,13 @@ class CurriculumUnit(StrictModel):
 
 def normalize_ref_segment(value: str) -> str:
     normalized = value.strip().lower()
+    normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
+    normalized = re.sub(r"-{2,}", "-", normalized)
+    return normalized.strip("-")
+
+
+def normalize_ref_segment_without_apostrophes(value: str) -> str:
+    normalized = value.strip().lower()
     normalized = normalized.replace("’", "").replace("'", "")
     normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
     normalized = re.sub(r"-{2,}", "-", normalized)
@@ -143,21 +150,38 @@ def build_document_skill_ref_aliases(document: dict[str, Any]) -> tuple[dict[str
     ambiguous: set[str] = set()
     leaf_aliases: dict[str, str] = {}
     ambiguous_leaf_aliases: set[str] = set()
+
+    def register_alias(alias: str, canonical_ref: str) -> None:
+        existing = aliases.get(alias)
+        if existing and existing != canonical_ref:
+            ambiguous.add(alias)
+            aliases.pop(alias, None)
+        elif alias not in ambiguous:
+            aliases[alias] = canonical_ref
+
+    def register_leaf_alias(alias: str, canonical_ref: str) -> None:
+        existing_leaf = leaf_aliases.get(alias)
+        if existing_leaf and existing_leaf != canonical_ref:
+            ambiguous_leaf_aliases.add(alias)
+            leaf_aliases.pop(alias, None)
+        elif alias not in ambiguous_leaf_aliases:
+            leaf_aliases[alias] = canonical_ref
+
     for canonical_ref, path, title in iter_document_skill_entries(document):
         normalized_ref = normalize_skill_ref(canonical_ref)
-        existing = aliases.get(normalized_ref)
-        if existing and existing != canonical_ref:
-            ambiguous.add(normalized_ref)
-            aliases.pop(normalized_ref, None)
-        elif normalized_ref not in ambiguous:
-            aliases[normalized_ref] = canonical_ref
+        register_alias(normalized_ref, canonical_ref)
+
+        apostrophe_collapsed_alias = "skill:" + "/".join(
+            normalize_ref_segment_without_apostrophes(segment) for segment in path
+        )
+        register_alias(apostrophe_collapsed_alias, canonical_ref)
+
         leaf_alias = normalize_ref_segment(title or path[-1])
-        existing_leaf = leaf_aliases.get(leaf_alias)
-        if existing_leaf and existing_leaf != canonical_ref:
-            ambiguous_leaf_aliases.add(leaf_alias)
-            leaf_aliases.pop(leaf_alias, None)
-        elif leaf_alias not in ambiguous_leaf_aliases:
-            leaf_aliases[leaf_alias] = canonical_ref
+        register_leaf_alias(leaf_alias, canonical_ref)
+
+        apostrophe_collapsed_leaf_alias = normalize_ref_segment_without_apostrophes(title or path[-1])
+        register_leaf_alias(apostrophe_collapsed_leaf_alias, canonical_ref)
+
     for leaf_alias, canonical_ref in leaf_aliases.items():
         if leaf_alias not in ambiguous_leaf_aliases and leaf_alias not in aliases:
             aliases[leaf_alias] = canonical_ref

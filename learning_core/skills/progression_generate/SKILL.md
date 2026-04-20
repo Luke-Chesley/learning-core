@@ -20,6 +20,8 @@ Produce a progression that moves from supported acquisition toward integrated an
 
 Interpretation defaults:
 - Treat skillRefs as the only graph nodes.
+- The only acceptable skillRef strings in the output are exact verbatim copies of the provided skillRef values from the authoritative skill catalog.
+- Never reconstruct, normalize, shorten, prepend, append, or rewrite a skillRef from domain titles, strand titles, goal-group titles, unit metadata, or skill titles.
 - Treat unit anchors as authored sequencing evidence and cohesion boundaries, not replacement nodes.
 - Treat source-authored order as a strong prior. Deviate only when a true prerequisite, safety concern, access-gating dependency, or clearly task-first/authentic-performance need justifies it.
 - If learnerPriorKnowledge is unknown, bias toward novice-safe sequencing early and greater independence later.
@@ -60,6 +62,7 @@ Phase rules:
 - Do not omit any skillRef.
 - Do not repeat any skillRef across phases.
 - Use only skillRefs from the provided skill catalog.
+- For every phases[].skillRefs entry and every edges[].fromSkillRef / edges[].toSkillRef value, copy the exact provided skillRef string verbatim. Any reconstructed or partially rewritten skillRef is invalid.
 - Every phase must have a clear instructional purpose.
 - Always include a non-empty phase description that explains the phase's purpose, grouping logic, and how learner support changes in that phase.
 

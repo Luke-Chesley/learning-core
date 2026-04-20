@@ -26,14 +26,15 @@ class ProgressionGenerateSkill(StructuredOutputSkill):
     output_model = ProgressionArtifact
     policy = ExecutionPolicy(
         skill_name="progression_generate",
-        skill_version="2026-04-19.1",
+        skill_version="2026-04-19.2",
         max_tokens=8000,
     )
 
     def build_user_prompt(self, payload: ProgressionGenerationRequest, context) -> str:
         skill_list = "\n".join(
             [
-                f'{index + 1}. skillRef: "{item.skillRef}"\n'
+                f'{index + 1}. EXACT skillRef: "{item.skillRef}"\n'
+                f"   outputRule: copy this exact skillRef string verbatim anywhere it appears in phases or edges\n"
                 f'   title: "{item.title}"\n'
                 f"   ordinal: {_format_optional(item.ordinal)}"
                 + (f'\n   domain: "{item.domainTitle}"' if item.domainTitle else "")
@@ -98,6 +99,12 @@ class ProgressionGenerateSkill(StructuredOutputSkill):
             f"Authoritative skill catalog ({len(payload.skillCatalog)} skills):",
             skill_list or "No skills provided.",
             "",
+            "Exact output construction rule for skillRefs:",
+            "- The only acceptable skillRef strings in the output are the exact strings printed above after \"EXACT skillRef:\".",
+            "- When a phase or edge needs a skillRef, copy that exact string verbatim from the authoritative skill catalog.",
+            "- Do not reconstruct, normalize, shorten, prepend, append, or rewrite a skillRef from domain, strand, goalGroup, title, unit metadata, or any other label.",
+            "- Never combine path segments from metadata to build a new skillRef.",
+            "",
             f"Ordered unit anchors ({len(payload.unitAnchors)} units):",
             unit_anchor_list or "No unit anchors provided.",
             "",
@@ -115,6 +122,7 @@ class ProgressionGenerateSkill(StructuredOutputSkill):
             "- Skills remain the graph nodes.",
             "- Use unit anchors as authored sequencing evidence and cohesion boundaries, not as replacement nodes.",
             "- Use the output schema exactly.",
+            "- For every phases[].skillRefs entry and every edges[].fromSkillRef / edges[].toSkillRef value, the only acceptable output is an exact verbatim copy of a provided skillRef.",
         ]
         append_user_authored_context(lines, context)
         lines.extend(["", "Generate the progression graph."])

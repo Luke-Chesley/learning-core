@@ -114,3 +114,13 @@ def test_progression_prompt_includes_instructional_roles_and_flags():
     assert "requiresAdultSupport: yes" in prompt
     assert "safetyCritical: yes" in prompt
     assert "isAuthenticApplication: yes" in prompt
+
+
+def test_progression_prompt_requires_verbatim_skill_ref_copying():
+    prompt = ProgressionGenerateSkill().build_user_prompt(_payload(), _context())
+
+    assert 'EXACT skillRef: "skill:kitchen/foundations/knife-safety"' in prompt
+    assert "copy this exact skillRef string verbatim anywhere it appears in phases or edges" in prompt
+    assert "The only acceptable skillRef strings in the output are the exact strings printed above after \"EXACT skillRef:\"" in prompt
+    assert "Do not reconstruct, normalize, shorten, prepend, append, or rewrite a skillRef" in prompt
+    assert "the only acceptable output is an exact verbatim copy of a provided skillRef" in prompt

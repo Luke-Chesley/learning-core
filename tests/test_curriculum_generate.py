@@ -223,3 +223,48 @@ def test_curriculum_artifact_canonicalizes_resolvable_skill_refs():
         "preparation-and-heat-skills/measure-dry-ingredients-accurately"
     )
     assert artifact.units[0].skillRefs == [canonical_ref]
+
+
+def test_curriculum_artifact_resolves_possessive_skill_refs_with_shared_slug_rules():
+    artifact = CurriculumArtifact.model_validate(
+        {
+            "source": {
+                "title": "Montessori Cooking Foundations",
+                "description": "Desc",
+                "summary": "Summary",
+                "teachingApproach": "Approach",
+            },
+            "intakeSummary": "Summary",
+            "pacing": {
+                "coverageStrategy": "Strategy",
+            },
+            "document": {
+                "Montessori Cooking Foundations": {
+                    "How to Use the Book": [
+                        "Interpret the book’s pictorial, step-by-step format for nonreaders and beginning readers",
+                    ],
+                },
+                "Kitchen Preparation": {
+                    "Work Area and Safety": [
+                        "Set up a child’s work area",
+                    ],
+                },
+            },
+            "units": [
+                {
+                    "unitRef": "unit:1:intro",
+                    "title": "Intro",
+                    "description": "Desc",
+                    "skillRefs": [
+                        "skill:montessori-cooking-foundations/how-to-use-the-book/interpret-the-book-s-pictorial-step-by-step-format-for-nonreaders-and-beginning-readers",
+                        "skill:kitchen-preparation/work-area-and-safety/set-up-a-childs-work-area",
+                    ],
+                },
+            ],
+        }
+    )
+
+    assert artifact.units[0].skillRefs == [
+        "skill:montessori-cooking-foundations/how-to-use-the-book/interpret-the-book-s-pictorial-step-by-step-format-for-nonreaders-and-beginning-readers",
+        "skill:kitchen-preparation/work-area-and-safety/set-up-a-child-s-work-area",
+    ]
