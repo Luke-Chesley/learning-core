@@ -1,0 +1,1062 @@
+{
+  "version": 1,
+  "supportedCopilotActionKinds": [
+    "planning.adjust_day_load",
+    "planning.defer_or_move_item",
+    "planning.generate_today_lesson",
+    "tracking.record_note",
+    "tracking.apply_recommendation_decision",
+    "curriculum.map_or_remap_standards",
+    "curriculum.regenerate_section"
+  ],
+  "cases": [
+    {
+      "id": "worksheet_photo_fractions",
+      "label": "Worksheet photo / screenshot",
+      "sourceClass": "worksheet_photo",
+      "sourceInterpretInput": {
+        "learnerName": "Ava",
+        "requestedRoute": "single_lesson",
+        "inputModalities": ["photo"],
+        "rawText": "Photo of one worksheet page about equivalent fractions.",
+        "extractedText": "Equivalent fractions worksheet. Shade the matching models. Complete 1/2 = __/4 and 3/6 = __/2.",
+        "assetRefs": ["asset-worksheet-1"],
+        "sourcePackages": [
+          {
+            "id": "pkg-worksheet-1",
+            "title": "Equivalent fractions worksheet",
+            "modality": "photo",
+            "summary": "One worksheet page with fraction models and number sentences.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-worksheet-1"],
+            "detectedChunks": ["Fraction models", "Number sentences"],
+            "sourceFingerprint": "fp-worksheet-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-worksheet-1",
+            "packageId": "pkg-worksheet-1",
+            "title": "Equivalent fractions worksheet",
+            "modality": "photo",
+            "fileName": "fractions-worksheet.jpg",
+            "mimeType": "image/jpeg",
+            "fileUrl": "https://example.com/fractions-worksheet.jpg"
+          }
+        ],
+        "titleCandidate": "Equivalent fractions worksheet"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "bounded_material",
+        "entryStrategy": "use_as_is",
+        "entryLabel": null,
+        "continuationMode": "none",
+        "deliveryPattern": "skill_first",
+        "suggestedTitle": "Equivalent fractions worksheet",
+        "confidence": "high",
+        "recommendedHorizon": "single_day",
+        "assumptions": ["Treat the worksheet as a bounded one-day lesson."],
+        "detectedChunks": ["Fraction models", "Number sentences"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Ava",
+        "titleCandidate": "Equivalent fractions worksheet",
+        "requestMode": "source_entry",
+        "requestedRoute": "single_lesson",
+        "routedRoute": "single_lesson",
+        "sourceKind": "bounded_material",
+        "entryStrategy": "use_as_is",
+        "entryLabel": null,
+        "continuationMode": "none",
+        "deliveryPattern": "skill_first",
+        "recommendedHorizon": "single_day",
+        "sourceText": "Equivalent fractions worksheet. Shade the matching models. Complete 1/2 = __/4 and 3/6 = __/2.",
+        "sourcePackages": [
+          {
+            "id": "pkg-worksheet-1",
+            "title": "Equivalent fractions worksheet",
+            "modality": "photo",
+            "summary": "One worksheet page with fraction models and number sentences.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-worksheet-1"],
+            "detectedChunks": ["Fraction models", "Number sentences"],
+            "sourceFingerprint": "fp-worksheet-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-worksheet-1",
+            "packageId": "pkg-worksheet-1",
+            "title": "Equivalent fractions worksheet",
+            "modality": "photo",
+            "fileName": "fractions-worksheet.jpg",
+            "mimeType": "image/jpeg",
+            "fileUrl": "https://example.com/fractions-worksheet.jpg"
+          }
+        ],
+        "detectedChunks": ["Fraction models", "Number sentences"],
+        "assumptions": ["Treat the worksheet as a bounded one-day lesson."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "bounded",
+        "minUnits": 1,
+        "maxUnits": 1,
+        "minTotalWeeks": 1,
+        "maxTotalWeeks": 1,
+        "requiredKeywords": ["fraction", "equivalent", "worksheet"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "single_day",
+        "initialSliceUsed": false,
+        "openingLessonCountMin": 1,
+        "openingLessonCountMax": 1,
+        "scopeSummaryKeywords": ["worksheet", "fractions"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 30,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["fraction", "equivalent"],
+        "allowOfflineActivity": false
+      },
+      "copilotRubric": {
+        "prompt": "Can you lighten tomorrow if Ava still misses these fraction matches and save a short note for me?",
+        "allowedActionKinds": ["planning.adjust_day_load", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "chapter_excerpt_ecosystems",
+      "label": "Chapter excerpt",
+      "sourceClass": "chapter_excerpt",
+      "sourceInterpretInput": {
+        "learnerName": "Noah",
+        "requestedRoute": "outline",
+        "inputModalities": ["pdf"],
+        "rawText": "Pages 14-20 from a science reader about forest ecosystems.",
+        "extractedText": "Chapter 3 excerpt: Forest ecosystems. Producers and consumers. Energy flow. Food webs. Decomposers recycle matter.",
+        "assetRefs": ["asset-ecosystems-1"],
+        "sourcePackages": [
+          {
+            "id": "pkg-ecosystems-1",
+            "title": "Forest ecosystems excerpt",
+            "modality": "pdf",
+            "summary": "Seven-page chapter excerpt from a science reader.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-ecosystems-1"],
+            "detectedChunks": ["Energy flow", "Food webs"],
+            "sourceFingerprint": "fp-ecosystems-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-ecosystems-1",
+            "packageId": "pkg-ecosystems-1",
+            "title": "Forest ecosystems excerpt",
+            "modality": "pdf",
+            "fileName": "forest-ecosystems-excerpt.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/forest-ecosystems-excerpt.pdf"
+          }
+        ],
+        "titleCandidate": "Forest ecosystems excerpt"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "structured_sequence",
+        "entryStrategy": "sequential_start",
+        "entryLabel": "chapter 3 excerpt",
+        "continuationMode": "sequential",
+        "deliveryPattern": "concept_first",
+        "suggestedTitle": "Forest ecosystems excerpt",
+        "confidence": "high",
+        "recommendedHorizon": "few_days",
+        "assumptions": ["Treat the excerpt as the opening slice and keep continuation sequential."],
+        "detectedChunks": ["Energy flow", "Food webs"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Noah",
+        "titleCandidate": "Forest ecosystems excerpt",
+        "requestMode": "source_entry",
+        "requestedRoute": "outline",
+        "routedRoute": "outline",
+        "sourceKind": "structured_sequence",
+        "entryStrategy": "sequential_start",
+        "entryLabel": "chapter 3 excerpt",
+        "continuationMode": "sequential",
+        "deliveryPattern": "concept_first",
+        "recommendedHorizon": "few_days",
+        "sourceText": "Chapter 3 excerpt: Forest ecosystems. Producers and consumers. Energy flow. Food webs. Decomposers recycle matter.",
+        "sourcePackages": [
+          {
+            "id": "pkg-ecosystems-1",
+            "title": "Forest ecosystems excerpt",
+            "modality": "pdf",
+            "summary": "Seven-page chapter excerpt from a science reader.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-ecosystems-1"],
+            "detectedChunks": ["Energy flow", "Food webs"],
+            "sourceFingerprint": "fp-ecosystems-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-ecosystems-1",
+            "packageId": "pkg-ecosystems-1",
+            "title": "Forest ecosystems excerpt",
+            "modality": "pdf",
+            "fileName": "forest-ecosystems-excerpt.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/forest-ecosystems-excerpt.pdf"
+          }
+        ],
+        "detectedChunks": ["Energy flow", "Food webs"],
+        "assumptions": ["Treat the excerpt as the opening slice and keep continuation sequential."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "starter_arc",
+        "minUnits": 1,
+        "maxUnits": 2,
+        "minTotalWeeks": 1,
+        "maxTotalWeeks": 2,
+        "requiredKeywords": ["ecosystem", "food web", "energy"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "few_days",
+        "initialSliceUsed": false,
+        "openingLessonCountMin": 2,
+        "openingLessonCountMax": 3,
+        "scopeSummaryKeywords": ["ecosystem", "food web"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 35,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["ecosystem", "food web", "energy"],
+        "allowOfflineActivity": false
+      },
+      "copilotRubric": {
+        "prompt": "Can you help me simplify the opening ecosystems lesson and note one follow-up question for Noah?",
+        "allowedActionKinds": ["planning.generate_today_lesson", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "weekly_plan_multiplication",
+      "label": "Weekly plan",
+      "sourceClass": "weekly_plan",
+      "sourceInterpretInput": {
+        "learnerName": "Mia",
+        "requestedRoute": "weekly_plan",
+        "inputModalities": ["pdf"],
+        "rawText": "Week 1 multiplication assignments from Monday to Friday.",
+        "extractedText": "Week 1 multiplication plan. Monday: skip-count warm-up. Tuesday: 3x and 4x facts. Wednesday: arrays. Thursday: word problems. Friday: quick quiz.",
+        "assetRefs": ["asset-weekly-1"],
+        "sourcePackages": [
+          {
+            "id": "pkg-weekly-1",
+            "title": "Week 1 multiplication plan",
+            "modality": "pdf",
+            "summary": "A one-week assignment grid for multiplication practice.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-weekly-1"],
+            "detectedChunks": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            "sourceFingerprint": "fp-weekly-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-weekly-1",
+            "packageId": "pkg-weekly-1",
+            "title": "Week 1 multiplication plan",
+            "modality": "pdf",
+            "fileName": "week-1-multiplication.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/week-1-multiplication.pdf"
+          }
+        ],
+        "titleCandidate": "Week 1 multiplication"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "timeboxed_plan",
+        "entryStrategy": "timebox_start",
+        "entryLabel": "week 1",
+        "continuationMode": "timebox",
+        "deliveryPattern": "timeboxed",
+        "suggestedTitle": "Week 1 multiplication",
+        "confidence": "high",
+        "recommendedHorizon": "one_week",
+        "assumptions": ["Keep the launch aligned to the supplied week instead of expanding scope."],
+        "detectedChunks": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Mia",
+        "titleCandidate": "Week 1 multiplication",
+        "requestMode": "source_entry",
+        "requestedRoute": "weekly_plan",
+        "routedRoute": "weekly_plan",
+        "sourceKind": "timeboxed_plan",
+        "entryStrategy": "timebox_start",
+        "entryLabel": "week 1",
+        "continuationMode": "timebox",
+        "deliveryPattern": "timeboxed",
+        "recommendedHorizon": "one_week",
+        "sourceText": "Week 1 multiplication plan. Monday: skip-count warm-up. Tuesday: 3x and 4x facts. Wednesday: arrays. Thursday: word problems. Friday: quick quiz.",
+        "sourcePackages": [
+          {
+            "id": "pkg-weekly-1",
+            "title": "Week 1 multiplication plan",
+            "modality": "pdf",
+            "summary": "A one-week assignment grid for multiplication practice.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-weekly-1"],
+            "detectedChunks": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+            "sourceFingerprint": "fp-weekly-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-weekly-1",
+            "packageId": "pkg-weekly-1",
+            "title": "Week 1 multiplication plan",
+            "modality": "pdf",
+            "fileName": "week-1-multiplication.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/week-1-multiplication.pdf"
+          }
+        ],
+        "detectedChunks": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "assumptions": ["Keep the launch aligned to the supplied week instead of expanding scope."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "bounded",
+        "minUnits": 1,
+        "maxUnits": 1,
+        "minTotalWeeks": 1,
+        "maxTotalWeeks": 1,
+        "requiredKeywords": ["multiplication", "week", "array"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "one_week",
+        "initialSliceUsed": true,
+        "openingLessonCountMin": 3,
+        "openingLessonCountMax": 5,
+        "scopeSummaryKeywords": ["week", "multiplication"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 40,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["multiplication", "array", "fact"],
+        "allowOfflineActivity": false
+      },
+      "copilotRubric": {
+        "prompt": "Can you move one multiplication item if Wednesday gets too heavy and keep a note about the change?",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "outline_toc_world_history",
+      "label": "Outline / table of contents",
+      "sourceClass": "outline_toc",
+      "sourceInterpretInput": {
+        "learnerName": "Leah",
+        "requestedRoute": "outline",
+        "inputModalities": ["outline"],
+        "rawText": "Part I Ancient Civilizations. Part II Classical World. Part III Medieval Worlds. Part IV Early Modern.",
+        "extractedText": "Table of contents. Part I Ancient Civilizations. Egypt. Mesopotamia. Greece. Rome. Part II Classical World. Part III Medieval Worlds.",
+        "assetRefs": [],
+        "sourcePackages": [],
+        "sourceFiles": [],
+        "titleCandidate": "World history spine"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "structured_sequence",
+        "entryStrategy": "sequential_start",
+        "entryLabel": "part i",
+        "continuationMode": "sequential",
+        "deliveryPattern": "concept_first",
+        "suggestedTitle": "World history spine",
+        "confidence": "high",
+        "recommendedHorizon": "one_week",
+        "assumptions": ["Treat the table of contents as an ordered sequence and open from the beginning."],
+        "detectedChunks": ["Part I Ancient Civilizations", "Part II Classical World", "Part III Medieval Worlds"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Leah",
+        "titleCandidate": "World history spine",
+        "requestMode": "source_entry",
+        "requestedRoute": "outline",
+        "routedRoute": "outline",
+        "sourceKind": "structured_sequence",
+        "entryStrategy": "sequential_start",
+        "entryLabel": "part i",
+        "continuationMode": "sequential",
+        "deliveryPattern": "concept_first",
+        "recommendedHorizon": "one_week",
+        "sourceText": "Table of contents. Part I Ancient Civilizations. Egypt. Mesopotamia. Greece. Rome. Part II Classical World. Part III Medieval Worlds.",
+        "sourcePackages": [],
+        "sourceFiles": [],
+        "detectedChunks": ["Part I Ancient Civilizations", "Part II Classical World", "Part III Medieval Worlds"],
+        "assumptions": ["Treat the table of contents as an ordered sequence and open from the beginning."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "durable",
+        "minUnits": 3,
+        "maxUnits": 8,
+        "minTotalWeeks": 6,
+        "maxTotalWeeks": 24,
+        "requiredKeywords": ["history", "ancient", "civilization"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "one_week",
+        "initialSliceUsed": true,
+        "openingLessonCountMin": 3,
+        "openingLessonCountMax": 5,
+        "scopeSummaryKeywords": ["part i", "ancient"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 45,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["history", "ancient", "civilization"],
+        "allowOfflineActivity": false
+      },
+      "copilotRubric": {
+        "prompt": "Can you help me keep Leah on track through the first history week without overloading day 1?",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "planning.generate_today_lesson"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "whole_book_algebra_pdf",
+      "label": "Large PDF / whole book",
+      "sourceClass": "whole_book_pdf",
+      "sourceInterpretInput": {
+        "learnerName": "Jordan",
+        "requestedRoute": "outline",
+        "inputModalities": ["pdf"],
+        "rawText": "Full algebra workbook PDF.",
+        "extractedText": "Algebra workbook. Chapter 1 variables and expressions. Chapter 2 one-step equations. Chapter 3 graphs and patterns. Chapter 4 inequalities.",
+        "assetRefs": ["asset-algebra-1"],
+        "sourcePackages": [
+          {
+            "id": "pkg-algebra-1",
+            "title": "Algebra workbook",
+            "modality": "pdf",
+            "summary": "A full algebra workbook with multiple chapters.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-algebra-1"],
+            "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"],
+            "sourceFingerprint": "fp-algebra-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-algebra-1",
+            "packageId": "pkg-algebra-1",
+            "title": "Algebra workbook",
+            "modality": "pdf",
+            "fileName": "algebra-workbook.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/algebra-workbook.pdf"
+          }
+        ],
+        "titleCandidate": "Algebra workbook"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "section_start",
+        "entryLabel": "chapter 1",
+        "continuationMode": "sequential",
+        "deliveryPattern": "skill_first",
+        "suggestedTitle": "Algebra workbook",
+        "confidence": "high",
+        "recommendedHorizon": "one_week",
+        "assumptions": ["Keep the full book durable, but launch from chapter 1 instead of trying to cover everything at once."],
+        "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Jordan",
+        "titleCandidate": "Algebra workbook",
+        "requestMode": "source_entry",
+        "requestedRoute": "outline",
+        "routedRoute": "outline",
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "section_start",
+        "entryLabel": "chapter 1",
+        "continuationMode": "sequential",
+        "deliveryPattern": "skill_first",
+        "recommendedHorizon": "one_week",
+        "sourceText": "Algebra workbook. Chapter 1 variables and expressions. Chapter 2 one-step equations. Chapter 3 graphs and patterns. Chapter 4 inequalities.",
+        "sourcePackages": [
+          {
+            "id": "pkg-algebra-1",
+            "title": "Algebra workbook",
+            "modality": "pdf",
+            "summary": "A full algebra workbook with multiple chapters.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-algebra-1"],
+            "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"],
+            "sourceFingerprint": "fp-algebra-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-algebra-1",
+            "packageId": "pkg-algebra-1",
+            "title": "Algebra workbook",
+            "modality": "pdf",
+            "fileName": "algebra-workbook.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/algebra-workbook.pdf"
+          }
+        ],
+        "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3", "Chapter 4"],
+        "assumptions": ["Keep the full book durable, but launch from chapter 1 instead of trying to cover everything at once."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "durable",
+        "minUnits": 4,
+        "maxUnits": 12,
+        "minTotalWeeks": 8,
+        "maxTotalWeeks": 36,
+        "requiredKeywords": ["algebra", "equation", "variable"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "one_week",
+        "initialSliceUsed": true,
+        "openingLessonCountMin": 3,
+        "openingLessonCountMax": 5,
+        "scopeSummaryKeywords": ["chapter 1", "algebra"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 45,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["algebra", "equation", "variable"],
+        "allowOfflineActivity": false
+      },
+      "copilotRubric": {
+        "prompt": "Can you keep Jordan moving through chapter 1 and only suggest a real change if the day is overloaded?",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.generate_today_lesson", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "topic_seed_local_birds",
+      "label": "Topic seed",
+      "sourceClass": "topic_seed",
+      "sourceInterpretInput": {
+        "learnerName": "Ivy",
+        "requestedRoute": "topic",
+        "inputModalities": ["text"],
+        "rawText": "Teach my 8-year-old about local birds and how to keep a nature journal.",
+        "extractedText": "Teach my 8-year-old about local birds and how to keep a nature journal.",
+        "assetRefs": [],
+        "sourcePackages": [],
+        "sourceFiles": [],
+        "titleCandidate": "Local birds nature study"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "topic_seed",
+        "entryStrategy": "scaffold_only",
+        "entryLabel": null,
+        "continuationMode": "manual_review",
+        "deliveryPattern": "concept_first",
+        "suggestedTitle": "Local birds nature study",
+        "confidence": "high",
+        "recommendedHorizon": "starter_module",
+        "assumptions": ["Treat the request as a topic seed and build a starter module instead of pretending there is a full source document."],
+        "detectedChunks": ["Local birds", "Nature journal"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Ivy",
+        "titleCandidate": "Local birds nature study",
+        "requestMode": "source_entry",
+        "requestedRoute": "topic",
+        "routedRoute": "topic",
+        "sourceKind": "topic_seed",
+        "entryStrategy": "scaffold_only",
+        "entryLabel": null,
+        "continuationMode": "manual_review",
+        "deliveryPattern": "concept_first",
+        "recommendedHorizon": "starter_module",
+        "sourceText": "Teach my 8-year-old about local birds and how to keep a nature journal.",
+        "sourcePackages": [],
+        "sourceFiles": [],
+        "detectedChunks": ["Local birds", "Nature journal"],
+        "assumptions": ["Treat the request as a topic seed and build a starter module instead of pretending there is a full source document."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "starter_arc",
+        "minUnits": 2,
+        "maxUnits": 4,
+        "minTotalWeeks": 3,
+        "maxTotalWeeks": 8,
+        "requiredKeywords": ["bird", "nature", "journal"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "starter_module",
+        "initialSliceUsed": false,
+        "openingLessonCountMin": 3,
+        "openingLessonCountMax": 4,
+        "scopeSummaryKeywords": ["bird", "journal"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 35,
+        "maxActivityMinutes": 25,
+        "requiredKeywords": ["bird", "journal", "observation"],
+        "allowOfflineActivity": true
+      },
+      "copilotRubric": {
+        "prompt": "If Ivy loses momentum, can you suggest one practical next step and optionally save a parent note?",
+        "allowedActionKinds": ["planning.generate_today_lesson", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "shell_request_chemistry_launch",
+      "label": "Shell-like request",
+      "sourceClass": "shell_like_request",
+      "sourceInterpretInput": {
+        "learnerName": "Eli",
+        "requestedRoute": "manual_shell",
+        "inputModalities": ["text"],
+        "rawText": "Give me a first week for high school chemistry that covers lab safety, setup, and measurement before we buy a full program.",
+        "extractedText": "Give me a first week for high school chemistry that covers lab safety, setup, and measurement before we buy a full program.",
+        "assetRefs": [],
+        "sourcePackages": [],
+        "sourceFiles": [],
+        "titleCandidate": "Chemistry launch week"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "shell_request",
+        "entryStrategy": "scaffold_only",
+        "entryLabel": null,
+        "continuationMode": "manual_review",
+        "deliveryPattern": "mixed",
+        "suggestedTitle": "Chemistry launch week",
+        "confidence": "high",
+        "recommendedHorizon": "few_days",
+        "assumptions": ["Treat the request as a planning shell and stay inside a bounded launch week."],
+        "detectedChunks": ["Lab safety", "Setup", "Measurement"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Eli",
+        "titleCandidate": "Chemistry launch week",
+        "requestMode": "source_entry",
+        "requestedRoute": "manual_shell",
+        "routedRoute": "manual_shell",
+        "sourceKind": "shell_request",
+        "entryStrategy": "scaffold_only",
+        "entryLabel": null,
+        "continuationMode": "manual_review",
+        "deliveryPattern": "mixed",
+        "recommendedHorizon": "few_days",
+        "sourceText": "Give me a first week for high school chemistry that covers lab safety, setup, and measurement before we buy a full program.",
+        "sourcePackages": [],
+        "sourceFiles": [],
+        "detectedChunks": ["Lab safety", "Setup", "Measurement"],
+        "assumptions": ["Treat the request as a planning shell and stay inside a bounded launch week."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "starter_arc",
+        "minUnits": 1,
+        "maxUnits": 2,
+        "minTotalWeeks": 1,
+        "maxTotalWeeks": 2,
+        "requiredKeywords": ["chemistry", "safety", "measurement"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "few_days",
+        "initialSliceUsed": false,
+        "openingLessonCountMin": 2,
+        "openingLessonCountMax": 3,
+        "scopeSummaryKeywords": ["chemistry", "safety", "measurement"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 45,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["chemistry", "safety", "measurement"],
+        "allowOfflineActivity": true
+      },
+      "copilotRubric": {
+        "prompt": "If chemistry day 1 feels too big, can you suggest a smaller opening and leave everything else untouched?",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.generate_today_lesson"],
+        "maxActionCount": 1,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "ambiguous_noisy_scan",
+      "label": "Ambiguous / noisy source",
+      "sourceClass": "ambiguous_noisy_source",
+      "sourceInterpretInput": {
+        "learnerName": "Sophie",
+        "requestedRoute": "single_lesson",
+        "inputModalities": ["image"],
+        "rawText": "Blurry cropped page with partial handwriting.",
+        "extractedText": "Math ? page ... Monday ... maybe fractions ... cut off ...",
+        "assetRefs": ["asset-ambiguous-1"],
+        "sourcePackages": [
+          {
+            "id": "pkg-ambiguous-1",
+            "title": "Unreadable crop",
+            "modality": "image",
+            "summary": "A blurry cropped page with partial text.",
+            "extractionStatus": "requires_review",
+            "assetCount": 1,
+            "assetIds": ["asset-ambiguous-1"],
+            "detectedChunks": ["partial text"],
+            "sourceFingerprint": "fp-ambiguous-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-ambiguous-1",
+            "packageId": "pkg-ambiguous-1",
+            "title": "Unreadable crop",
+            "modality": "image",
+            "fileName": "blurry-crop.png",
+            "mimeType": "image/png",
+            "fileUrl": "https://example.com/blurry-crop.png"
+          }
+        ],
+        "titleCandidate": "Review needed"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "ambiguous",
+        "entryStrategy": "scaffold_only",
+        "entryLabel": null,
+        "continuationMode": "manual_review",
+        "deliveryPattern": "mixed",
+        "suggestedTitle": "Review needed",
+        "confidence": "low",
+        "recommendedHorizon": "single_day",
+        "assumptions": ["Do not over-assume from a blurry partial page."],
+        "detectedChunks": ["partial text"],
+        "followUpQuestion": "Is this one page or part of a bigger packet?",
+        "needsConfirmation": true
+      },
+      "curriculumRubric": {
+        "expectedDepth": "skip_until_confirmation",
+        "minUnits": 0,
+        "maxUnits": 0,
+        "minTotalWeeks": null,
+        "maxTotalWeeks": null,
+        "requiredKeywords": []
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": true,
+        "chosenHorizon": "single_day",
+        "initialSliceUsed": false,
+        "openingLessonCountMin": 0,
+        "openingLessonCountMax": 0,
+        "scopeSummaryKeywords": []
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": true,
+        "maxLessonMinutes": 0,
+        "maxActivityMinutes": 0,
+        "requiredKeywords": [],
+        "allowOfflineActivity": false
+      },
+      "copilotRubric": {
+        "prompt": "This scan is unclear. Do not invent changes. Ask me what this is if needed.",
+        "allowedActionKinds": [],
+        "maxActionCount": 0,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": true
+      }
+    },
+    {
+      "id": "explicit_range_cookbook_chapter2",
+      "label": "Explicit range inside large source",
+      "sourceClass": "explicit_range_inside_large_source",
+      "sourceInterpretInput": {
+        "learnerName": "Harper",
+        "requestedRoute": "outline",
+        "inputModalities": ["pdf"],
+        "rawText": "Use only chapter 2 from this family cookbook for now.",
+        "extractedText": "Family cookbook. Chapter 1 kitchen setup. Chapter 2 knife skills and safe chopping. Chapter 3 baking basics. Parent note: start with chapter 2 only.",
+        "assetRefs": ["asset-cookbook-2"],
+        "sourcePackages": [
+          {
+            "id": "pkg-cookbook-2",
+            "title": "Family cookbook",
+            "modality": "pdf",
+            "summary": "A practical skills cookbook with multiple chapters.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-cookbook-2"],
+            "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3"],
+            "sourceFingerprint": "fp-cookbook-2"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-cookbook-2",
+            "packageId": "pkg-cookbook-2",
+            "title": "Family cookbook",
+            "modality": "pdf",
+            "fileName": "family-cookbook.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/family-cookbook.pdf"
+          }
+        ],
+        "titleCandidate": "Knife skills launch"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "explicit_range",
+        "entryLabel": "chapter 2: knife skills",
+        "continuationMode": "sequential",
+        "deliveryPattern": "task_first",
+        "suggestedTitle": "Knife skills launch",
+        "confidence": "high",
+        "recommendedHorizon": "few_days",
+        "assumptions": ["Honor the explicit chapter 2 request while keeping the rest of the cookbook available for continuation."],
+        "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Harper",
+        "titleCandidate": "Knife skills launch",
+        "requestMode": "source_entry",
+        "requestedRoute": "outline",
+        "routedRoute": "outline",
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "explicit_range",
+        "entryLabel": "chapter 2: knife skills",
+        "continuationMode": "sequential",
+        "deliveryPattern": "task_first",
+        "recommendedHorizon": "few_days",
+        "sourceText": "Family cookbook. Chapter 1 kitchen setup. Chapter 2 knife skills and safe chopping. Chapter 3 baking basics. Parent note: start with chapter 2 only.",
+        "sourcePackages": [
+          {
+            "id": "pkg-cookbook-2",
+            "title": "Family cookbook",
+            "modality": "pdf",
+            "summary": "A practical skills cookbook with multiple chapters.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-cookbook-2"],
+            "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3"],
+            "sourceFingerprint": "fp-cookbook-2"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-cookbook-2",
+            "packageId": "pkg-cookbook-2",
+            "title": "Family cookbook",
+            "modality": "pdf",
+            "fileName": "family-cookbook.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/family-cookbook.pdf"
+          }
+        ],
+        "detectedChunks": ["Chapter 1", "Chapter 2", "Chapter 3"],
+        "assumptions": ["Honor the explicit chapter 2 request while keeping the rest of the cookbook available for continuation."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "durable",
+        "minUnits": 3,
+        "maxUnits": 8,
+        "minTotalWeeks": 4,
+        "maxTotalWeeks": 20,
+        "requiredKeywords": ["knife", "cook", "safety"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "few_days",
+        "initialSliceUsed": true,
+        "openingLessonCountMin": 2,
+        "openingLessonCountMax": 3,
+        "scopeSummaryKeywords": ["chapter 2", "knife"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 40,
+        "maxActivityMinutes": 20,
+        "requiredKeywords": ["knife", "safety", "prep"],
+        "allowOfflineActivity": true
+      },
+      "copilotRubric": {
+        "prompt": "If Harper is not ready for chopping yet, suggest a safer next step and log the choice for me.",
+        "allowedActionKinds": ["planning.defer_or_move_item", "tracking.apply_recommendation_decision", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    },
+    {
+      "id": "cookbook_practical_skills",
+      "label": "Cookbook / practical-skills source",
+      "sourceClass": "cookbook_practical_skills",
+      "sourceInterpretInput": {
+        "learnerName": "Nora",
+        "requestedRoute": "outline",
+        "inputModalities": ["pdf"],
+        "rawText": "A practical life cookbook for kids.",
+        "extractedText": "Kids in the Kitchen. Basics. Measuring. Safe heat. Knife skills. Snacks. Baking. Cleanup routines.",
+        "assetRefs": ["asset-kitchen-1"],
+        "sourcePackages": [
+          {
+            "id": "pkg-kitchen-1",
+            "title": "Kids in the Kitchen",
+            "modality": "pdf",
+            "summary": "A practical skills cookbook for kitchen independence.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-kitchen-1"],
+            "detectedChunks": ["Basics", "Measuring", "Safe heat", "Knife skills"],
+            "sourceFingerprint": "fp-kitchen-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-kitchen-1",
+            "packageId": "pkg-kitchen-1",
+            "title": "Kids in the Kitchen",
+            "modality": "pdf",
+            "fileName": "kids-in-the-kitchen.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/kids-in-the-kitchen.pdf"
+          }
+        ],
+        "titleCandidate": "Kids in the Kitchen"
+      },
+      "expectedSourceInterpretArtifact": {
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "section_start",
+        "entryLabel": "basics",
+        "continuationMode": "sequential",
+        "deliveryPattern": "task_first",
+        "suggestedTitle": "Kids in the Kitchen",
+        "confidence": "high",
+        "recommendedHorizon": "two_weeks",
+        "assumptions": ["Preserve the full practical-skills arc, but open from the basics section first."],
+        "detectedChunks": ["Basics", "Measuring", "Safe heat", "Knife skills"],
+        "followUpQuestion": null,
+        "needsConfirmation": false
+      },
+      "curriculumGenerateInput": {
+        "learnerName": "Nora",
+        "titleCandidate": "Kids in the Kitchen",
+        "requestMode": "source_entry",
+        "requestedRoute": "outline",
+        "routedRoute": "outline",
+        "sourceKind": "comprehensive_source",
+        "entryStrategy": "section_start",
+        "entryLabel": "basics",
+        "continuationMode": "sequential",
+        "deliveryPattern": "task_first",
+        "recommendedHorizon": "two_weeks",
+        "sourceText": "Kids in the Kitchen. Basics. Measuring. Safe heat. Knife skills. Snacks. Baking. Cleanup routines.",
+        "sourcePackages": [
+          {
+            "id": "pkg-kitchen-1",
+            "title": "Kids in the Kitchen",
+            "modality": "pdf",
+            "summary": "A practical skills cookbook for kitchen independence.",
+            "extractionStatus": "ready",
+            "assetCount": 1,
+            "assetIds": ["asset-kitchen-1"],
+            "detectedChunks": ["Basics", "Measuring", "Safe heat", "Knife skills"],
+            "sourceFingerprint": "fp-kitchen-1"
+          }
+        ],
+        "sourceFiles": [
+          {
+            "assetId": "asset-kitchen-1",
+            "packageId": "pkg-kitchen-1",
+            "title": "Kids in the Kitchen",
+            "modality": "pdf",
+            "fileName": "kids-in-the-kitchen.pdf",
+            "mimeType": "application/pdf",
+            "fileUrl": "https://example.com/kids-in-the-kitchen.pdf"
+          }
+        ],
+        "detectedChunks": ["Basics", "Measuring", "Safe heat", "Knife skills"],
+        "assumptions": ["Preserve the full practical-skills arc, but open from the basics section first."]
+      },
+      "curriculumRubric": {
+        "expectedDepth": "durable",
+        "minUnits": 4,
+        "maxUnits": 10,
+        "minTotalWeeks": 6,
+        "maxTotalWeeks": 24,
+        "requiredKeywords": ["kitchen", "measure", "safety"]
+      },
+      "launchHandoffRubric": {
+        "skipUntilConfirmation": false,
+        "chosenHorizon": "two_weeks",
+        "initialSliceUsed": true,
+        "openingLessonCountMin": 4,
+        "openingLessonCountMax": 6,
+        "scopeSummaryKeywords": ["basics", "kitchen"]
+      },
+      "sessionActivityRubric": {
+        "skipUntilConfirmation": false,
+        "maxLessonMinutes": 45,
+        "maxActivityMinutes": 25,
+        "requiredKeywords": ["kitchen", "measure", "safety"],
+        "allowOfflineActivity": true
+      },
+      "copilotRubric": {
+        "prompt": "Can you help me keep Nora's kitchen launch practical and safe without adding a lot of new work?",
+        "allowedActionKinds": ["planning.adjust_day_load", "tracking.apply_recommendation_decision", "tracking.record_note"],
+        "maxActionCount": 2,
+        "requiresApprovalForActions": true,
+        "shouldPreferNoAction": false
+      }
+    }
+  ]
+}

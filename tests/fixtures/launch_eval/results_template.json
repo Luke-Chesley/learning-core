@@ -1,0 +1,107 @@
+{
+  "capturedAt": "2026-04-20T00:00:00Z",
+  "runLabel": "fill-me-in",
+  "environment": "local",
+  "cases": [
+    {
+      "caseId": "worksheet_photo_fractions",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "chapter_excerpt_ecosystems",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "weekly_plan_multiplication",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "outline_toc_world_history",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "whole_book_algebra_pdf",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "topic_seed_local_birds",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "shell_request_chemistry_launch",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "ambiguous_noisy_scan",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "explicit_range_cookbook_chapter2",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    },
+    {
+      "caseId": "cookbook_practical_skills",
+      "sourceInterpretArtifact": null,
+      "curriculumArtifact": null,
+      "launchHandoff": null,
+      "sessionArtifact": null,
+      "activityArtifact": null,
+      "copilotArtifact": null,
+      "notes": []
+    }
+  ]
+}
