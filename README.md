@@ -1,37 +1,99 @@
 # learning-core
 
-`learning-core` is the headless Python service that owns AI runtime concerns for learning products.
+`learning-core` is the headless Python AI runtime behind `homeschool-v2`.
 
-Current interactive activity generation stays bounded by the `ActivityArtifact` contract. Rich engine-backed interaction now flows through the top-level `interactive_widget` component, with backend domain engines owning canonical state and runtime evaluation.
+For the current closed-beta product, it turns structured homeschool product context into bounded, typed artifacts.
+It does not own UI, auth, product persistence, or direct product mutations.
+
+## Current Product Context
+
+- Primary consuming app: `../homeschool-v2`
+- Current wedge: bring what you already have, create a usable curriculum and opening window, open Today fast, and keep the week and records nearby.
+- Billing is out of scope for the current launch-prep work.
+
+## Read This First
+
+- Current operational source of truth: `docs/CURRENT_PRODUCT_AND_RUNTIME_MODEL.md`
+- Source taxonomy and horizon notes: `docs/source-taxonomy-model.md`
+- Launch eval fixtures and rubric: `tests/fixtures/launch_eval/scenarios.json`, `tests/test_launch_eval_fixtures.py`
+- `docs/plans/` is implementation history and future planning, not the operational guide for the current beta product.
 
 ## Scope
 
-- Owns: agent runtime, skill registry, prompt/`SKILL.md` loading, contracts, workflow semantics, validation, and observability.
-- Does not own: product UI, product DB tables, auth, or persistence policy for app records.
+- Owns: named operations, contracts, prompt and `SKILL.md` loading, workflow semantics, validation, prompt previews, model execution, lineage, traces, and observability.
+- Does not own: product UI, product DB tables, auth, or app-side approval and mutation policy.
 
-## Current Slice
+## Current Generation Chain
 
-- Shared operation-envelope runtime is in place.
-- All extracted operations are exposed through `/v1/operations/{operation_name}`.
-- Prompt ownership lives in `SKILL.md` plus Python prompt builders inside `learning-core`.
-- Skill runtime code lives under `learning_core/skills/<skill>/scripts/main.py` and any
-  skill-local helper modules live alongside it in `scripts/`.
-- Public operations now route through a shared internal kernel that normalizes requests,
-  resolves task profiles and response types, builds workflow-card previews, and executes
-  through explicit bounded strategies.
+At the product level, `homeschool-v2` currently treats this repo as the AI side of a homeschool-specific flow:
+
+1. `source_interpret` classifies source entry and recommends the safest opening approach.
+2. `curriculum_generate` creates the durable curriculum artifact.
+3. Opening-window and day-1 handoff are downstream planning concerns. They are not part of the canonical `curriculum_generate` artifact contract.
+4. `progression_generate` helps turn the curriculum into schedulable order for the app-side planning system.
+5. `session_generate` creates a bounded lesson draft for a specific day or slot.
+6. `activity_generate` creates lesson-scoped learner activities.
+7. `copilot_chat` provides grounded adult-facing assistance. It may summarize or propose, but the app must validate and apply any real mutation itself.
+
+`curriculum_generate` is the single curriculum-creation skill.
+It supports two explicit request modes:
+
+- `source_entry`: source-first generation grounded in `source_interpret` output plus source text, packages, and files
+- `conversation_intake`: conversation-first generation grounded in learner messages, goals, and pacing hints
+
+The output is one durable curriculum artifact.
+The app owns import, persistence, progression handoff, and opening-window or day-1 flow selection.
 
 ## Runtime Model
 
-`learning-core` now has one internal runtime vocabulary:
+`learning-core` uses one internal runtime vocabulary:
 
-- `task_profiles`: what kind of job the request is asking for
-- `response_types`: the typed artifact contract that must come back
-- `workflow_cards`: bounded prompt and execution recipes
-- `packs`: reusable domain context layered in by request metadata or task-specific selection
-- `AgentKernel`: the shared preview/execute backbone used by the public operation routes
+- `task_profiles`
+  What kind of job the request is asking for.
+- `response_types`
+  The typed artifact contract that must come back.
+- `workflow_cards`
+  Bounded prompt and execution recipes.
+- `packs`
+  Reusable domain context layered in by request metadata or task-specific selection.
+- `AgentKernel`
+  The shared preview and execute backbone used by the public operation routes.
 
-The public API is still operation-based.
+The public API remains operation-based.
 Internally, those operations map onto the shared runtime layer.
+
+## Current First-Class Operations
+
+| Operation | Current role | Task profile | Response type |
+| --- | --- | --- | --- |
+| `source_interpret` | classify source entry and opening horizon | `source_interpret` | `source_interpretation` |
+| `curriculum_generate` | create the durable curriculum artifact | `long_horizon_planning` | `curriculum_artifact` |
+| `progression_generate` | produce schedulable curriculum ordering and structure | `long_horizon_planning` | `progression_artifact` |
+| `session_generate` | create a bounded day lesson draft | `bounded_day_generation` | `lesson_draft` |
+| `activity_generate` | create lesson-scoped learner activities | `adaptive_or_bounded_activity_generation` | `activity_spec` |
+| `activity_feedback` | return bounded learner-feedback responses | `activity_evaluation` | `activity_feedback` |
+| `widget_transition` | execute deterministic widget transitions | `interactive_assistance` | `widget_transition` |
+| `curriculum_intake` | handle intake dialogue turns | `intake_dialogue` | `intake_turn` |
+| `curriculum_revise` | revise a curriculum artifact | `artifact_revision` | `curriculum_artifact_revision` |
+| `progression_revise` | revise progression structure | `artifact_revision` | `progression_artifact` |
+| `session_evaluate` | synthesize lesson/session outcomes | `session_synthesis` | `evaluation` |
+| `copilot_chat` | grounded parent-facing assistance | `interactive_assistance` | `summary` |
+
+Registered but not part of the current canonical product chain:
+
+- `launch_plan_generate`
+  still exists in the runtime for bounded opening-slice generation, but do not treat it as proof that every current curriculum flow returns or persists `launchPlan`.
+
+## Copilot Boundary
+
+`copilot_chat` is not allowed to mutate product state directly.
+
+- The app sends structured learner, curriculum, daily, and weekly context.
+- `learning-core` returns bounded chat output grounded in that context.
+- Any action proposal must stay explicit, typed, and app-approved.
+- The app owns approval, dispatch, persistence, and failure handling.
+
+If a Copilot artifact and the product state disagree, the product state wins.
 
 ## Local Dev
 
@@ -56,16 +118,16 @@ Internally, those operations map onto the shared runtime layer.
    - `LEARNING_CORE_CHAT_MODEL`
    - `LEARNING_CORE_FAST_MODEL`
    - `LEARNING_CORE_GENERATION_MODEL`
-   - provider credential/base-url vars for the selected backend
+   - provider credential and base-url vars for the selected backend
 6. Run the API:
    - `uv run learning-core`
 
 The service defaults to `http://127.0.0.1:8000`.
-`learning-core` now auto-loads `.env` and `.env.local` from the repo root without requiring you to `source` them first.
+`learning-core` auto-loads `.env` and `.env.local` from the repo root without requiring you to `source` them first.
 
 ## Provider Logs
 
-- Every provider request/response exchange is written to `logs/YYYY-MM-DD/`.
+- Every provider request and response exchange is written to `logs/YYYY-MM-DD/`.
 - Each file is named with the request timestamp.
 - The top half of the file is the provider request payload.
 - The bottom half is the provider response payload or provider error.
@@ -90,9 +152,6 @@ learning_core/
     activity_generate/
       SKILL.md
       packs/
-        index.md
-        math/
-        chess/
       ui_components/
       ui_widgets/
       scripts/
@@ -116,11 +175,15 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    curriculum_revise/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_update_propose/
       SKILL.md
       scripts/
         main.py
-    curriculum_revise/
+    launch_plan_generate/
       SKILL.md
       scripts/
         main.py
@@ -132,7 +195,7 @@ learning_core/
       SKILL.md
       scripts/
         main.py
-    launch_plan_generate/
+    session_evaluate/
       SKILL.md
       scripts/
         main.py
@@ -141,10 +204,6 @@ learning_core/
       scripts/
         main.py
     source_interpret/
-      SKILL.md
-      scripts/
-        main.py
-    session_evaluate/
       SKILL.md
       scripts/
         main.py
@@ -159,43 +218,17 @@ learning_core/
 - `POST /v1/operations/{operation_name}/execute`
 
 Internal orchestration helpers live behind the engine and are not the main public API.
-The first internal source-entry chain currently available is `generate_from_source`, which composes:
-
-1. `source_interpret`
-2. `curriculum_generate`
-
-`curriculum_generate` is the single curriculum-creation skill. It supports two explicit request modes:
-
-- `source_entry`: source-first generation grounded in `source_interpret` output plus source text, packages, and files
-- `conversation_intake`: conversation-first generation grounded in learner messages, goals, and pacing hints
-
-The output is always one durable curriculum artifact. Opening-slice selection is handled separately by `launch_plan_generate`.
-
-Current first-class operations:
-
-- `activity_feedback`
-- `activity_generate`
-- `widget_transition`
-- `session_generate`
-- `source_interpret`
-- `curriculum_intake`
-- `copilot_chat`
-- `curriculum_generate`
-- `curriculum_revise`
-- `launch_plan_generate`
-- `progression_generate`
-- `progression_revise`
-- `session_evaluate`
 
 ## Design Rules
 
 - No silent fallbacks.
 - Unknown operation names fail immediately.
-- Missing model/provider config fails immediately.
-- Runtime/provider defaults do not live in code; define them in `.env.local`.
+- Missing model or provider config fails immediately.
+- Runtime and provider defaults do not live in code; define them in `.env.local`.
 - Contract mismatches fail immediately.
 - Product repos persist artifacts; `learning-core` returns typed artifacts, lineage, and traces.
 - Product repos send structured request envelopes only. They do not send prompt fragments or raw system prompts.
+- `learning-core` never mutates app state directly.
 - The legacy generic gateway surface is deleted. Apps call named operations only.
 - Backend domain logic is canonical for engine-backed widgets. Frontend libraries are rendering helpers, not the source of truth.
 

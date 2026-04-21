@@ -1,0 +1,423 @@
+{
+  "version": "2026-04-20",
+  "sourceClassesRequired": [
+    "worksheet_photo",
+    "chapter_excerpt",
+    "weekly_plan",
+    "outline_toc",
+    "large_pdf_whole_book",
+    "topic_seed",
+    "shell_like_request",
+    "ambiguous_noisy_source",
+    "explicit_range_inside_large_source",
+    "cookbook_practical_skills_source"
+  ],
+  "supportedCopilotActionKinds": [
+    "planning.adjust_day_load",
+    "planning.defer_or_move_item",
+    "planning.generate_today_lesson",
+    "tracking.record_note"
+  ],
+  "scenarios": [
+    {
+      "id": "worksheet-photo-equivalent-fractions",
+      "sourceClass": "worksheet_photo",
+      "title": "Equivalent fractions worksheet photo",
+      "sourceSummary": "Single worksheet page with equivalent-fractions practice.",
+      "sourceInterpret": {
+        "expectedSourceKind": "bounded_material",
+        "acceptableEntryStrategies": ["use_as_is"],
+        "acceptableContinuationModes": ["none"],
+        "acceptableHorizons": ["single_day", "few_days"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must acknowledge the source is bounded",
+          "must not imply a durable full curriculum already exists"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "bounded_start",
+        "mustReflectSourceBreadth": false,
+        "mustAvoidShallowLaunchOnly": false,
+        "launchPlanExpectation": "One or two immediately teachable lessons grounded in the worksheet."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "1-2 coherent openings",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": false
+      },
+      "sessionGenerate": {
+        "maxScope": "single lesson",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Prefer no action unless today or lesson context is already attached.",
+        "allowedActionKinds": ["planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item"],
+        "falsePositiveRisk": "Do not invent weekly route ids from a worksheet alone."
+      }
+    },
+    {
+      "id": "chapter-excerpt-ecosystems",
+      "sourceClass": "chapter_excerpt",
+      "title": "Ecosystems chapter excerpt",
+      "sourceSummary": "A bounded excerpt from one textbook chapter about ecosystems and food webs.",
+      "sourceInterpret": {
+        "expectedSourceKind": "bounded_material",
+        "acceptableEntryStrategies": ["use_as_is"],
+        "acceptableContinuationModes": ["none", "manual_review"],
+        "acceptableHorizons": ["few_days", "one_week"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must stay inside the excerpt",
+          "must not treat the excerpt as the whole course"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "starter_arc",
+        "mustReflectSourceBreadth": true,
+        "mustAvoidShallowLaunchOnly": false,
+        "launchPlanExpectation": "Opening lessons should stay inside the excerpt concepts and vocabulary."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "2-3 teachable openings",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Usually answer-only unless today planning context is attached.",
+        "allowedActionKinds": ["planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item"],
+        "falsePositiveRisk": "Do not pretend a chapter excerpt implies a ready weekly route."
+      }
+    },
+    {
+      "id": "weekly-plan-fractions",
+      "sourceClass": "weekly_plan",
+      "title": "Week 1 fractions plan",
+      "sourceSummary": "Monday-to-Friday assignment list for one homeschool week.",
+      "sourceInterpret": {
+        "expectedSourceKind": "timeboxed_plan",
+        "acceptableEntryStrategies": ["timebox_start"],
+        "acceptableContinuationModes": ["timebox"],
+        "acceptableHorizons": ["one_week"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must keep the week bounded",
+          "must not imply the whole semester is covered"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "bounded_week",
+        "mustReflectSourceBreadth": true,
+        "mustAvoidShallowLaunchOnly": false,
+        "launchPlanExpectation": "The opening window should mirror the week plan without inventing additional units."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "Matches the bounded week",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": false
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Planning moves are valid when weekly route ids are present.",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "tracking.record_note"],
+        "disallowedActionKinds": [],
+        "falsePositiveRisk": "Do not suggest moving unknown items or dates not in the current week."
+      }
+    },
+    {
+      "id": "outline-toc-middle-grades-history",
+      "sourceClass": "outline_toc",
+      "title": "History course outline",
+      "sourceSummary": "Ordered outline or table of contents covering major history units.",
+      "sourceInterpret": {
+        "expectedSourceKind": "structured_sequence",
+        "acceptableEntryStrategies": ["sequential_start"],
+        "acceptableContinuationModes": ["sequential"],
+        "acceptableHorizons": ["few_days", "one_week"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must keep the sequence order visible",
+          "must not flatten the outline into one lesson"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "durable_curriculum",
+        "mustReflectSourceBreadth": true,
+        "mustAvoidShallowLaunchOnly": true,
+        "launchPlanExpectation": "Opening arc should begin at the start of the sequence without losing later structure."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "2-4 coherent opening lessons",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Answer-first; planning actions only when weekly ids are present.",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": [],
+        "falsePositiveRisk": "Do not propose curriculum regeneration from Copilot."
+      }
+    },
+    {
+      "id": "whole-book-large-pdf-biology",
+      "sourceClass": "large_pdf_whole_book",
+      "title": "Whole-book biology PDF",
+      "sourceSummary": "Large PDF or whole book with many chapters and durable content breadth.",
+      "sourceInterpret": {
+        "expectedSourceKind": "comprehensive_source",
+        "acceptableEntryStrategies": ["section_start", "sequential_start"],
+        "acceptableContinuationModes": ["sequential"],
+        "acceptableHorizons": ["one_week", "two_weeks", "starter_module"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must acknowledge the broader source exists beyond launch",
+          "must not collapse a full book into a shallow week-only curriculum"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "durable_curriculum",
+        "mustReflectSourceBreadth": true,
+        "mustAvoidShallowLaunchOnly": true,
+        "launchPlanExpectation": "The opening arc should be bounded, but the stored curriculum should reflect broader chapter coverage."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "3-5 openings anchored to the book start",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single lesson",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Prefer planning or today actions over speculative curriculum mutations.",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": [],
+        "falsePositiveRisk": "Do not invent section-regeneration or standards-remap actions."
+      }
+    },
+    {
+      "id": "topic-seed-fractions-summer",
+      "sourceClass": "topic_seed",
+      "title": "Fractions this summer",
+      "sourceSummary": "Short topic-only request without a pre-existing source artifact.",
+      "sourceInterpret": {
+        "expectedSourceKind": "topic_seed",
+        "acceptableEntryStrategies": ["scaffold_only"],
+        "acceptableContinuationModes": ["manual_review"],
+        "acceptableHorizons": ["starter_module"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must be honest about the lack of source detail",
+          "must build a usable opening without pretending source coverage exists"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "durable_curriculum",
+        "mustReflectSourceBreadth": false,
+        "mustAvoidShallowLaunchOnly": false,
+        "launchPlanExpectation": "A starter module is acceptable when the input is intentionally topic-first."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "2-4 openings",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Usually answer-only unless current week or today state is attached.",
+        "allowedActionKinds": ["planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item"],
+        "falsePositiveRisk": "Do not invent route-item ids from a topic seed."
+      }
+    },
+    {
+      "id": "shell-like-request-kindergarten",
+      "sourceClass": "shell_like_request",
+      "title": "Kindergarten shell request",
+      "sourceSummary": "Parent asks for a lightweight shell around daily routines and interests.",
+      "sourceInterpret": {
+        "expectedSourceKind": "shell_request",
+        "acceptableEntryStrategies": ["scaffold_only"],
+        "acceptableContinuationModes": ["manual_review"],
+        "acceptableHorizons": ["starter_module"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must not hallucinate source assets",
+          "must keep the shell explicitly lightweight"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "starter_arc",
+        "mustReflectSourceBreadth": false,
+        "mustAvoidShallowLaunchOnly": false,
+        "launchPlanExpectation": "The opening window should stay modest and founder-friendly."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "1-3 openings",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Answer-first; only note capture should appear without planning ids.",
+        "allowedActionKinds": ["planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item"],
+        "falsePositiveRisk": "Do not propose bounded week mutations when no week is attached."
+      }
+    },
+    {
+      "id": "ambiguous-noisy-upload",
+      "sourceClass": "ambiguous_noisy_source",
+      "title": "Ambiguous noisy upload",
+      "sourceSummary": "Low-quality or unclear source that needs parent clarification before safe planning.",
+      "sourceInterpret": {
+        "expectedSourceKind": "ambiguous",
+        "acceptableEntryStrategies": ["scaffold_only"],
+        "acceptableContinuationModes": ["manual_review"],
+        "acceptableHorizons": ["few_days", "starter_module"],
+        "requiresConfirmation": true,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must say what is unclear",
+          "must ask a bounded follow-up instead of bluffing"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "defer_generation",
+        "mustReflectSourceBreadth": false,
+        "mustAvoidShallowLaunchOnly": false,
+        "launchPlanExpectation": "Do not continue into a confident curriculum without clarification."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "None until clarified",
+        "mustBeDayOneReady": false,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "not_applicable",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "No action by default.",
+        "allowedActionKinds": ["tracking.record_note"],
+        "disallowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "planning.generate_today_lesson"],
+        "falsePositiveRisk": "Any confident planning action here is a blocker."
+      }
+    },
+    {
+      "id": "explicit-range-inside-large-source",
+      "sourceClass": "explicit_range_inside_large_source",
+      "title": "Chapters 4-6 inside a large biology source",
+      "sourceSummary": "Parent specifies a bounded range from a larger durable source.",
+      "sourceInterpret": {
+        "expectedSourceKind": "comprehensive_source",
+        "acceptableEntryStrategies": ["explicit_range"],
+        "acceptableContinuationModes": ["sequential"],
+        "acceptableHorizons": ["one_week", "two_weeks"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must respect the explicit range",
+          "must retain the fact that the larger source still exists"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "durable_curriculum_with_bounded_opening",
+        "mustReflectSourceBreadth": true,
+        "mustAvoidShallowLaunchOnly": true,
+        "launchPlanExpectation": "Opening arc starts inside the requested range without erasing the durable source."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "2-4 openings inside the chosen range",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Planning and today actions are allowed when route ids are present.",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": [],
+        "falsePositiveRisk": "Do not reinterpret the explicit range into unsupported regeneration actions."
+      }
+    },
+    {
+      "id": "cookbook-practical-skills-sequence",
+      "sourceClass": "cookbook_practical_skills_source",
+      "title": "Kitchen independence practical-skills source",
+      "sourceSummary": "Practical-skills source such as recipe cards, kitchen routines, or a home-economics sequence.",
+      "sourceInterpret": {
+        "expectedSourceKind": "structured_sequence",
+        "acceptableEntryStrategies": ["sequential_start"],
+        "acceptableContinuationModes": ["sequential"],
+        "acceptableHorizons": ["few_days", "one_week"],
+        "requiresConfirmation": false,
+        "mustStayGroundedInDetectedChunks": true,
+        "assumptionChecks": [
+          "must preserve task order and safety progression",
+          "must stay homeschool-specific where it helps"
+        ]
+      },
+      "curriculumGenerate": {
+        "expectedScale": "durable_curriculum",
+        "mustReflectSourceBreadth": true,
+        "mustAvoidShallowLaunchOnly": true,
+        "launchPlanExpectation": "Opening arc should be teachable, concrete, and hands-on rather than generic academics."
+      },
+      "launchHandoff": {
+        "openingLessonCountExpectation": "2-4 task-first openings",
+        "mustBeDayOneReady": true,
+        "mustPreserveDownstreamPlanningSpace": true
+      },
+      "sessionGenerate": {
+        "maxScope": "single day",
+        "mustStayGroundedToCurrentSlice": true,
+        "mustBeAgeAppropriate": true
+      },
+      "copilot": {
+        "defaultActionExpectation": "Prefer planning and note actions over speculative curriculum rewrites.",
+        "allowedActionKinds": ["planning.adjust_day_load", "planning.defer_or_move_item", "planning.generate_today_lesson", "tracking.record_note"],
+        "disallowedActionKinds": [],
+        "falsePositiveRisk": "Do not drop the practical-skills specificity from suggestions."
+      }
+    }
+  ]
+}

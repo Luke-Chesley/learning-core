@@ -14,7 +14,7 @@ class CurriculumIntakeSkill(StructuredOutputSkill):
     output_model = CurriculumIntakeArtifact
     policy = ExecutionPolicy(
         skill_name="curriculum_intake",
-        skill_version="2026-04-09",
+        skill_version="2026-04-20",
         task_kind="chat",
         max_tokens=4096,
     )

@@ -12,7 +12,7 @@ class LaunchPlanGenerateSkill(StructuredOutputSkill):
     output_model = LaunchPlanArtifact
     policy = ExecutionPolicy(
         skill_name="launch_plan_generate",
-        skill_version="2026-04-19",
+        skill_version="2026-04-20",
         max_tokens=6000,
     )
 
@@ -62,6 +62,7 @@ class LaunchPlanGenerateSkill(StructuredOutputSkill):
             phase_list,
             "",
             "Requirements:",
+            "- Treat this as an optional opening-window selector, not as the canonical curriculum-creation path.",
             "- Return a bounded opening slice only.",
             "- Use only unitRefs and skillRefs from the provided basis.",
             "- Do not invent refs.",
@@ -72,5 +73,5 @@ class LaunchPlanGenerateSkill(StructuredOutputSkill):
             "- Respect the chosen horizon exactly; do not reinterpret it.",
         ]
         append_user_authored_context(lines, context)
-        lines.extend(["", "Generate the launch plan."])
+        lines.extend(["", "Generate the optional launch window."])
         return "\n".join(lines)

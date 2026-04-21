@@ -43,11 +43,13 @@ It is a launch recommendation, not a promise about total curriculum size.
 - `requestMode: "source_entry"` is used for source-first flows after `source_interpret`
 - `requestMode: "conversation_intake"` is used for regular curriculum creation without source interpretation
 
-Both modes return one durable curriculum artifact with `launchPlan`.
+Both modes return one durable curriculum artifact.
 
 - For `comprehensive_source`, the curriculum should reflect the broader source in teachable order.
-- `launchPlan` defines the bounded opening arc and day-1 handoff.
+- Opening-window and day-1 handoff are downstream concerns for app planning flow or separate bounded operations.
 - Weak inputs should stay small; strong sources should not collapse into a shallow launch week.
+
+Older docs that say every `curriculum_generate` response includes `launchPlan` are stale.
 
 ## No User Horizon Choice
 

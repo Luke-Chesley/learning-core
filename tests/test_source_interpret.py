@@ -626,4 +626,5 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
     assert curriculum_call["input"]["detectedChunks"] == ["chapter 1", "chapter 2"]
     assert curriculum_call["input"]["assumptions"] == ["Honor the explicit chapter 1 request."]
     assert result.operation_name == "curriculum_generate"
-    assert result.artifact["launchPlan"]["recommendedHorizon"] == "one_week"
+    assert "launchPlan" not in result.artifact
+    assert result.trace.agent_trace["substeps"][0]["artifact"]["recommendedHorizon"] == "one_week"

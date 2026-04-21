@@ -284,6 +284,31 @@ class CurriculumGenerationRequest(StrictModel):
         else:
             if not self.messages:
                 raise ValueError("conversation_intake curriculum generation requires messages.")
+            forbidden_source_fields = {
+                "requestedRoute": self.requestedRoute,
+                "routedRoute": self.routedRoute,
+                "sourceKind": self.sourceKind,
+                "entryStrategy": self.entryStrategy,
+                "entryLabel": self.entryLabel,
+                "continuationMode": self.continuationMode,
+                "deliveryPattern": self.deliveryPattern,
+                "recommendedHorizon": self.recommendedHorizon,
+                "sourceText": self.sourceText,
+                "sourcePackages": self.sourcePackages,
+                "sourceFiles": self.sourceFiles,
+                "detectedChunks": self.detectedChunks,
+                "assumptions": self.assumptions,
+            }
+            present = [
+                name
+                for name, value in forbidden_source_fields.items()
+                if value not in (None, "") and value != []
+            ]
+            if present:
+                raise ValueError(
+                    "conversation_intake curriculum generation does not accept source-entry fields: "
+                    + ", ".join(sorted(present))
+                )
         return self
 
 

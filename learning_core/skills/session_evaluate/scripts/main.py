@@ -12,7 +12,7 @@ class SessionEvaluateSkill(StructuredOutputSkill):
     output_model = EvaluationArtifact
     policy = ExecutionPolicy(
         skill_name="session_evaluate",
-        skill_version="2026-04-09",
+        skill_version="2026-04-20",
         max_tokens=4000,
     )
 
@@ -38,6 +38,11 @@ class SessionEvaluateSkill(StructuredOutputSkill):
             "- partial",
             "- successful",
             "- exceeded",
+            "",
+            "Judgment rules:",
+            "- Rate the session from the supplied evidence only.",
+            "- If the evidence is thin or mixed, stay conservative.",
+            "- Keep nextActions short and directly teachable by a parent or teacher.",
         ]
         append_user_authored_context(lines, context)
         lines.extend(["", "Return the evaluation artifact."])
