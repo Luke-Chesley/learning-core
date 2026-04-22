@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+
+from learning_core.observability.traces import PromptPreview
 from learning_core.contracts.curriculum import CurriculumRevisionRequest, CurriculumRevisionTurn
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
@@ -13,7 +16,7 @@ class CurriculumReviseSkill(StructuredOutputSkill):
     output_model = CurriculumRevisionTurn
     policy = ExecutionPolicy(
         skill_name="curriculum_revise",
-        skill_version="2026-04-19",
+        skill_version="2026-04-22",
         max_tokens=12000,
     )
 
@@ -70,3 +73,77 @@ class CurriculumReviseSkill(StructuredOutputSkill):
             lineage=lineage,
             trace=trace,
         )
+
+    def repair_invalid_artifact(self, *, raw_artifact, payload, context, error):
+        del payload, context, error
+        if not isinstance(raw_artifact, dict):
+            return None
+
+        repaired = dict(raw_artifact)
+        artifact = repaired.get("artifact")
+        if repaired.get("action") != "apply" or not isinstance(artifact, dict):
+            return None
+
+        expected_artifact_keys = {"source", "intakeSummary", "pacing", "document", "units"}
+        document = artifact.get("document")
+        if document is None:
+            document = {}
+        if not isinstance(document, dict):
+            return None
+
+        moved_any = False
+        repaired_artifact = dict(artifact)
+        repaired_document = dict(document)
+
+        for key, value in list(repaired_artifact.items()):
+            if key in expected_artifact_keys:
+                continue
+            if not isinstance(value, (dict, list, str)):
+                continue
+            if key in repaired_document:
+                continue
+            repaired_document[key] = value
+            repaired_artifact.pop(key, None)
+            moved_any = True
+
+        if not moved_any:
+            return None
+
+        repaired_artifact["document"] = repaired_document
+        repaired["artifact"] = repaired_artifact
+        return repaired
+
+    def build_validation_retry_preview(
+        self,
+        *,
+        payload,
+        context,
+        raw_artifact,
+        error,
+    ) -> PromptPreview | None:
+        system_prompt = "\n\n".join(
+            [
+                self.read_skill_markdown(),
+                "Repair instructions:",
+                "- The previous response was invalid.",
+                "- Return only one corrected JSON object.",
+                "- The top-level shape must be exactly assistantMessage, action, changeSummary, and optional artifact.",
+                "- When action is apply, artifact may contain only source, intakeSummary, pacing, document, and units.",
+                "- Every curriculum domain, strand, goal group, and skill title belongs inside artifact.document, never as extra keys beside document.",
+                "- Keep the document tree in the canonical domain -> strand -> goal group -> skill shape.",
+                "- Preserve the intended curriculum content while fixing the JSON structure.",
+            ]
+        )
+        user_prompt = "\n".join(
+            [
+                self.build_user_prompt(payload, context),
+                "",
+                "Previous invalid JSON:",
+                json.dumps(raw_artifact, indent=2, ensure_ascii=True),
+                "",
+                f"Validation error: {error}",
+                "",
+                "Repair the JSON so it matches the exact schema. Return only the corrected JSON object.",
+            ]
+        )
+        return PromptPreview(system_prompt=system_prompt, user_prompt=user_prompt)
