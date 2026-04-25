@@ -227,7 +227,7 @@ class ProgressionGenerateSkill(StructuredOutputSkill):
             "- Do not invent skillRefs or omit skillRefs.",
             "- Every phase must have a non-empty, meaningful description.",
             "- Use revisitAfter deliberately for retention, fluency, and retrieval support.",
-            "- Keep phases schedulable; avoid micro-phases and giant catch-all phases.",
+            "- Keep phases schedulable; tiny curricula may have one or two compact phases, while larger curricula should avoid micro-phases and giant catch-all phases.",
             "- Keep hardPrerequisite edges acyclic.",
             "- Do not point hardPrerequisite or recommendedBefore from a later phase to an earlier phase.",
             "- Prefer sparse, meaningful edges over dense graphs.",

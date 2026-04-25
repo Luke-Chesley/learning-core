@@ -17,6 +17,8 @@ from learning_core.contracts.source_interpret import (
     SourcePackageContext,
 )
 
+CurriculumScale = Literal["micro", "week", "module", "course", "reference_source"]
+
 
 class CurriculumChatMessage(StrictModel):
     role: Literal["user", "assistant"]
@@ -103,16 +105,16 @@ def canonical_skill_ref_from_titles(
 
 class CurriculumSkill(StrictModel):
     skillId: str
-    domainTitle: str
-    strandTitle: str
-    goalGroupTitle: str
+    domainTitle: str | None = None
+    strandTitle: str | None = None
+    goalGroupTitle: str | None = None
     title: str
 
     def canonical_skill_ref(self) -> str:
         return canonical_skill_ref_from_titles(
-            self.domainTitle,
-            self.strandTitle,
-            self.goalGroupTitle,
+            self.domainTitle or "Curriculum",
+            self.strandTitle or "Core Sequence",
+            self.goalGroupTitle or "Focus Skills",
             self.title,
         )
 
@@ -160,7 +162,12 @@ def iter_curriculum_skill_entries(
     return [
         (
             skill.canonical_skill_ref(),
-            [skill.domainTitle, skill.strandTitle, skill.goalGroupTitle, skill.title],
+            [
+                skill.domainTitle or "Curriculum",
+                skill.strandTitle or "Core Sequence",
+                skill.goalGroupTitle or "Focus Skills",
+                skill.title,
+            ],
             skill.title,
         )
         for skill in skills
@@ -171,6 +178,7 @@ class CurriculumArtifact(StrictModel):
     source: CurriculumDraftSummary
     intakeSummary: str
     pacing: CurriculumPacing
+    curriculumScale: CurriculumScale | None = None
     skills: list[CurriculumSkill] = Field(min_length=1, max_length=400)
     units: list[CurriculumUnit] = Field(min_length=1, max_length=20)
 

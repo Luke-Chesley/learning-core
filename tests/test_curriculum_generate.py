@@ -86,6 +86,7 @@ def test_curriculum_generate_prompt_preview_mentions_source_entry_fields():
     assert "Request mode: source_entry" in preview.user_prompt
     assert "Source kind: comprehensive_source" in preview.user_prompt
     assert "Delivery pattern: concept_first" in preview.user_prompt
+    assert "Scale guidance:" in preview.user_prompt
     assert "Attached source files:" in preview.user_prompt
     assert "egypt-reader.pdf" in preview.user_prompt
     assert "Primary source text:" in preview.user_prompt
@@ -95,12 +96,22 @@ def test_curriculum_generate_prompt_preview_mentions_conversation_fields():
     preview = CurriculumGenerateSkill().build_prompt_preview(_conversation_payload(), _context())
 
     assert "Request mode: conversation_intake" in preview.user_prompt
+    assert "Scale guidance:" in preview.user_prompt
     assert "Conversation transcript:" in preview.user_prompt
     assert "Teach my daughter fractions this summer" in preview.user_prompt
     assert "Granularity guidance:" in preview.user_prompt
     assert "Correction notes for this retry:" in preview.user_prompt
     assert "Requested route:" not in preview.user_prompt
     assert "Routed route:" not in preview.user_prompt
+
+
+def test_curriculum_generate_prompt_allows_scale_matched_hierarchy():
+    preview = CurriculumGenerateSkill().build_prompt_preview(_conversation_payload(), _context())
+
+    assert "Choose a curriculum scale" in preview.system_prompt
+    assert "micro" in preview.system_prompt
+    assert "week" in preview.system_prompt
+    assert "Do not force domain/strand/goal-group hierarchy" in preview.system_prompt
 
 
 def test_curriculum_generate_builds_openai_file_message_blocks_for_source_entry():
@@ -224,6 +235,7 @@ def _artifact_payload():
         "pacing": {
             "coverageStrategy": "Strategy",
         },
+        "curriculumScale": "module",
         "skills": [
             {
                 "skillId": "skill-1",
@@ -256,6 +268,47 @@ def test_curriculum_artifact_accepts_flat_skill_catalog():
 
     assert [skill.skillId for skill in artifact.skills] == ["skill-1", "skill-2"]
     assert artifact.units[0].skillIds == ["skill-1", "skill-2"]
+
+
+def test_curriculum_artifact_accepts_week_scale_without_hierarchy_labels():
+    artifact = CurriculumArtifact.model_validate(
+        {
+            "source": {
+                "title": "Clouds This Week",
+                "description": "Desc",
+                "summary": "Summary",
+                "teachingApproach": "Approach",
+            },
+            "intakeSummary": "A one-week cloud observation curriculum.",
+            "pacing": {
+                "totalWeeks": 1,
+                "sessionsPerWeek": 4,
+                "totalSessions": 4,
+                "coverageStrategy": "Observe and classify common cloud types this week.",
+            },
+            "curriculumScale": "week",
+            "skills": [
+                {"skillId": "skill-1", "title": "Observe cloud shape and height"},
+                {"skillId": "skill-2", "title": "Match cloud observations to likely weather"},
+            ],
+            "units": [
+                {
+                    "unitRef": "unit:1:clouds-week",
+                    "title": "Cloud observations",
+                    "description": "A compact week of cloud observation.",
+                    "estimatedWeeks": 1,
+                    "estimatedSessions": 4,
+                    "skillIds": ["skill-1", "skill-2"],
+                }
+            ],
+        }
+    )
+
+    assert artifact.curriculumScale == "week"
+    assert artifact.skills[0].domainTitle is None
+    assert artifact.skills[0].canonical_skill_ref() == (
+        "skill:curriculum/core-sequence/focus-skills/observe-cloud-shape-and-height"
+    )
 
 
 def test_curriculum_artifact_rejects_unknown_unit_skill_ids():

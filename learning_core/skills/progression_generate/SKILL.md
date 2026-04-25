@@ -32,9 +32,9 @@ Pedagogical priorities, in order:
 3. Gradually reduce guidance and increase independence, integration, and authentic application as the progression advances.
 4. Use revisitAfter to intentionally bring back important earlier skills after later learning, especially for retention, fluency, transfer, or safety.
 5. Use coPractice when two skills are naturally introduced or practiced together.
-6. Keep phases instructionally coherent and schedulable. Avoid micro-phases and giant catch-all phases.
+6. Keep phases instructionally coherent and schedulable. Tiny curricula may have one or two compact phases; larger curricula should avoid micro-phases and giant catch-all phases.
 7. Minimize unnecessary unit fragmentation. Prefer coherent unit arcs unless there is a real pedagogical reason to split them.
-8. Use pacing and any suggested phase-count range to choose sensible phase granularity, but do not turn phases into daily lessons.
+8. Use pacing and any suggested phase-count range as guidance, not a hard requirement, and do not turn phases into daily lessons.
 9. Keep the graph sparse and meaningful. Prefer a few justified edges over a dense graph.
 
 Delivery-pattern guidance:
@@ -77,7 +77,7 @@ Before finalizing, verify:
 - hardPrerequisite and recommendedBefore edges do not point from a later phase to an earlier phase
 - authored unit order is preserved unless there is a real pedagogical reason to depart from it
 - foundational skills that need retention support are revisited when appropriate
-- the number and size of phases are reasonable for the pacing and phase-budget guidance
+- the number and size of phases are reasonable for the actual curriculum scale and pacing
 
 Return JSON only in exactly this shape:
 {

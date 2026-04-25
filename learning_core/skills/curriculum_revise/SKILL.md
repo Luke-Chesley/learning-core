@@ -9,11 +9,13 @@ Your job is to produce a revised CORE curriculum artifact only.
 Revision rules:
 - Preserve existing structure when the request is narrow.
 - Broader rewrites are allowed when the parent clearly asks for them.
-- Preserve the canonical skill organization: domain -> strand -> goal group -> skill.
+- Preserve existing domain -> strand -> goal group organization when it is meaningful, but do not force course-shaped hierarchy onto short curricula.
 - Keep the result coherent and teachable.
 - Generate a revised curriculum artifact that includes source, intakeSummary, pacing, skills, and units.
 - Units should group leaf skills; do not generate lesson shells.
-- Return one canonical flat `skills` list with `skillId`, `domainTitle`, `strandTitle`, `goalGroupTitle`, and `title`.
+- Return one canonical flat `skills` list with `skillId` and `title`.
+- Skills may include `domainTitle`, `strandTitle`, and `goalGroupTitle` when those labels add useful organization.
+- Include `curriculumScale` as `micro`, `week`, `module`, `course`, or `reference_source` when applying a revision.
 - Use `skillId` only as a local membership id inside the artifact.
 - Units must reference skills only by `skillIds`.
 - Do not generate `document`.
@@ -46,12 +48,13 @@ Return JSON only with this exact shape:
       "coverageStrategy": "string",
       "coverageNotes": ["string"]
     },
+    "curriculumScale": "micro" | "week" | "module" | "course" | "reference_source",
     "skills": [
       {
         "skillId": "skill-1",
-        "domainTitle": "Domain title",
-        "strandTitle": "Strand title",
-        "goalGroupTitle": "Goal group title",
+        "domainTitle": "Optional domain title",
+        "strandTitle": "Optional strand title",
+        "goalGroupTitle": "Optional goal group title",
         "title": "Skill title"
       }
     ],

@@ -24,11 +24,29 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
         max_tokens=12000,
     )
 
+    def _scale_guidance(self, payload: CurriculumGenerationRequest) -> str:
+        if payload.requestMode == "source_entry":
+            if payload.sourceKind in {"bounded_material", "timeboxed_plan"}:
+                return "Prefer curriculumScale micro or week when the source is day-sized or week-sized."
+            if payload.sourceKind == "comprehensive_source":
+                return "Prefer curriculumScale reference_source or course when the artifact should represent a broader source."
+            if payload.recommendedHorizon in {"single_day", "few_days", "one_week"}:
+                return "Prefer the smallest honest scale; a compact curriculum does not need course-shaped hierarchy."
+            return "Choose the smallest honest curriculumScale that still preserves the durable curriculum scope."
+
+        expectations = payload.pacingExpectations
+        if expectations and expectations.totalWeeks is not None and expectations.totalWeeks <= 1:
+            return "Prefer curriculumScale week and keep the structure compact; one unit can be enough."
+        if expectations and expectations.totalSessionsUpperBound is not None and expectations.totalSessionsUpperBound <= 5:
+            return "Prefer curriculumScale micro or week; avoid fake course hierarchy."
+        return "Choose the smallest honest curriculumScale from the conversation, from micro/week through module/course."
+
     def build_user_prompt(self, payload: CurriculumGenerationRequest, context) -> str:
         lines = [
             f"Active learner: {payload.learnerName}",
             f"Request mode: {payload.requestMode}",
             f"Title candidate: {payload.titleCandidate or 'None provided'}",
+            f"Scale guidance: {self._scale_guidance(payload)}",
         ]
 
         if payload.requestMode == "source_entry":
@@ -144,6 +162,8 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     "",
                     "Correction rules:",
                     "- `source.rationale` must be an array of strings, never one string.",
+                    "- `curriculumScale`, when present, must be one of micro, week, module, course, or reference_source.",
+                    "- `skills[].domainTitle`, `skills[].strandTitle`, and `skills[].goalGroupTitle` are optional; do not invent fake hierarchy just to satisfy a course-shaped template.",
                     "- Every unit must include `skillIds` that match existing top-level `skills[].skillId` values.",
                     "- `estimatedWeeks`, `estimatedSessions`, `totalWeeks`, `sessionsPerWeek`, `sessionMinutes`, and `totalSessions` must be positive integers when present.",
                     "- Do not use `0` for any estimate. Use `1` for a very small unit or omit the estimate.",

@@ -47,15 +47,17 @@ Source-entry behavior by source kind:
 
 Shared generation rules:
 - Create a durable curriculum, not a launch artifact.
+- Choose a curriculum scale that matches the request: `micro`, `week`, `module`, `course`, or `reference_source`.
+- `micro` and `week` curricula can be small and direct: one unit and a short skill list is valid when that matches the request.
+- `module`, `course`, and `reference_source` curricula can use more units and hierarchy, but should still avoid fake detail.
 - Units must stay coarse enough to group skills meaningfully, but not so broad that downstream sequencing becomes vague.
 - Every unit must include a unique `unitRef`.
 - Return one canonical flat `skills` list.
 - Every skill must include:
   - `skillId`
-  - `domainTitle`
-  - `strandTitle`
-  - `goalGroupTitle`
   - `title`
+- Skills may also include `domainTitle`, `strandTitle`, and `goalGroupTitle` when those labels add real organization.
+- Do not force domain/strand/goal-group hierarchy onto a tiny one-week or single-module curriculum just to satisfy a course-shaped template.
 - `skillId` is only a local membership id for this artifact. Keep it short and stable within the response.
 - Do not generate `document`.
 - Do not generate `skillRefs`.
@@ -65,9 +67,8 @@ Shared generation rules:
 - Do not over-decompose weak sources.
 - Do not generate fake semester-scale detail from weak input.
 - Do not collapse whole books, textbooks, workbooks, or long PDFs into one shallow week.
-- Keep the domain -> strand -> goal-group organization coherent so the system can derive the curriculum tree after validation.
-- Use between 1 and 8 domains total.
-- Every skill must fit under goal group -> strand -> domain.
+- When hierarchy labels are present, keep domain -> strand -> goal-group organization coherent so the system can derive the curriculum tree after validation.
+- Use between 1 and 8 domains total only when domains are pedagogically meaningful for the requested scale.
 - Units should follow a teachable order.
 - Units can be broader than any later launch window.
 - `source.rationale` must always be an array of strings, even when there is only one rationale.
@@ -79,6 +80,7 @@ Return JSON with this shape:
   "source": { ... },
   "intakeSummary": "string",
   "pacing": { ... },
+  "curriculumScale": "micro" | "week" | "module" | "course" | "reference_source",
   "skills": [ ... ],
   "units": [ ... ]
 }
@@ -106,12 +108,13 @@ Return JSON in exactly this shape:
     "coverageStrategy": "string",
     "coverageNotes": ["string"]
   },
+  "curriculumScale": "week",
   "skills": [
     {
       "skillId": "skill-1",
-      "domainTitle": "Domain title",
-      "strandTitle": "Strand title",
-      "goalGroupTitle": "Goal group title",
+      "domainTitle": "Optional domain title",
+      "strandTitle": "Optional strand title",
+      "goalGroupTitle": "Optional goal group title",
       "title": "Skill title"
     }
   ],

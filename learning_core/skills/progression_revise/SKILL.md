@@ -36,7 +36,7 @@ Phase rules:
 - Do not omit any skillRef.
 - Do not repeat any skillRef across phases.
 - Every phase must include a non-empty description that explains the grouping logic and learner-support posture.
-- Keep phases schedulable. Avoid micro-phases and giant catch-all phases.
+- Keep phases schedulable. Tiny curricula may have one or two compact phases; larger curricula should avoid micro-phases and giant catch-all phases.
 - Keep the graph sparse and meaningful.
 
 Before finalizing, verify:

@@ -45,7 +45,8 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- Read the snapshot and transcript directly.",
                 "- Decide whether the change is a split, rename, targeted adjust, or broader rewrite.",
                 "- Preserve unchanged branches unless the parent explicitly asked for a broader rewrite.",
-                "- Keep the canonical skill organization: domain -> strand -> goal group -> skill.",
+                "- Preserve domain -> strand -> goal group labels when they are meaningful in the existing curriculum.",
+                "- Do not force course-shaped hierarchy onto short curricula; skillId plus title is enough for tiny or week-sized scopes.",
                 "- Preserve teachable granularity while keeping the hierarchy coherent.",
                 "- Units should remain coarse curriculum groupings, not lesson plans.",
                 "- Return one flat skills list plus units that reference those skills by skillId.",
@@ -89,7 +90,15 @@ class CurriculumReviseSkill(StructuredOutputSkill):
         if repaired.get("action") != "apply" or not isinstance(artifact, dict):
             return None
 
-        expected_artifact_keys = {"source", "intakeSummary", "pacing", "skills", "units", "document"}
+        expected_artifact_keys = {
+            "source",
+            "intakeSummary",
+            "pacing",
+            "curriculumScale",
+            "skills",
+            "units",
+            "document",
+        }
         document = artifact.get("document")
         if document is not None and not isinstance(document, dict):
             return None
@@ -161,6 +170,7 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "source": repaired_artifact.get("source"),
                 "intakeSummary": repaired_artifact.get("intakeSummary"),
                 "pacing": repaired_artifact.get("pacing"),
+                "curriculumScale": repaired_artifact.get("curriculumScale"),
                 "skills": skills,
                 "units": repaired_units,
             }
@@ -188,8 +198,8 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- The previous response was invalid.",
                 "- Return only one corrected JSON object.",
                 "- The top-level shape must be exactly assistantMessage, action, changeSummary, and optional artifact.",
-                "- When action is apply, artifact may contain only source, intakeSummary, pacing, skills, and units.",
-                "- Every skill belongs in artifact.skills with skillId, domainTitle, strandTitle, goalGroupTitle, and title.",
+                "- When action is apply, artifact may contain only source, intakeSummary, pacing, curriculumScale, skills, and units.",
+                "- Every skill belongs in artifact.skills with skillId and title; domainTitle, strandTitle, and goalGroupTitle are optional.",
                 "- Units may reference those skills only through units[].skillIds.",
                 "- Preserve the intended curriculum content while fixing the JSON structure.",
             ]
