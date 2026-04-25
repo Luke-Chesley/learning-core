@@ -21,6 +21,11 @@ from learning_core.runtime.providers import ModelRuntime
 from learning_core.skills.catalog import build_skill_registry
 from learning_core.skills.session_generate.scripts.main import SessionGenerateSkill
 
+ALLOWED_CLOUD_URL = (
+    "https://upload.wikimedia.org/wikipedia/commons/b/b5/"
+    "Cumulus_clouds_in_fair_weather.jpeg"
+)
+
 
 def _lesson_artifact(lesson_shape: str) -> dict:
     return {
@@ -131,6 +136,49 @@ def test_structured_lesson_draft_accepts_canonical_lesson_shape():
     assert artifact.lesson_shape == "direct_instruction"
 
 
+def test_structured_lesson_draft_accepts_allowed_visual_aid_reference():
+    artifact = _lesson_artifact("direct_instruction")
+    artifact["visual_aids"] = [
+        {
+            "id": "cloud-photo",
+            "title": "Cumulus cloud reference",
+            "kind": "reference_image",
+            "url": ALLOWED_CLOUD_URL,
+            "alt": "White cumulus clouds against a blue sky.",
+        }
+    ]
+    artifact["blocks"][0]["visual_aid_ids"] = ["cloud-photo"]
+
+    parsed = StructuredLessonDraft.model_validate(artifact)
+
+    assert parsed.visual_aids[0].url == ALLOWED_CLOUD_URL
+    assert parsed.blocks[0].visual_aid_ids == ["cloud-photo"]
+
+
+def test_structured_lesson_draft_rejects_disallowed_visual_aid_url():
+    artifact = _lesson_artifact("direct_instruction")
+    artifact["visual_aids"] = [
+        {
+            "id": "cloud-photo",
+            "title": "Random cloud image",
+            "kind": "reference_image",
+            "url": "https://example.com/cloud.jpg",
+            "alt": "Cloud image.",
+        }
+    ]
+
+    with pytest.raises(ValidationError):
+        StructuredLessonDraft.model_validate(artifact)
+
+
+def test_structured_lesson_draft_rejects_unknown_visual_aid_reference():
+    artifact = _lesson_artifact("direct_instruction")
+    artifact["blocks"][0]["visual_aid_ids"] = ["missing-photo"]
+
+    with pytest.raises(ValidationError):
+        StructuredLessonDraft.model_validate(artifact)
+
+
 def test_structured_lesson_draft_rejects_lesson_shape_as_block_type():
     artifact = _lesson_artifact("practice_heavy")
     artifact["blocks"][0]["type"] = "practice_heavy"
@@ -172,6 +220,76 @@ def test_session_generate_prompt_preview_constrains_lesson_shape_values():
     ) in preview.user_prompt
 
 
+def test_session_generate_prompt_preview_lists_only_allowed_visual_aid_candidates():
+    payload = SessionPlanGenerationRequest.model_validate(
+        {
+            "topic": "Cloud observation",
+            "context": {
+                "visualAidCandidates": [
+                    {
+                        "id": "cloud-photo",
+                        "title": "Cumulus cloud reference",
+                        "url": ALLOWED_CLOUD_URL,
+                        "sourceName": "Wikimedia Commons",
+                    },
+                    {
+                        "id": "random-photo",
+                        "title": "Random cloud image",
+                        "url": "https://example.com/cloud.jpg",
+                        "sourceName": "Example",
+                    },
+                ]
+            },
+        }
+    )
+
+    preview = SessionGenerateSkill().build_prompt_preview(
+        payload,
+        RuntimeContext.create(
+            operation_name="session_generate",
+            app_context=AppContext(product="homeschool-v2", surface="today"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+    )
+
+    assert "Allowed visual-aid candidates:" in preview.user_prompt
+    assert ALLOWED_CLOUD_URL in preview.user_prompt
+    assert "https://example.com/cloud.jpg" in preview.user_prompt
+    allowed_section = preview.user_prompt.split("Allowed visual-aid candidates:", 1)[1].split("\nObjectives:", 1)[0]
+    assert ALLOWED_CLOUD_URL in allowed_section
+    assert "https://example.com/cloud.jpg" not in allowed_section
+
+
+def test_session_generate_prompt_preview_omits_visual_aids_when_no_candidates():
+    payload = SessionPlanGenerationRequest.model_validate(
+        {
+            "topic": "Cloud observation",
+            "context": {
+                "visualAidCandidates": [
+                    {
+                        "id": "random-photo",
+                        "title": "Random cloud image",
+                        "url": "https://example.com/cloud.jpg",
+                    },
+                ]
+            },
+        }
+    )
+
+    preview = SessionGenerateSkill().build_prompt_preview(
+        payload,
+        RuntimeContext.create(
+            operation_name="session_generate",
+            app_context=AppContext(product="homeschool-v2", surface="today"),
+            presentation_context=PresentationContext(),
+            user_authored_context=UserAuthoredContext(),
+        ),
+    )
+
+    assert "Allowed visual-aid candidates: none. Omit visual_aids and visual_aid_ids." in preview.user_prompt
+
+
 def test_session_generate_validation_retry_corrects_block_type_values():
     payload = SessionPlanGenerationRequest.model_validate(
         {
@@ -198,6 +316,8 @@ def test_session_generate_validation_retry_corrects_block_type_values():
     assert "Every blocks[].type must be one of" in preview.user_prompt
     assert "Never put lesson_shape slugs" in preview.user_prompt
     assert "guided_practice or independent_practice" in preview.user_prompt
+    assert "Every visual_aids[].url must be copied exactly" in preview.user_prompt
+    assert "Do not invent, generate, guess, rewrite, or use placeholder image URLs." in preview.user_prompt
 
 
 def test_session_generate_prompt_preview_adds_script_first_constraints():

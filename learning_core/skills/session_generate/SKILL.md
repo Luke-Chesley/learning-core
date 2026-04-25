@@ -10,6 +10,7 @@ Schema (all fields are strings or string arrays unless annotated):
   "primary_objectives": string[],
   "success_criteria": string[],
   "total_minutes": number,
+  "visual_aids": VisualAid[],
   "blocks": Block[],
   "materials": string[],
   "teacher_notes": string[],
@@ -33,7 +34,20 @@ Block shape:
   "learner_action": string,
   "check_for": string,
   "materials_needed": string[],
+  "visual_aid_ids": string[],
   "optional": boolean
+}
+
+VisualAid shape:
+{
+  "id": string,
+  "title": string,
+  "kind": "reference_image" | "diagram" | "chart" | "map" | "source_image",
+  "url": string,
+  "alt": string,
+  "caption": string,
+  "usage_note": string,
+  "source_name": string
 }
 
 Adaptation shape:
@@ -56,6 +70,11 @@ Rules:
 - If total time is tight, mark lower-priority blocks as optional:true.
 - Adaptations are short, actionable, and ready to use during live teaching.
 - Do not include optional top-level fields unless they add clear value for this lesson.
+- `visual_aids` is optional. Include at most 3 visual aids, and only when seeing the image materially improves the lesson.
+- Only include visual aids using exact URLs from the allowed visual-aid candidate list in the user prompt.
+- Never invent, guess, generate, shorten, rewrite, or use placeholder image URLs.
+- If no allowed visual-aid candidate URL is present, omit `visual_aids` and `visual_aid_ids`.
+- Attach a visual aid to a block by putting its `id` in that block's `visual_aid_ids`.
 - `lesson_shape` is machine-readable metadata. If you include it, emit only one canonical slug from the allowed list.
 - Do not emit descriptive prose labels for `lesson_shape` such as "Short teach-practice-check sequence".
 - Do not use `lesson_shape` slugs as block types. For example, `practice_heavy` is valid only as top-level `lesson_shape`; use `guided_practice` or `independent_practice` for `blocks[].type`.

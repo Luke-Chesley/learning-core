@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 import re
 
-from learning_core.contracts.lesson_draft import LESSON_BLOCK_TYPE_VALUES, LESSON_SHAPE_VALUES
+from learning_core.contracts.lesson_draft import (
+    LESSON_BLOCK_TYPE_VALUES,
+    LESSON_SHAPE_VALUES,
+    validate_lesson_visual_aid_url,
+)
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
 from learning_core.observability.traces import PromptPreview
 from learning_core.runtime.policy import ExecutionPolicy
@@ -89,6 +93,41 @@ def _infer_total_minutes(payload: SessionPlanGenerationRequest, context) -> int:
     return 30
 
 
+def _visual_aid_candidates(payload: SessionPlanGenerationRequest) -> list[dict[str, object]]:
+    if not payload.context:
+        return []
+
+    candidates = payload.context.get("visualAidCandidates")
+    if not isinstance(candidates, list):
+        return []
+
+    normalized: list[dict[str, object]] = []
+    seen_urls: set[str] = set()
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        url = candidate.get("url")
+        title = candidate.get("title")
+        if not isinstance(url, str) or not url.strip():
+            continue
+        try:
+            validate_lesson_visual_aid_url(url)
+        except ValueError:
+            continue
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        normalized.append(
+            {
+                "id": candidate.get("id") if isinstance(candidate.get("id"), str) else f"visual-{len(normalized) + 1}",
+                "title": title if isinstance(title, str) and title.strip() else "Visual aid",
+                "url": url,
+                "sourceName": candidate.get("sourceName") if isinstance(candidate.get("sourceName"), str) else None,
+            }
+        )
+    return normalized[:6]
+
+
 class SessionGenerateSkill(StructuredOutputSkill):
     name = "session_generate"
     input_model = SessionPlanGenerationRequest
@@ -143,6 +182,7 @@ class SessionGenerateSkill(StructuredOutputSkill):
             learner_name = context.app_context.learner_id
 
         total_minutes = _infer_total_minutes(payload, context)
+        visual_aid_candidates = _visual_aid_candidates(payload)
 
         lines = [
             f"Generate a structured lesson plan for {learner_name or 'the learner'} on "
@@ -166,6 +206,10 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 "- Prefer fewer, clearer blocks over filler transitions or repeated review.",
                 "- Keep top-level lesson_shape separate from block types.",
                 "- Never use a lesson_shape slug as blocks[].type. For a practice-heavy lesson, set top-level lesson_shape to practice_heavy and use block types like guided_practice or independent_practice.",
+                "- Use visual_aids only when seeing the image materially improves teaching, such as clouds, maps, diagrams, artwork, or source images.",
+                "- Include at most 3 visual aids.",
+                "- Use only exact URLs from the allowed visual-aid candidate list below. Never invent, generate, guess, rewrite, or use placeholder image URLs.",
+                "- If no allowed visual-aid candidate fits the lesson, omit visual_aids and visual_aid_ids.",
                 "",
                 "Teacher guidance rules:",
                 "- Assume the adult may be capable but not topic-expert unless the request clearly says otherwise.",
@@ -198,6 +242,26 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 [
                     "- Preserve distinct expectations for the learners instead of collapsing into one shared task.",
                     "- Make the split visible inside block actions, adaptations, or teacher notes so the parent can run it without guessing.",
+                ]
+            )
+
+        if visual_aid_candidates:
+            lines.extend(
+                [
+                    "",
+                    "Allowed visual-aid candidates:",
+                    *[
+                        f"{index + 1}. id: {candidate['id']}; title: {candidate['title']}; url: {candidate['url']}"
+                        + (f"; source: {candidate['sourceName']}" if candidate.get("sourceName") else "")
+                        for index, candidate in enumerate(visual_aid_candidates)
+                    ],
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "",
+                    "Allowed visual-aid candidates: none. Omit visual_aids and visual_aid_ids.",
                 ]
             )
 
@@ -267,6 +331,9 @@ class SessionGenerateSkill(StructuredOutputSkill):
                     f"- Top-level lesson_shape, when present, must be one of: {', '.join(LESSON_SHAPE_VALUES)}.",
                     "- Never put lesson_shape slugs such as practice_heavy, balanced, or project_based in blocks[].type.",
                     "- If the intended lesson shape is practice-heavy, keep lesson_shape as practice_heavy and use guided_practice or independent_practice blocks.",
+                    "- Every visual_aids[].url must be copied exactly from the allowed visual-aid candidate list.",
+                    "- If there are no allowed visual-aid candidates, omit visual_aids and visual_aid_ids.",
+                    "- Do not invent, generate, guess, rewrite, or use placeholder image URLs.",
                     "- Keep block minutes aligned to total_minutes and keep teacher_action runnable by a non-expert adult.",
                     "",
                     "Previous invalid JSON:",
