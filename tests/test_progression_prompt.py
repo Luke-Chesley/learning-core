@@ -1,4 +1,7 @@
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
+import pytest
+from pydantic import ValidationError
+
 from learning_core.contracts.progression import ProgressionArtifact, ProgressionGenerationRequest
 from learning_core.runtime.context import RuntimeContext
 from learning_core.skills.progression_generate.scripts.main import ProgressionGenerateSkill
@@ -173,6 +176,38 @@ def test_progression_repair_removes_duplicate_skill_refs_from_later_phases():
 
     artifact = ProgressionArtifact.model_validate(repaired)
     assert [phase.title for phase in artifact.phases] == ["Foundations", "Application"]
+
+
+def test_progression_artifact_rejects_duplicate_edge_pairs_with_different_kinds():
+    with pytest.raises(ValidationError):
+        ProgressionArtifact.model_validate(
+            {
+                "phases": [
+                    {
+                        "title": "Foundations",
+                        "description": "Start with safety.",
+                        "skillRefs": ["skill:kitchen/foundations/knife-safety"],
+                    },
+                    {
+                        "title": "Application",
+                        "description": "Apply the routine.",
+                        "skillRefs": ["skill:kitchen/application/make-snack"],
+                    },
+                ],
+                "edges": [
+                    {
+                        "fromSkillRef": "skill:kitchen/foundations/knife-safety",
+                        "toSkillRef": "skill:kitchen/application/make-snack",
+                        "kind": "hardPrerequisite",
+                    },
+                    {
+                        "fromSkillRef": "skill:kitchen/foundations/knife-safety",
+                        "toSkillRef": "skill:kitchen/application/make-snack",
+                        "kind": "recommendedBefore",
+                    },
+                ],
+            }
+        )
 
 
 def test_progression_repair_recovers_uniquely_shortened_skill_refs():

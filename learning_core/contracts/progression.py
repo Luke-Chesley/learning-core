@@ -87,7 +87,7 @@ class ProgressionArtifact(StrictModel):
                     )
                 seen_skill_refs.add(skill_ref)
 
-        seen_edges: set[tuple[str, str, ProgressionEdgeKind]] = set()
+        seen_edges: set[tuple[str, str]] = set()
         hard_prerequisites: list[tuple[str, str]] = []
         for edge in self.edges:
             if edge.fromSkillRef == edge.toSkillRef:
@@ -95,11 +95,11 @@ class ProgressionArtifact(StrictModel):
                     f'ProgressionArtifact contains self-loop edge: "{edge.fromSkillRef}"',
                 )
 
-            edge_key = (edge.fromSkillRef, edge.toSkillRef, edge.kind)
+            edge_key = (edge.fromSkillRef, edge.toSkillRef)
             if edge_key in seen_edges:
                 raise ValueError(
                     "ProgressionArtifact contains duplicate edge "
-                    f'"{edge.fromSkillRef}" -> "{edge.toSkillRef}" ({edge.kind})',
+                    f'"{edge.fromSkillRef}" -> "{edge.toSkillRef}"',
                 )
             seen_edges.add(edge_key)
 
