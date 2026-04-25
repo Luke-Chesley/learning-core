@@ -10,7 +10,11 @@ from learning_core.contracts.operation import AppContext, PresentationContext, U
 from learning_core.runtime.context import RuntimeContext
 from learning_core.runtime.engine import AgentEngine
 from learning_core.runtime.providers import ModelRuntime
-from learning_core.skills.activity_generate.scripts.main import ActivityGenerateSkill, _select_packs
+from learning_core.skills.activity_generate.scripts.main import (
+    ActivityGenerateSkill,
+    _normalize_activity_json,
+    _select_packs,
+)
 from learning_core.skills.activity_generate.validation.widgets import normalize_and_validate_widget_activity
 from learning_core.skills.catalog import build_skill_registry
 
@@ -135,6 +139,30 @@ _VALID_ARTIFACT_WITH_NULLS = {
         "confidenceMasteryLevel": None,
     },
 }
+
+
+def test_activity_json_normalizer_removes_non_string_paragraph_markdown():
+    normalized = _normalize_activity_json(
+        {
+            "components": [
+                {
+                    "type": "paragraph",
+                    "id": "intro",
+                    "text": "Read this first.",
+                    "markdown": False,
+                },
+                {
+                    "type": "callout",
+                    "id": "tip",
+                    "text": "Keep going.",
+                    "markdown": False,
+                },
+            ]
+        }
+    )
+
+    assert "markdown" not in normalized["components"][0]
+    assert normalized["components"][1]["markdown"] is False
 
 _VALID_CHESS_ARTIFACT = {
     "schemaVersion": "2",
@@ -495,6 +523,42 @@ def test_activity_artifact_accepts_interactive_widget_component():
     artifact = ActivityArtifact.model_validate(_VALID_CHESS_ARTIFACT)
     assert artifact.components[0].type == "interactive_widget"
     assert artifact.components[0].widget.engineKind == "chess"
+
+
+def test_activity_artifact_rejects_placeholder_image_urls():
+    invalid = {
+        **_VALID_ARTIFACT,
+        "components": [
+            *_VALID_ARTIFACT["components"],
+            {
+                "type": "image",
+                "id": "prepared-image",
+                "src": "prepared-cell-image-placeholder",
+                "alt": "Prepared cell image",
+            },
+        ],
+    }
+
+    with pytest.raises(ValueError, match="Media URLs must be real"):
+        ActivityArtifact.model_validate(invalid)
+
+
+def test_activity_artifact_accepts_real_image_urls():
+    valid = {
+        **_VALID_ARTIFACT,
+        "components": [
+            *_VALID_ARTIFACT["components"],
+            {
+                "type": "image",
+                "id": "prepared-image",
+                "src": "https://example.com/prepared-cell-image.png",
+                "alt": "Prepared cell image",
+            },
+        ],
+    }
+
+    artifact = ActivityArtifact.model_validate(valid)
+    assert artifact.components[-1].src == "https://example.com/prepared-cell-image.png"
 
 
 def test_activity_artifact_rejects_top_level_chess_board_component():

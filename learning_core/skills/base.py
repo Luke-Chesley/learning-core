@@ -34,6 +34,9 @@ class StructuredOutputSkill(SkillDefinition):
     def repair_invalid_artifact(self, *, raw_artifact, payload, context, error):
         return None
 
+    def validate_artifact_semantics(self, *, artifact, payload, context) -> list[str]:
+        return []
+
     def build_validation_retry_preview(
         self,
         *,

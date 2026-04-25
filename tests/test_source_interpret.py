@@ -532,13 +532,21 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                 "coverageStrategy": "Stay inside the initial launch slice.",
                 "coverageNotes": [],
             },
-            "document": {"Life Skills": {"Chapter 1": ["Kitchen setup"]}},
+            "skills": [
+                {
+                    "skillId": "skill-1",
+                    "domainTitle": "Life Skills",
+                    "strandTitle": "Chapter 1",
+                    "goalGroupTitle": "Kitchen launch",
+                    "title": "Kitchen setup",
+                }
+            ],
             "units": [
                 {
                     "unitRef": "unit:chapter-1",
                     "title": "Chapter 1",
                     "description": "Source-entry launch unit",
-                    "skillRefs": ["skill:life-skills/chapter-1/kitchen-setup"],
+                    "skillIds": ["skill-1"],
                 },
             ],
         },

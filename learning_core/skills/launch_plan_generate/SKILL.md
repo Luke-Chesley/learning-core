@@ -22,7 +22,8 @@ Rules:
 - Keep the opening slice small, operational, and easy to schedule first.
 - Prefer the earliest teachable unit arc unless source-entry metadata clearly points elsewhere.
 - Use openingSkillRefs as the canonical startup set.
-- Use openingUnitRefs to identify the owning unit arc.
+- Do not return openingUnitRefs.
+- The app derives owning units from the selected openingSkillRefs after validation.
 
 Return JSON in exactly this shape:
 {
@@ -30,7 +31,6 @@ Return JSON in exactly this shape:
   "scopeSummary": "string",
   "initialSliceUsed": true,
   "initialSliceLabel": "string or null",
-  "openingUnitRefs": ["unit:..."],
   "openingSkillRefs": ["skill:..."]
 }
 

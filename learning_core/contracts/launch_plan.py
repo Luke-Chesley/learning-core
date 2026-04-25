@@ -54,7 +54,6 @@ class LaunchPlanArtifact(StrictModel):
     scopeSummary: str
     initialSliceUsed: bool
     initialSliceLabel: str | None = None
-    openingUnitRefs: list[str] = Field(default_factory=list)
     openingSkillRefs: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")

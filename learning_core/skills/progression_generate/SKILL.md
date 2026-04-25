@@ -61,6 +61,8 @@ Phase rules:
 - Assign every skillRef to exactly one phase.
 - Do not omit any skillRef.
 - Do not repeat any skillRef across phases.
+- Do not create review, transfer, capstone, or catch-all phases by repeating skillRefs that already appeared in earlier phases.
+- Represent review, retrieval, and later practice with `revisitAfter` edges, not duplicate phase membership.
 - Use only skillRefs from the provided skill catalog.
 - For every phases[].skillRefs entry and every edges[].fromSkillRef / edges[].toSkillRef value, copy the exact provided skillRef string verbatim. Any reconstructed or partially rewritten skillRef is invalid.
 - Every phase must have a clear instructional purpose.

@@ -58,3 +58,4 @@ Rules:
 - Do not include optional top-level fields unless they add clear value for this lesson.
 - `lesson_shape` is machine-readable metadata. If you include it, emit only one canonical slug from the allowed list.
 - Do not emit descriptive prose labels for `lesson_shape` such as "Short teach-practice-check sequence".
+- Do not use `lesson_shape` slugs as block types. For example, `practice_heavy` is valid only as top-level `lesson_shape`; use `guided_practice` or `independent_practice` for `blocks[].type`.

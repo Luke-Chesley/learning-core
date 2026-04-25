@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 
 from learning_core.observability.traces import PromptPreview
-from learning_core.contracts.curriculum import CurriculumRevisionRequest, CurriculumRevisionTurn
+from learning_core.contracts.curriculum import (
+    CurriculumRevisionRequest,
+    CurriculumRevisionTurn,
+    iter_document_skill_entries,
+)
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.runtime.skill import SkillExecutionResult
 from learning_core.skills.base import StructuredOutputSkill
@@ -41,9 +45,10 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- Read the snapshot and transcript directly.",
                 "- Decide whether the change is a split, rename, targeted adjust, or broader rewrite.",
                 "- Preserve unchanged branches unless the parent explicitly asked for a broader rewrite.",
-                "- Keep the canonical tree shape: domain -> strand -> goal group -> skill.",
-                "- Preserve teachable granularity while keeping the tree coherent.",
+                "- Keep the canonical skill organization: domain -> strand -> goal group -> skill.",
+                "- Preserve teachable granularity while keeping the hierarchy coherent.",
                 "- Units should remain coarse curriculum groupings, not lesson plans.",
+                "- Return one flat skills list plus units that reference those skills by skillId.",
                 "- Return the full revised curriculum artifact when action is \"apply\".",
                 "- If the request is too vague to apply safely, ask one precise clarification question.",
             ]
@@ -84,16 +89,14 @@ class CurriculumReviseSkill(StructuredOutputSkill):
         if repaired.get("action") != "apply" or not isinstance(artifact, dict):
             return None
 
-        expected_artifact_keys = {"source", "intakeSummary", "pacing", "document", "units"}
+        expected_artifact_keys = {"source", "intakeSummary", "pacing", "skills", "units", "document"}
         document = artifact.get("document")
-        if document is None:
-            document = {}
-        if not isinstance(document, dict):
+        if document is not None and not isinstance(document, dict):
             return None
 
         moved_any = False
         repaired_artifact = dict(artifact)
-        repaired_document = dict(document)
+        repaired_document = dict(document or {})
 
         for key, value in list(repaired_artifact.items()):
             if key in expected_artifact_keys:
@@ -106,10 +109,67 @@ class CurriculumReviseSkill(StructuredOutputSkill):
             repaired_artifact.pop(key, None)
             moved_any = True
 
+        if repaired_document:
+            skills = []
+            skill_id_by_ref = {}
+            skill_ids_by_title = {}
+            for ordinal, (skill_ref, path, title) in enumerate(iter_document_skill_entries(repaired_document), start=1):
+                domain_title = path[0] if len(path) > 0 else "General"
+                strand_title = path[1] if len(path) > 1 else "General"
+                goal_group_title = " / ".join(path[2:-1]) if len(path) > 3 else (path[2] if len(path) > 2 else "Skills")
+                skill_id = f"skill-{ordinal}"
+                skill_id_by_ref[skill_ref] = skill_id
+                skill_ids_by_title.setdefault(title, []).append(skill_id)
+                skills.append(
+                    {
+                        "skillId": skill_id,
+                        "domainTitle": domain_title,
+                        "strandTitle": strand_title,
+                        "goalGroupTitle": goal_group_title,
+                        "title": title,
+                    }
+                )
+
+            repaired_units = []
+            for raw_unit in repaired_artifact.get("units", []):
+                if not isinstance(raw_unit, dict):
+                    return None
+                unit = dict(raw_unit)
+                if "skillIds" not in unit:
+                    if isinstance(unit.get("skillRefs"), list):
+                        unit["skillIds"] = [
+                            skill_id_by_ref[skill_ref]
+                            for skill_ref in unit["skillRefs"]
+                            if isinstance(skill_ref, str) and skill_ref in skill_id_by_ref
+                        ]
+                    elif isinstance(unit.get("skills"), list):
+                        resolved_skill_ids = []
+                        for title in unit["skills"]:
+                            if not isinstance(title, str):
+                                continue
+                            matches = skill_ids_by_title.get(title, [])
+                            if len(matches) != 1:
+                                return None
+                            resolved_skill_ids.append(matches[0])
+                        unit["skillIds"] = resolved_skill_ids
+                unit.pop("skillRefs", None)
+                unit.pop("skills", None)
+                unit.pop("skillTitles", None)
+                repaired_units.append(unit)
+
+            repaired_artifact = {
+                "source": repaired_artifact.get("source"),
+                "intakeSummary": repaired_artifact.get("intakeSummary"),
+                "pacing": repaired_artifact.get("pacing"),
+                "skills": skills,
+                "units": repaired_units,
+            }
+            repaired["artifact"] = repaired_artifact
+            return repaired
+
         if not moved_any:
             return None
 
-        repaired_artifact["document"] = repaired_document
         repaired["artifact"] = repaired_artifact
         return repaired
 
@@ -128,9 +188,9 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- The previous response was invalid.",
                 "- Return only one corrected JSON object.",
                 "- The top-level shape must be exactly assistantMessage, action, changeSummary, and optional artifact.",
-                "- When action is apply, artifact may contain only source, intakeSummary, pacing, document, and units.",
-                "- Every curriculum domain, strand, goal group, and skill title belongs inside artifact.document, never as extra keys beside document.",
-                "- Keep the document tree in the canonical domain -> strand -> goal group -> skill shape.",
+                "- When action is apply, artifact may contain only source, intakeSummary, pacing, skills, and units.",
+                "- Every skill belongs in artifact.skills with skillId, domainTitle, strandTitle, goalGroupTitle, and title.",
+                "- Units may reference those skills only through units[].skillIds.",
                 "- Preserve the intended curriculum content while fixing the JSON structure.",
             ]
         )

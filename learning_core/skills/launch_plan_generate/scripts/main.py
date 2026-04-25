@@ -67,7 +67,7 @@ class LaunchPlanGenerateSkill(StructuredOutputSkill):
             "- Use only unitRefs and skillRefs from the provided basis.",
             "- Do not invent refs.",
             "- openingSkillRefs must contain only canonical skill refs.",
-            "- openingUnitRefs should identify the unit arc that owns the opening slice.",
+            "- Do not return openingUnitRefs; the app derives owning units from openingSkillRefs.",
             "- Keep the opening slice small enough for the chosen horizon.",
             "- Favor the earliest teachable unit arc unless the source metadata clearly points elsewhere.",
             "- Respect the chosen horizon exactly; do not reinterpret it.",

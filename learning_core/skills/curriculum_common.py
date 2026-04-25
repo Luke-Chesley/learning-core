@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumUnit, iter_document_skill_entries
+from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumSkill, CurriculumUnit
 from learning_core.contracts.progression import (
     ProgressionGenerationRequest,
     ProgressionRevisionRequest,
@@ -15,7 +15,7 @@ def build_progression_request_from_curriculum(
     learner_name: str,
     source_title: str,
     source_summary: str | None,
-    document,
+    skills: list[CurriculumSkill],
     units: list[CurriculumUnit],
     request_mode: str | None,
     source_kind: str | None,
@@ -24,8 +24,8 @@ def build_progression_request_from_curriculum(
     continuation_mode: str | None,
     revision_request: str | None = None,
 ) -> ProgressionGenerationRequest | ProgressionRevisionRequest:
-    skill_catalog = build_skill_catalog(document)
-    unit_anchors = build_unit_anchors(units)
+    skill_catalog = build_skill_catalog(skills)
+    unit_anchors = build_unit_anchors(units, skills)
     common_kwargs = {
         "learnerName": learner_name,
         "sourceTitle": source_title,
@@ -61,7 +61,7 @@ def build_progression_request_from_artifact(
         learner_name=learner_name,
         source_title=artifact.source.title,
         source_summary=artifact.source.summary,
-        document=artifact.document,
+        skills=artifact.skills,
         units=artifact.units,
         request_mode=request_mode,
         source_kind=source_kind,
@@ -72,25 +72,34 @@ def build_progression_request_from_artifact(
     )
 
 
-def build_skill_catalog(document) -> list[SkillCatalogItem]:
+def build_skill_catalog(skills: list[CurriculumSkill]) -> list[SkillCatalogItem]:
     skill_catalog: list[SkillCatalogItem] = []
-    for ordinal, (skill_ref, path, title) in enumerate(iter_document_skill_entries(document), start=1):
+    for ordinal, skill in enumerate(skills, start=1):
         skill_catalog.append(
             SkillCatalogItem(
-                skillRef=skill_ref,
-                title=title,
-                domainTitle=path[0] if len(path) > 0 else None,
-                strandTitle=path[1] if len(path) > 1 else None,
-                goalGroupTitle=path[2] if len(path) > 2 else None,
+                skillRef=skill.canonical_skill_ref(),
+                title=skill.title,
+                domainTitle=skill.domainTitle,
+                strandTitle=skill.strandTitle,
+                goalGroupTitle=skill.goalGroupTitle,
                 ordinal=ordinal,
             )
         )
     return skill_catalog
 
 
-def build_unit_anchors(units: list[CurriculumUnit]) -> list[ProgressionUnitAnchor]:
+def build_unit_anchors(
+    units: list[CurriculumUnit],
+    skills: list[CurriculumSkill],
+) -> list[ProgressionUnitAnchor]:
+    skill_ref_by_id = {
+        skill.skillId: skill.canonical_skill_ref()
+        for skill in skills
+    }
+
     anchors: list[ProgressionUnitAnchor] = []
     for index, unit in enumerate(units, start=1):
+        skill_refs = [skill_ref_by_id.get(skill_id, skill_id) for skill_id in unit.skillIds]
         anchors.append(
             ProgressionUnitAnchor(
                 unitRef=unit.unitRef,
@@ -99,7 +108,7 @@ def build_unit_anchors(units: list[CurriculumUnit]) -> list[ProgressionUnitAncho
                 orderIndex=index,
                 estimatedWeeks=unit.estimatedWeeks,
                 estimatedSessions=unit.estimatedSessions,
-                skillRefs=list(unit.skillRefs),
+                skillRefs=skill_refs,
             )
         )
     return anchors

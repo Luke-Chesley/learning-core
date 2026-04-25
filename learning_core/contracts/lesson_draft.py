@@ -15,6 +15,24 @@ LESSON_SHAPE_VALUES = (
     "gentle_short_blocks",
 )
 
+LESSON_BLOCK_TYPE_VALUES = (
+    "opener",
+    "retrieval",
+    "warm_up",
+    "model",
+    "guided_practice",
+    "independent_practice",
+    "discussion",
+    "check_for_understanding",
+    "reflection",
+    "wrap_up",
+    "transition",
+    "movement_break",
+    "project_work",
+    "read_aloud",
+    "demonstration",
+)
+
 LessonShape: TypeAlias = Literal[
     "balanced",
     "direct_instruction",
@@ -24,6 +42,24 @@ LessonShape: TypeAlias = Literal[
     "gentle_short_blocks",
 ]
 
+LessonBlockType: TypeAlias = Literal[
+    "opener",
+    "retrieval",
+    "warm_up",
+    "model",
+    "guided_practice",
+    "independent_practice",
+    "discussion",
+    "check_for_understanding",
+    "reflection",
+    "wrap_up",
+    "transition",
+    "movement_break",
+    "project_work",
+    "read_aloud",
+    "demonstration",
+]
+
 
 class LessonAdaptation(StrictModel):
     trigger: str
@@ -31,7 +67,7 @@ class LessonAdaptation(StrictModel):
 
 
 class LessonBlock(StrictModel):
-    type: str
+    type: LessonBlockType
     title: str
     minutes: int
     purpose: str

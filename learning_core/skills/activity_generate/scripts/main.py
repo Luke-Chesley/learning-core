@@ -531,6 +531,21 @@ def _extract_json(text: str) -> str:
     return text[start : end + 1]
 
 
+def _normalize_activity_json(value):
+    if isinstance(value, list):
+        return [_normalize_activity_json(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    normalized = {
+        key: _normalize_activity_json(item)
+        for key, item in value.items()
+    }
+    if normalized.get("type") == "paragraph" and "markdown" in normalized and not isinstance(normalized.get("markdown"), str):
+        normalized.pop("markdown", None)
+    return normalized
+
+
 class ActivityGenerateSkill(SkillDefinition):
     name = "activity_generate"
     input_model = ActivityGenerationInput
@@ -643,7 +658,7 @@ class ActivityGenerateSkill(SkillDefinition):
         semantic_validation_soft_warnings: list[str] = []
 
         try:
-            parsed = json.loads(json_text)
+            parsed = _normalize_activity_json(json.loads(json_text))
             artifact = ActivityArtifact.model_validate(parsed)
         except Exception as first_error:
             validation_error_text = str(first_error)
@@ -671,7 +686,7 @@ class ActivityGenerateSkill(SkillDefinition):
                         for item in repair_text
                     )
                 repair_json = _extract_json(str(repair_text))
-                repaired = json.loads(repair_json)
+                repaired = _normalize_activity_json(json.loads(repair_json))
                 artifact = ActivityArtifact.model_validate(repaired)
                 repair_succeeded = True
                 raw_text = str(repair_text)
@@ -728,7 +743,7 @@ class ActivityGenerateSkill(SkillDefinition):
                     fallback_max_steps=8,
                 )
                 repair_json = _extract_json(repair_result.final_text)
-                repaired = json.loads(repair_json)
+                repaired = _normalize_activity_json(json.loads(repair_json))
                 artifact = ActivityArtifact.model_validate(repaired)
 
                 # Merge repair tool calls into the log
@@ -821,7 +836,7 @@ class ActivityGenerateSkill(SkillDefinition):
                     fallback_max_steps=8,
                 )
                 repair_json = _extract_json(repair_result.final_text)
-                repaired = json.loads(repair_json)
+                repaired = _normalize_activity_json(json.loads(repair_json))
                 artifact = ActivityArtifact.model_validate(repaired)
                 repair_tool_log = _build_tool_call_log(repair_result.tool_calls)
                 tool_call_log.extend(repair_tool_log)

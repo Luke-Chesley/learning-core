@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 
@@ -22,6 +23,13 @@ ActivityKind = Literal[
     "collaborative",
     "offline_real_world",
 ]
+
+
+def validate_real_media_url(value: str) -> str:
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Media URLs must be real http(s) URLs from the input context.")
+    return value
 
 EvidenceKind = Literal[
     "answer_response",
@@ -155,6 +163,11 @@ class ImageComponent(StrictModel):
     src: str
     alt: str
     caption: str | None = None
+
+    @field_validator("src")
+    @classmethod
+    def validate_src(cls, value: str) -> str:
+        return validate_real_media_url(value)
 
 
 class DividerComponent(StrictModel):
@@ -357,6 +370,11 @@ class LabelMapComponent(StrictModel):
     imageAlt: str
     labels: list[LabelMapLabel] = Field(min_length=1)
 
+    @field_validator("imageUrl")
+    @classmethod
+    def validate_image_url(cls, value: str) -> str:
+        return validate_real_media_url(value)
+
 
 class Hotspot(StrictModel):
     id: str
@@ -376,6 +394,11 @@ class HotspotSelectComponent(StrictModel):
     hotspots: list[Hotspot] = Field(min_length=1)
     requiredSelections: int | None = Field(default=None, gt=0)
     hint: str | None = None
+
+    @field_validator("imageUrl")
+    @classmethod
+    def validate_image_url(cls, value: str) -> str:
+        return validate_real_media_url(value)
 
 
 class BuildStep(StrictModel):

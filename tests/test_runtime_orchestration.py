@@ -68,15 +68,29 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                 "coverageStrategy": "Launch inside the interpreted opening slice.",
                 "coverageNotes": [],
             },
-            "document": {
-                "Math": {
-                    "Pages 1-12": [
-                        "Warm-up from page 1",
-                        "Guided practice from pages 2-6",
-                        "Independent practice from pages 7-12",
-                    ]
-                }
-            },
+            "skills": [
+                {
+                    "skillId": "skill-1",
+                    "domainTitle": "Math",
+                    "strandTitle": "Pages 1-12",
+                    "goalGroupTitle": "Workbook launch",
+                    "title": "Warm-up from page 1",
+                },
+                {
+                    "skillId": "skill-2",
+                    "domainTitle": "Math",
+                    "strandTitle": "Pages 1-12",
+                    "goalGroupTitle": "Workbook launch",
+                    "title": "Guided practice from pages 2-6",
+                },
+                {
+                    "skillId": "skill-3",
+                    "domainTitle": "Math",
+                    "strandTitle": "Pages 1-12",
+                    "goalGroupTitle": "Workbook launch",
+                    "title": "Independent practice from pages 7-12",
+                },
+            ],
             "units": [
                 {
                     "unitRef": "unit:1:pages-1-12",
@@ -84,11 +98,7 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                     "description": "Work through the opening workbook range in order.",
                     "estimatedWeeks": 1,
                     "estimatedSessions": 3,
-                    "skillRefs": [
-                        "skill:math/pages-1-12/warm-up-from-page-1",
-                        "skill:math/pages-1-12/guided-practice-from-pages-2-6",
-                        "skill:math/pages-1-12/independent-practice-from-pages-7-12",
-                    ],
+                    "skillIds": ["skill-1", "skill-2", "skill-3"],
                 }
             ],
         },
@@ -142,7 +152,7 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
     )
 
     assert result.operation_name == "curriculum_generate"
-    assert result.artifact["units"][0]["skillRefs"][0] == "skill:math/pages-1-12/warm-up-from-page-1"
+    assert result.artifact["units"][0]["skillIds"][0] == "skill-1"
     assert result.trace.agent_trace["orchestration_profile"] == "generate_from_source"
     assert [step["operation_name"] for step in result.trace.agent_trace["substeps"]] == [
         "source_interpret",

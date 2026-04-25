@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import re
 
-from learning_core.contracts.lesson_draft import LESSON_SHAPE_VALUES
+from learning_core.contracts.lesson_draft import LESSON_BLOCK_TYPE_VALUES, LESSON_SHAPE_VALUES
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
+from learning_core.observability.traces import PromptPreview
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.prompt_utils import append_user_authored_context
@@ -152,6 +154,7 @@ class SessionGenerateSkill(StructuredOutputSkill):
             f"Total time: {total_minutes} minutes",
             f"Objectives in scope: {len(payload.objectives)}",
             f"Allowed lesson_shape slugs: {', '.join(LESSON_SHAPE_VALUES)}",
+            f"Allowed blocks[].type values: {', '.join(LESSON_BLOCK_TYPE_VALUES)}",
         ]
 
         lines.extend(
@@ -161,6 +164,8 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 f"- Keep the lesson genuinely teachable within about {total_minutes} minutes.",
                 "- Do not inflate a bounded request into a generic 45-minute lesson unless the source clearly requires it.",
                 "- Prefer fewer, clearer blocks over filler transitions or repeated review.",
+                "- Keep top-level lesson_shape separate from block types.",
+                "- Never use a lesson_shape slug as blocks[].type. For a practice-heavy lesson, set top-level lesson_shape to practice_heavy and use block types like guided_practice or independent_practice.",
                 "",
                 "Teacher guidance rules:",
                 "- Assume the adult may be capable but not topic-expert unless the request clearly says otherwise.",
@@ -235,3 +240,37 @@ class SessionGenerateSkill(StructuredOutputSkill):
             ]
         )
         return "\n".join(lines)
+
+    def build_validation_retry_preview(
+        self,
+        *,
+        payload: SessionPlanGenerationRequest,
+        context,
+        raw_artifact,
+        error,
+    ) -> PromptPreview:
+        raw_json = json.dumps(raw_artifact, indent=2, default=str)
+        return PromptPreview(
+            system_prompt=self.read_skill_markdown(),
+            user_prompt="\n".join(
+                [
+                    self.build_user_prompt(payload, context),
+                    "",
+                    "The previous JSON did not validate against the structured lesson draft contract.",
+                    "Return one corrected JSON object only. Preserve the lesson content while fixing schema violations.",
+                    "",
+                    "Validation error:",
+                    str(error),
+                    "",
+                    "Correction rules:",
+                    f"- Every blocks[].type must be one of: {', '.join(LESSON_BLOCK_TYPE_VALUES)}.",
+                    f"- Top-level lesson_shape, when present, must be one of: {', '.join(LESSON_SHAPE_VALUES)}.",
+                    "- Never put lesson_shape slugs such as practice_heavy, balanced, or project_based in blocks[].type.",
+                    "- If the intended lesson shape is practice-heavy, keep lesson_shape as practice_heavy and use guided_practice or independent_practice blocks.",
+                    "- Keep block minutes aligned to total_minutes and keep teacher_action runnable by a non-expert adult.",
+                    "",
+                    "Previous invalid JSON:",
+                    raw_json,
+                ]
+            ),
+        )

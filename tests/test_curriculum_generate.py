@@ -212,88 +212,87 @@ def test_curriculum_generate_rejects_route_fields_in_conversation_mode():
         )
 
 
-def test_curriculum_artifact_canonicalizes_resolvable_skill_refs():
-    artifact = CurriculumArtifact.model_validate(
-        {
-            "source": {
-                "title": "Kitchen Skills",
+def _artifact_payload():
+    return {
+        "source": {
+            "title": "Fractions Foundations",
+            "description": "Desc",
+            "summary": "Summary",
+            "teachingApproach": "Approach",
+        },
+        "intakeSummary": "Summary",
+        "pacing": {
+            "coverageStrategy": "Strategy",
+        },
+        "skills": [
+            {
+                "skillId": "skill-1",
+                "domainTitle": "Fractions",
+                "strandTitle": "Concrete Fraction Sense",
+                "goalGroupTitle": "Comparing and relating simple fractions",
+                "title": "Compare fractions with the same denominator",
+            },
+            {
+                "skillId": "skill-2",
+                "domainTitle": "Fractions",
+                "strandTitle": "Concrete Fraction Sense",
+                "goalGroupTitle": "Comparing and relating simple fractions",
+                "title": "Explain why two fourths equals one half",
+            },
+        ],
+        "units": [
+            {
+                "unitRef": "unit:1:compare",
+                "title": "Compare simple fractions",
                 "description": "Desc",
-                "summary": "Summary",
-                "teachingApproach": "Approach",
+                "skillIds": ["skill-1", "skill-2"],
             },
-            "intakeSummary": "Summary",
-            "pacing": {
-                "coverageStrategy": "Strategy",
-            },
-            "document": {
-                "Montessori Kitchen Independence": {
-                    "Kitchen Skills": {
-                        "Preparation and heat skills": [
-                            "Measure dry ingredients accurately",
-                        ],
-                    },
-                },
-            },
-            "units": [
-                {
-                    "unitRef": "unit:1:intro",
-                    "title": "Intro",
-                    "description": "Desc",
-                    "skillRefs": [
-                        "skill:montessori-kitchen-independence/kitchen-skills/strength-and-precision-skills/measure-dry-ingredients-accurately",
-                    ],
-                },
-            ],
+        ],
+    }
+
+
+def test_curriculum_artifact_accepts_flat_skill_catalog():
+    artifact = CurriculumArtifact.model_validate(_artifact_payload())
+
+    assert [skill.skillId for skill in artifact.skills] == ["skill-1", "skill-2"]
+    assert artifact.units[0].skillIds == ["skill-1", "skill-2"]
+
+
+def test_curriculum_artifact_rejects_unknown_unit_skill_ids():
+    payload = _artifact_payload()
+    payload["units"][0]["skillIds"] = ["skill-1", "missing-skill"]
+
+    with pytest.raises(ValueError, match="unknown skillIds"):
+        CurriculumArtifact.model_validate(payload)
+
+
+def test_curriculum_artifact_rejects_duplicate_skill_paths():
+    payload = _artifact_payload()
+    payload["skills"].append(
+        {
+            "skillId": "skill-3",
+            "domainTitle": "Fractions",
+            "strandTitle": "Concrete Fraction Sense",
+            "goalGroupTitle": "Comparing and relating simple fractions",
+            "title": "Compare fractions with the same denominator",
         }
     )
 
-    canonical_ref = (
-        "skill:montessori-kitchen-independence/kitchen-skills/"
-        "preparation-and-heat-skills/measure-dry-ingredients-accurately"
-    )
-    assert artifact.units[0].skillRefs == [canonical_ref]
+    with pytest.raises(ValueError, match="duplicate skill paths"):
+        CurriculumArtifact.model_validate(payload)
 
 
-def test_curriculum_artifact_resolves_possessive_skill_refs_with_shared_slug_rules():
-    artifact = CurriculumArtifact.model_validate(
-        {
-            "source": {
-                "title": "Montessori Cooking Foundations",
-                "description": "Desc",
-                "summary": "Summary",
-                "teachingApproach": "Approach",
-            },
-            "intakeSummary": "Summary",
-            "pacing": {
-                "coverageStrategy": "Strategy",
-            },
-            "document": {
-                "Montessori Cooking Foundations": {
-                    "How to Use the Book": [
-                        "Interpret the book’s pictorial, step-by-step format for nonreaders and beginning readers",
-                    ],
-                },
-                "Kitchen Preparation": {
-                    "Work Area and Safety": [
-                        "Set up a child’s work area",
-                    ],
-                },
-            },
-            "units": [
-                {
-                    "unitRef": "unit:1:intro",
-                    "title": "Intro",
-                    "description": "Desc",
-                    "skillRefs": [
-                        "skill:montessori-cooking-foundations/how-to-use-the-book/interpret-the-book-s-pictorial-step-by-step-format-for-nonreaders-and-beginning-readers",
-                        "skill:kitchen-preparation/work-area-and-safety/set-up-a-childs-work-area",
-                    ],
-                },
-            ],
-        }
-    )
+def test_curriculum_artifact_allows_leaf_titles_with_slashes():
+    payload = _artifact_payload()
+    payload["skills"][0]["title"] = "Read home/away patterns in a season schedule"
 
-    assert artifact.units[0].skillRefs == [
-        "skill:montessori-cooking-foundations/how-to-use-the-book/interpret-the-book-s-pictorial-step-by-step-format-for-nonreaders-and-beginning-readers",
-        "skill:kitchen-preparation/work-area-and-safety/set-up-a-child-s-work-area",
-    ]
+    artifact = CurriculumArtifact.model_validate(payload)
+    assert artifact.skills[0].title == "Read home/away patterns in a season schedule"
+
+
+def test_curriculum_artifact_rejects_zero_estimated_sessions():
+    payload = _artifact_payload()
+    payload["units"][0]["estimatedSessions"] = 0
+
+    with pytest.raises(ValueError, match="estimatedSessions"):
+        CurriculumArtifact.model_validate(payload)

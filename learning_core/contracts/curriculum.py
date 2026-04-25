@@ -74,21 +74,12 @@ class CurriculumDraftSummary(StrictModel):
 
 
 class CurriculumPacing(StrictModel):
-    totalWeeks: int | None = None
-    sessionsPerWeek: int | None = None
-    sessionMinutes: int | None = None
-    totalSessions: int | None = None
+    totalWeeks: int | None = Field(default=None, gt=0, le=52)
+    sessionsPerWeek: int | None = Field(default=None, gt=0, le=14)
+    sessionMinutes: int | None = Field(default=None, gt=0, le=360)
+    totalSessions: int | None = Field(default=None, gt=0, le=500)
     coverageStrategy: str
     coverageNotes: list[str] = Field(default_factory=list)
-
-
-class CurriculumUnit(StrictModel):
-    unitRef: str
-    title: str
-    description: str
-    estimatedWeeks: int | None = None
-    estimatedSessions: int | None = None
-    skillRefs: list[str] = Field(default_factory=list)
 
 
 def normalize_ref_segment(value: str) -> str:
@@ -98,23 +89,41 @@ def normalize_ref_segment(value: str) -> str:
     return normalized.strip("-")
 
 
-def normalize_ref_segment_without_apostrophes(value: str) -> str:
-    normalized = value.strip().lower()
-    normalized = normalized.replace("’", "").replace("'", "")
-    normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
-    normalized = re.sub(r"-{2,}", "-", normalized)
-    return normalized.strip("-")
+def canonical_skill_ref_from_titles(
+    domain_title: str,
+    strand_title: str,
+    goal_group_title: str,
+    title: str,
+) -> str:
+    return "skill:" + "/".join(
+        normalize_ref_segment(segment)
+        for segment in (domain_title, strand_title, goal_group_title, title)
+    )
 
 
-def normalize_skill_ref(skill_ref: str) -> str:
-    prefix = "skill:"
-    body = skill_ref[len(prefix) :] if skill_ref.startswith(prefix) else skill_ref
-    normalized_parts = [
-        normalize_ref_segment(part)
-        for part in body.split("/")
-        if normalize_ref_segment(part)
-    ]
-    return prefix + "/".join(normalized_parts)
+class CurriculumSkill(StrictModel):
+    skillId: str
+    domainTitle: str
+    strandTitle: str
+    goalGroupTitle: str
+    title: str
+
+    def canonical_skill_ref(self) -> str:
+        return canonical_skill_ref_from_titles(
+            self.domainTitle,
+            self.strandTitle,
+            self.goalGroupTitle,
+            self.title,
+        )
+
+
+class CurriculumUnit(StrictModel):
+    unitRef: str
+    title: str
+    description: str
+    estimatedWeeks: int | None = Field(default=None, gt=0, le=52)
+    estimatedSessions: int | None = Field(default=None, gt=0, le=160)
+    skillIds: list[str] = Field(min_length=1, max_length=64)
 
 
 def iter_document_skill_entries(
@@ -145,95 +154,61 @@ def iter_document_skill_entries(
     return entries
 
 
-def build_document_skill_ref_aliases(document: dict[str, Any]) -> tuple[dict[str, str], set[str]]:
-    aliases: dict[str, str] = {}
-    ambiguous: set[str] = set()
-    leaf_aliases: dict[str, str] = {}
-    ambiguous_leaf_aliases: set[str] = set()
-
-    def register_alias(alias: str, canonical_ref: str) -> None:
-        existing = aliases.get(alias)
-        if existing and existing != canonical_ref:
-            ambiguous.add(alias)
-            aliases.pop(alias, None)
-        elif alias not in ambiguous:
-            aliases[alias] = canonical_ref
-
-    def register_leaf_alias(alias: str, canonical_ref: str) -> None:
-        existing_leaf = leaf_aliases.get(alias)
-        if existing_leaf and existing_leaf != canonical_ref:
-            ambiguous_leaf_aliases.add(alias)
-            leaf_aliases.pop(alias, None)
-        elif alias not in ambiguous_leaf_aliases:
-            leaf_aliases[alias] = canonical_ref
-
-    for canonical_ref, path, title in iter_document_skill_entries(document):
-        normalized_ref = normalize_skill_ref(canonical_ref)
-        register_alias(normalized_ref, canonical_ref)
-
-        apostrophe_collapsed_alias = "skill:" + "/".join(
-            normalize_ref_segment_without_apostrophes(segment) for segment in path
+def iter_curriculum_skill_entries(
+    skills: list[CurriculumSkill],
+) -> list[tuple[str, list[str], str]]:
+    return [
+        (
+            skill.canonical_skill_ref(),
+            [skill.domainTitle, skill.strandTitle, skill.goalGroupTitle, skill.title],
+            skill.title,
         )
-        register_alias(apostrophe_collapsed_alias, canonical_ref)
-
-        leaf_alias = normalize_ref_segment(title or path[-1])
-        register_leaf_alias(leaf_alias, canonical_ref)
-
-        apostrophe_collapsed_leaf_alias = normalize_ref_segment_without_apostrophes(title or path[-1])
-        register_leaf_alias(apostrophe_collapsed_leaf_alias, canonical_ref)
-
-    for leaf_alias, canonical_ref in leaf_aliases.items():
-        if leaf_alias not in ambiguous_leaf_aliases and leaf_alias not in aliases:
-            aliases[leaf_alias] = canonical_ref
-    return aliases, ambiguous
+        for skill in skills
+    ]
 
 
 class CurriculumArtifact(StrictModel):
     source: CurriculumDraftSummary
     intakeSummary: str
     pacing: CurriculumPacing
-    document: dict[str, Any]
-    units: list[CurriculumUnit] = Field(default_factory=list)
+    skills: list[CurriculumSkill] = Field(min_length=1, max_length=400)
+    units: list[CurriculumUnit] = Field(min_length=1, max_length=20)
 
     @model_validator(mode="after")
     def validate_refs(self) -> "CurriculumArtifact":
+        skill_ids = [skill.skillId for skill in self.skills]
+        if len(set(skill_ids)) != len(self.skills):
+            raise ValueError("CurriculumArtifact requires unique skillId values.")
+
+        canonical_skill_refs = [skill.canonical_skill_ref() for skill in self.skills]
+        if len(set(canonical_skill_refs)) != len(canonical_skill_refs):
+            raise ValueError("CurriculumArtifact contains duplicate skill paths.")
+
         unit_refs = {unit.unitRef for unit in self.units}
         if len(unit_refs) != len(self.units):
             raise ValueError("CurriculumArtifact requires unique unitRef values.")
 
-        document_skill_aliases, ambiguous_skill_refs = build_document_skill_ref_aliases(self.document)
-
-        def canonicalize_skill_refs(skill_refs: list[str]) -> tuple[list[str], list[str]]:
-            canonicalized: list[str] = []
-            missing: list[str] = []
-            seen: set[str] = set()
-            for skill_ref in skill_refs:
-                normalized_ref = normalize_skill_ref(skill_ref)
-                leaf_ref = normalize_ref_segment(
-                    skill_ref.split("/")[-1] if "/" in skill_ref else skill_ref
-                )
-                if normalized_ref in ambiguous_skill_refs or leaf_ref in ambiguous_skill_refs:
-                    missing.append(skill_ref)
-                    continue
-                canonical_ref = document_skill_aliases.get(normalized_ref) or document_skill_aliases.get(leaf_ref)
-                if not canonical_ref:
-                    missing.append(skill_ref)
-                    continue
-                if canonical_ref not in seen:
-                    canonicalized.append(canonical_ref)
-                    seen.add(canonical_ref)
-            return canonicalized, missing
-
+        known_skill_ids = set(skill_ids)
         for unit in self.units:
-            canonical_skill_refs, missing_skill_refs = canonicalize_skill_refs(unit.skillRefs)
-            unit.skillRefs = canonical_skill_refs
-            if missing_skill_refs:
+            deduped_skill_ids: list[str] = []
+            seen: set[str] = set()
+            missing_skill_ids: list[str] = []
+            for skill_id in unit.skillIds:
+                if skill_id not in known_skill_ids:
+                    missing_skill_ids.append(skill_id)
+                    continue
+                if skill_id in seen:
+                    continue
+                seen.add(skill_id)
+                deduped_skill_ids.append(skill_id)
+            unit.skillIds = deduped_skill_ids
+            if missing_skill_ids:
                 raise ValueError(
-                    "CurriculumArtifact unit contains unresolved skillRefs: "
-                    + ", ".join(sorted(missing_skill_refs))
+                    "CurriculumArtifact unit contains unknown skillIds: "
+                    + ", ".join(sorted(missing_skill_ids))
                 )
-            if not unit.skillRefs:
-                raise ValueError(f'CurriculumArtifact unit "{unit.title}" requires at least one skillRef.')
+            if not unit.skillIds:
+                raise ValueError(f'CurriculumArtifact unit "{unit.title}" requires at least one skillId.')
 
         return self
 

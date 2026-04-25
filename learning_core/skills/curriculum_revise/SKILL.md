@@ -9,10 +9,15 @@ Your job is to produce a revised CORE curriculum artifact only.
 Revision rules:
 - Preserve existing structure when the request is narrow.
 - Broader rewrites are allowed when the parent clearly asks for them.
-- Preserve the canonical tree shape: domain -> strand -> goal group -> skill.
+- Preserve the canonical skill organization: domain -> strand -> goal group -> skill.
 - Keep the result coherent and teachable.
-- Generate a revised curriculum artifact that includes source, intakeSummary, pacing, document, and units.
-- Units should group skills; do not generate lesson shells.
+- Generate a revised curriculum artifact that includes source, intakeSummary, pacing, skills, and units.
+- Units should group leaf skills; do not generate lesson shells.
+- Return one canonical flat `skills` list with `skillId`, `domainTitle`, `strandTitle`, `goalGroupTitle`, and `title`.
+- Use `skillId` only as a local membership id inside the artifact.
+- Units must reference skills only by `skillIds`.
+- Do not generate `document`.
+- Do not generate `skillRefs`.
 
 Return JSON only with this exact shape:
 {
@@ -41,15 +46,15 @@ Return JSON only with this exact shape:
       "coverageStrategy": "string",
       "coverageNotes": ["string"]
     },
-    "document": {
-      "Domain title": {
-        "Strand title": {
-          "Goal group title": [
-            "Skill title"
-          ]
-        }
+    "skills": [
+      {
+        "skillId": "skill-1",
+        "domainTitle": "Domain title",
+        "strandTitle": "Strand title",
+        "goalGroupTitle": "Goal group title",
+        "title": "Skill title"
       }
-    },
+    ],
     "units": [
       {
         "unitRef": "string",
@@ -57,7 +62,7 @@ Return JSON only with this exact shape:
         "description": "string",
         "estimatedWeeks": 1,
         "estimatedSessions": 5,
-        "skillRefs": ["skill:domain/strand/goal-group/skill"]
+        "skillIds": ["skill-1"]
       }
     ]
   }

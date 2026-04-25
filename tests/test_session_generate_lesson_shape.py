@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 import learning_core.runtime.engine as engine_module
-from learning_core.contracts.lesson_draft import LESSON_SHAPE_VALUES, StructuredLessonDraft
+from learning_core.contracts.lesson_draft import (
+    LESSON_BLOCK_TYPE_VALUES,
+    LESSON_SHAPE_VALUES,
+    StructuredLessonDraft,
+)
 from learning_core.contracts.operation import AppContext, PresentationContext, UserAuthoredContext
 from learning_core.contracts.session_plan import SessionPlanGenerationRequest
 from learning_core.runtime.context import RuntimeContext
@@ -70,6 +75,11 @@ class _FakeStructuredInvoker:
         return self.artifact
 
 
+class _FakeTextResponse:
+    def __init__(self, content: str) -> None:
+        self.content = content
+
+
 class _FakeClient:
     def __init__(self, artifact: dict) -> None:
         self.artifact = artifact
@@ -78,6 +88,9 @@ class _FakeClient:
     def with_structured_output(self, _output_model, **kwargs):
         self.structured_output_method = kwargs.get("method")
         return _FakeStructuredInvoker(self.artifact)
+
+    def invoke(self, _messages):
+        return _FakeTextResponse(json.dumps(self.artifact))
 
 
 def _session_generate_envelope() -> dict:
@@ -118,6 +131,14 @@ def test_structured_lesson_draft_accepts_canonical_lesson_shape():
     assert artifact.lesson_shape == "direct_instruction"
 
 
+def test_structured_lesson_draft_rejects_lesson_shape_as_block_type():
+    artifact = _lesson_artifact("practice_heavy")
+    artifact["blocks"][0]["type"] = "practice_heavy"
+
+    with pytest.raises(ValidationError):
+        StructuredLessonDraft.model_validate(artifact)
+
+
 def test_session_generate_prompt_preview_constrains_lesson_shape_values():
     payload = SessionPlanGenerationRequest.model_validate(
         {
@@ -139,12 +160,44 @@ def test_session_generate_prompt_preview_constrains_lesson_shape_values():
     for lesson_shape in LESSON_SHAPE_VALUES:
         assert lesson_shape in preview.system_prompt
         assert lesson_shape in preview.user_prompt
+    for block_type in LESSON_BLOCK_TYPE_VALUES:
+        assert block_type in preview.system_prompt
+        assert block_type in preview.user_prompt
     assert "machine-readable metadata" in preview.system_prompt
     assert "do not emit descriptive prose labels" in preview.system_prompt.lower()
+    assert "Never use a lesson_shape slug as blocks[].type" in preview.user_prompt
     assert (
         "Lesson shape preference (canonical lesson_shape slug; reuse exactly if included): "
         "direct_instruction"
     ) in preview.user_prompt
+
+
+def test_session_generate_validation_retry_corrects_block_type_values():
+    payload = SessionPlanGenerationRequest.model_validate(
+        {
+            "topic": "Responding correctly to 1. e4",
+            "lessonShape": "practice_heavy",
+        }
+    )
+    context = RuntimeContext.create(
+        operation_name="session_generate",
+        app_context=AppContext(product="homeschool-v2", surface="today"),
+        presentation_context=PresentationContext(),
+        user_authored_context=UserAuthoredContext(),
+    )
+    raw_artifact = _lesson_artifact("practice_heavy")
+    raw_artifact["blocks"][0]["type"] = "practice_heavy"
+
+    preview = SessionGenerateSkill().build_validation_retry_preview(
+        payload=payload,
+        context=context,
+        raw_artifact=raw_artifact,
+        error=ValueError("bad block type"),
+    )
+
+    assert "Every blocks[].type must be one of" in preview.user_prompt
+    assert "Never put lesson_shape slugs" in preview.user_prompt
+    assert "guided_practice or independent_practice" in preview.user_prompt
 
 
 def test_session_generate_prompt_preview_adds_script_first_constraints():

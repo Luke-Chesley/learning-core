@@ -2,7 +2,7 @@ from learning_core.contracts.curriculum import CurriculumRevisionTurn
 from learning_core.skills.curriculum_revise.scripts.main import CurriculumReviseSkill
 
 
-def test_curriculum_revise_repairs_stray_artifact_domains_into_document():
+def test_curriculum_revise_repairs_legacy_document_shape_into_flat_skill_catalog():
     skill = CurriculumReviseSkill()
     raw_artifact = {
         "assistantMessage": "Applied the requested revision.",
@@ -65,4 +65,10 @@ def test_curriculum_revise_repairs_stray_artifact_domains_into_document():
 
     assert repaired is not None
     validated = CurriculumRevisionTurn.model_validate(repaired)
-    assert "Simple Recipes From the Book" in validated.artifact.document
+    assert validated.artifact is not None
+    assert [skill.title for skill in validated.artifact.skills] == [
+        "Use real tools",
+        "Assemble a simple snack",
+    ]
+    assert validated.artifact.units[0].skillIds == ["skill-1"]
+    assert validated.artifact.units[1].skillIds == ["skill-2"]

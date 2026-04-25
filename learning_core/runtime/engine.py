@@ -246,6 +246,23 @@ class AgentEngine:
 
         return text[start : end + 1]
 
+    def _extract_structured_output_error_artifact(self, error: Exception) -> dict | list | None:
+        message = str(error)
+        marker_index = message.find("completion ")
+        if marker_index == -1:
+            return None
+
+        raw_fragment = message[marker_index + len("completion ") :]
+        try:
+            extracted = self._extract_json(raw_fragment)
+            parsed = json.loads(extracted)
+        except Exception:
+            return None
+
+        if isinstance(parsed, (dict, list)):
+            return parsed
+        return None
+
     def _run_text_json_fallback(self, *, skill, payload, context, structured_error: Exception):
         return self._run_text_json_fallback_with_preview(
             skill=skill,
@@ -455,6 +472,7 @@ class AgentEngine:
             structured_output_method=structured_output_method,
         )
 
+        raw_artifact = None
         try:
             structured_kwargs = (
                 {"method": structured_output_method}
@@ -470,7 +488,10 @@ class AgentEngine:
                 lambda: structured.invoke(provider_messages),
             )
         except Exception as error:  # pragma: no cover - provider exceptions vary
-            if self._is_retryable_provider_error(model_runtime.provider, error):
+            parsed_artifact = self._extract_structured_output_error_artifact(error)
+            if parsed_artifact is not None:
+                raw_artifact = parsed_artifact
+            elif self._is_retryable_provider_error(model_runtime.provider, error):
                 write_provider_exchange_log(
                     request=provider_request,
                     response={
@@ -486,15 +507,16 @@ class AgentEngine:
                     context=context,
                     structured_error=error,
                 )
-            write_provider_exchange_log(
-                request=provider_request,
-                response={
-                    "status": "error",
-                    "error_type": error.__class__.__name__,
-                    "error": str(error),
-                },
-            )
-            raise ProviderExecutionError(str(error)) from error
+            else:
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "error",
+                        "error_type": error.__class__.__name__,
+                        "error": str(error),
+                    },
+                )
+                raise ProviderExecutionError(str(error)) from error
 
         try:
             artifact = skill.output_model.model_validate(raw_artifact)
@@ -588,6 +610,109 @@ class AgentEngine:
                 },
             )
             raise ContractValidationError(str(error)) from error
+
+        semantic_issues = skill.validate_artifact_semantics(
+            artifact=artifact,
+            payload=payload,
+            context=context,
+        )
+        if semantic_issues:
+            semantic_error = ContractValidationError("; ".join(semantic_issues))
+            repaired_artifact = skill.repair_invalid_artifact(
+                raw_artifact=artifact.model_dump(mode="json", exclude_none=True),
+                payload=payload,
+                context=context,
+                error=semantic_error,
+            )
+            if repaired_artifact is not None:
+                try:
+                    repaired_model = skill.output_model.model_validate(repaired_artifact)
+                except Exception:
+                    repaired_model = None
+                else:
+                    repaired_issues = skill.validate_artifact_semantics(
+                        artifact=repaired_model,
+                        payload=payload,
+                        context=context,
+                    )
+                    if not repaired_issues:
+                        write_provider_exchange_log(
+                            request=provider_request,
+                            response={
+                                "status": "semantic_validation_repaired",
+                                "error_type": semantic_error.__class__.__name__,
+                                "error": str(semantic_error),
+                                "raw_response": raw_artifact,
+                                "repaired_response": repaired_artifact,
+                                "validated_artifact": repaired_model.model_dump(mode="json", exclude_none=True),
+                            },
+                        )
+                        lineage = ExecutionLineage(
+                            operation_name=context.operation_name,
+                            skill_name=skill.name,
+                            skill_version=skill.policy.skill_version,
+                            provider=model_runtime.provider,
+                            model=model_runtime.model,
+                        )
+                        trace = ExecutionTrace(
+                            request_id=context.request_id,
+                            operation_name=context.operation_name,
+                            allowed_tools=list(skill.policy.allowed_tools),
+                            prompt_preview=preview,
+                            request_envelope=OperationEnvelope(
+                                input=payload.model_dump(mode="json"),
+                                app_context=context.app_context,
+                                presentation_context=context.presentation_context,
+                                user_authored_context=context.user_authored_context,
+                                request_id=context.request_id,
+                            ),
+                        )
+                        trace.agent_trace = {
+                            **(trace.agent_trace or {}),
+                            "structured_output_fallback": {
+                                "strategy": "semantic_deterministic_repair",
+                                "reason": semantic_error.__class__.__name__,
+                                "message": str(semantic_error),
+                            },
+                        }
+                        return repaired_model, lineage, trace
+
+            repair_preview = skill.build_validation_retry_preview(
+                payload=payload,
+                context=context,
+                raw_artifact=artifact.model_dump(mode="json", exclude_none=True),
+                error=semantic_error,
+            )
+            if repair_preview is not None:
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "semantic_validation_error_fallback",
+                        "error_type": semantic_error.__class__.__name__,
+                        "error": str(semantic_error),
+                        "raw_response": raw_artifact,
+                        "fallback_strategy": "semantic_validation_repair",
+                    },
+                )
+                return self._run_text_json_fallback_with_preview(
+                    skill=skill,
+                    payload=payload,
+                    context=context,
+                    structured_error=semantic_error,
+                    preview=repair_preview,
+                    strategy="semantic_validation_repair",
+                )
+
+            write_provider_exchange_log(
+                request=provider_request,
+                response={
+                    "status": "semantic_validation_error",
+                    "error_type": semantic_error.__class__.__name__,
+                    "error": str(semantic_error),
+                    "raw_response": raw_artifact,
+                },
+            )
+            raise semantic_error
 
         write_provider_exchange_log(
             request=provider_request,

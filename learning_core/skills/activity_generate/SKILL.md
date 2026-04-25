@@ -149,3 +149,6 @@ answer_response, file_artifact, image_artifact, audio_artifact, self_assessment,
 17. Prefer a coherent, pedagogically strong activity over a crowded one.
 18. Use as many components and widgets as the activity genuinely needs and no more.
 19. Do not use components or widgets just because they exist.
+20. Only use `image`, `label_map`, or `hotspot_select` when the request includes a real http(s) image URL or asset reference to use. Never invent placeholder, local, symbolic, or guessed image URLs.
+21. If the lesson mentions an image but no real image URL is available, use text, callout, observation, teacher checkoff, construction, or reflection components instead of image-dependent components.
+22. Optional fields must use the declared type when present. For `paragraph.markdown`, return a string or omit the field; never return `false`, `true`, `0`, or another non-string sentinel.

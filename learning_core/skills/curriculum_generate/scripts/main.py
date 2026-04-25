@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumGenerationRequest
+from learning_core.observability.traces import PromptPreview
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.prompt_utils import (
@@ -119,6 +120,40 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             ]
         )
         return "\n".join(lines)
+
+    def build_validation_retry_preview(
+        self,
+        *,
+        payload: CurriculumGenerationRequest,
+        context,
+        raw_artifact,
+        error,
+    ) -> PromptPreview:
+        raw_json = json.dumps(raw_artifact, indent=2, default=str)
+        return PromptPreview(
+            system_prompt=self.read_skill_markdown(),
+            user_prompt="\n".join(
+                [
+                    self.build_user_prompt(payload, context),
+                    "",
+                    "The previous JSON did not validate against the curriculum artifact contract.",
+                    "Return one corrected JSON object only. Preserve the intended curriculum content while fixing schema violations.",
+                    "",
+                    "Validation error:",
+                    str(error),
+                    "",
+                    "Correction rules:",
+                    "- `source.rationale` must be an array of strings, never one string.",
+                    "- Every unit must include `skillIds` that match existing top-level `skills[].skillId` values.",
+                    "- `estimatedWeeks`, `estimatedSessions`, `totalWeeks`, `sessionsPerWeek`, `sessionMinutes`, and `totalSessions` must be positive integers when present.",
+                    "- Do not use `0` for any estimate. Use `1` for a very small unit or omit the estimate.",
+                    "- Do not add `document`, `skillRefs`, `lessons`, `launchPlan`, or `progression`.",
+                    "",
+                    "Previous invalid JSON:",
+                    raw_json,
+                ]
+            ),
+        )
 
     def build_user_message_content(
         self,

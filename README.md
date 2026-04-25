@@ -42,6 +42,14 @@ It supports two explicit request modes:
 - `conversation_intake`: conversation-first generation grounded in learner messages, goals, and pacing hints
 
 The output is one durable curriculum artifact.
+That artifact is intentionally flat:
+
+- `skills[]` is the authoritative generated skill catalog
+- `units[].skillIds` links units to those skills
+
+The model does not author a second nested curriculum tree or canonical path refs.
+`homeschool-v2` derives the persisted document tree and canonical `skillRefs` after validation.
+
 The app owns import, persistence, progression handoff, and opening-window or day-1 flow selection.
 
 ## Runtime Model
@@ -82,7 +90,7 @@ Internally, those operations map onto the shared runtime layer.
 Registered but not part of the current canonical product chain:
 
 - `launch_plan_generate`
-  still exists in the runtime for bounded opening-slice generation, but do not treat it as proof that every current curriculum flow returns or persists `launchPlan`.
+  still exists in the runtime for bounded opening-slice generation, but do not treat it as proof that every current curriculum flow returns or persists `launchPlan`; when used, it returns canonical `openingSkillRefs` only and the app derives owning unit refs after validation.
 
 ## Copilot Boundary
 
