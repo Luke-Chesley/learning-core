@@ -15,6 +15,7 @@ from learning_core.skills.progression_revise.scripts.main import ProgressionRevi
 from learning_core.skills.session_evaluate.scripts.main import SessionEvaluateSkill
 from learning_core.skills.session_generate.scripts.main import SessionGenerateSkill
 from learning_core.skills.source_interpret.scripts.main import SourceInterpretSkill
+from learning_core.skills.topic_suggest.scripts.main import TopicSuggestSkill
 from learning_core.skills.widget_transition.scripts.main import WidgetTransitionSkill
 from learning_core.workflow_cards.base import WorkflowCardDefinition
 
@@ -120,6 +121,13 @@ WORKFLOW_CARD_REGISTRY: dict[str, WorkflowCardDefinition] = {
         supported_task_profiles=("source_interpret",),
         supported_response_types=("source_interpretation",),
         prompt_preview_builder=_skill_prompt_preview_builder(SourceInterpretSkill),
+        pack_categories=("domain",),
+    ),
+    "topic_suggestion": WorkflowCardDefinition(
+        name="topic_suggestion",
+        supported_task_profiles=("topic_suggestion",),
+        supported_response_types=("topic_suggestions",),
+        prompt_preview_builder=_skill_prompt_preview_builder(TopicSuggestSkill, append_pack_sections=False),
         pack_categories=("domain",),
     ),
     "widget_transition": WorkflowCardDefinition(

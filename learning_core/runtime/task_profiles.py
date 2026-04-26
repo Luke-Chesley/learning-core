@@ -38,6 +38,7 @@ TASK_PROFILE_REGISTRY: dict[str, TaskProfileDefinition] = {
         TaskProfileDefinition("long_horizon_planning", "curriculum_artifact", "skill_execute", "generation", latency_class="background", allow_chaining=True),
         TaskProfileDefinition("session_synthesis", "evaluation", "single_pass", "generation"),
         TaskProfileDefinition("source_interpret", "source_interpretation", "single_pass", "generation"),
+        TaskProfileDefinition("topic_suggestion", "topic_suggestions", "single_pass", "chat"),
     )
 }
 
@@ -53,8 +54,9 @@ OPERATION_RUNTIME_MAP: dict[str, OperationRuntimeDefinition] = {
     "progression_generate": OperationRuntimeDefinition("progression_generate", "long_horizon_planning", "progression_artifact", "progression_generation", "structured"),
     "progression_revise": OperationRuntimeDefinition("progression_revise", "artifact_revision", "progression_artifact", "progression_revision", "structured"),
     "session_evaluate": OperationRuntimeDefinition("session_evaluate", "session_synthesis", "evaluation", "session_synthesis", "structured"),
-    "session_generate": OperationRuntimeDefinition("session_generate", "bounded_day_generation", "lesson_draft", "bounded_day_generation", "structured"),
+    "session_generate": OperationRuntimeDefinition("session_generate", "bounded_day_generation", "lesson_draft", "bounded_day_generation", "skill_execute"),
     "source_interpret": OperationRuntimeDefinition("source_interpret", "source_interpret", "source_interpretation", "source_interpret", "structured"),
+    "topic_suggest": OperationRuntimeDefinition("topic_suggest", "topic_suggestion", "topic_suggestions", "topic_suggestion", "structured"),
     "widget_transition": OperationRuntimeDefinition("widget_transition", "interactive_assistance", "widget_transition", "widget_transition", "skill_execute"),
 }
 

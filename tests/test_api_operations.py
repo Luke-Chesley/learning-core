@@ -39,6 +39,7 @@ def test_list_operations_includes_required_cutover_operations():
         "session_evaluate",
         "curriculum_intake",
         "copilot_chat",
+        "topic_suggest",
     }.issubset(operation_names)
 
 

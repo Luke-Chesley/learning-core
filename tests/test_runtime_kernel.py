@@ -23,7 +23,7 @@ def test_kernel_preview_exposes_runtime_metadata_for_session_generate():
     assert preview.task_profile == "bounded_day_generation"
     assert preview.response_type == "lesson_draft"
     assert preview.workflow_card == "bounded_day_generation"
-    assert preview.runtime_mode == "structured"
+    assert preview.runtime_mode == "skill_execute"
     assert preview.selected_packs == ["homeschool"]
 
 

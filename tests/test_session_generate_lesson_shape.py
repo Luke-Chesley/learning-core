@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import learning_core.runtime.engine as engine_module
+import learning_core.skills.session_generate.scripts.main as session_generate_module
+from learning_core.agent import AgentResult
 from learning_core.contracts.lesson_draft import (
     LESSON_BLOCK_TYPE_VALUES,
     LESSON_SHAPE_VALUES,
@@ -220,26 +221,10 @@ def test_session_generate_prompt_preview_constrains_lesson_shape_values():
     ) in preview.user_prompt
 
 
-def test_session_generate_prompt_preview_lists_only_allowed_visual_aid_candidates():
+def test_session_generate_prompt_preview_exposes_image_search_policy():
     payload = SessionPlanGenerationRequest.model_validate(
         {
             "topic": "Cloud observation",
-            "context": {
-                "visualAidCandidates": [
-                    {
-                        "id": "cloud-photo",
-                        "title": "Cumulus cloud reference",
-                        "url": ALLOWED_CLOUD_URL,
-                        "sourceName": "Wikimedia Commons",
-                    },
-                    {
-                        "id": "random-photo",
-                        "title": "Random cloud image",
-                        "url": "https://example.com/cloud.jpg",
-                        "sourceName": "Example",
-                    },
-                ]
-            },
         }
     )
 
@@ -253,27 +238,17 @@ def test_session_generate_prompt_preview_lists_only_allowed_visual_aid_candidate
         ),
     )
 
-    assert "Allowed visual-aid candidates:" in preview.user_prompt
-    assert ALLOWED_CLOUD_URL in preview.user_prompt
-    assert "https://example.com/cloud.jpg" in preview.user_prompt
-    allowed_section = preview.user_prompt.split("Allowed visual-aid candidates:", 1)[1].split("\nObjectives:", 1)[0]
-    assert ALLOWED_CLOUD_URL in allowed_section
-    assert "https://example.com/cloud.jpg" not in allowed_section
+    assert "search_lesson_images" in preview.system_prompt
+    assert "Use search_lesson_images" in preview.user_prompt
+    assert "Use only exact URLs returned by search_lesson_images" in preview.user_prompt
+    assert "Use each visual aid id in at most one block" in preview.user_prompt
+    assert "Prefer distinct visual aids" in preview.user_prompt
 
 
-def test_session_generate_prompt_preview_omits_visual_aids_when_no_candidates():
+def test_session_generate_prompt_preview_uses_image_search_for_visuals():
     payload = SessionPlanGenerationRequest.model_validate(
         {
             "topic": "Cloud observation",
-            "context": {
-                "visualAidCandidates": [
-                    {
-                        "id": "random-photo",
-                        "title": "Random cloud image",
-                        "url": "https://example.com/cloud.jpg",
-                    },
-                ]
-            },
         }
     )
 
@@ -287,7 +262,7 @@ def test_session_generate_prompt_preview_omits_visual_aids_when_no_candidates():
         ),
     )
 
-    assert "Allowed visual-aid candidates: none. Omit visual_aids and visual_aid_ids." in preview.user_prompt
+    assert "Use only exact URLs returned by search_lesson_images" in preview.user_prompt
 
 
 def test_session_generate_validation_retry_corrects_block_type_values():
@@ -316,8 +291,9 @@ def test_session_generate_validation_retry_corrects_block_type_values():
     assert "Every blocks[].type must be one of" in preview.user_prompt
     assert "Never put lesson_shape slugs" in preview.user_prompt
     assert "guided_practice or independent_practice" in preview.user_prompt
-    assert "Every visual_aids[].url must be copied exactly" in preview.user_prompt
+    assert "Every visual_aids[].url must be copied exactly from search_lesson_images" in preview.user_prompt
     assert "Do not invent, generate, guess, rewrite, or use placeholder image URLs." in preview.user_prompt
+    assert "Use each visual aid id in at most one block" in preview.user_prompt
 
 
 def test_session_generate_prompt_preview_adds_script_first_constraints():
@@ -384,17 +360,27 @@ def test_session_generate_without_resolved_timing_uses_route_item_minutes():
 
 def test_session_generate_execute_rejects_prose_lesson_shape(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    fake_client = _FakeClient(_lesson_artifact("Short teach-practice-check sequence"))
     monkeypatch.setattr(
-        engine_module,
+        session_generate_module,
         "build_model_runtime",
         lambda **_kwargs: ModelRuntime(
             provider="test",
             model="fake-session-generate",
-            client=_FakeClient(_lesson_artifact("Short teach-practice-check sequence")),
+            client=fake_client,
             temperature=0.2,
             max_tokens=4096,
             max_tokens_source="test",
             provider_settings={},
+        ),
+    )
+    monkeypatch.setattr(
+        session_generate_module,
+        "run_agent_loop",
+        lambda **_kwargs: AgentResult(
+            final_text=json.dumps(_lesson_artifact("Short teach-practice-check sequence")),
+            tool_calls=[],
+            messages=[],
         ),
     )
 
@@ -406,17 +392,27 @@ def test_session_generate_execute_rejects_prose_lesson_shape(monkeypatch, tmp_pa
 
 def test_session_generate_execute_accepts_canonical_lesson_shape(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    fake_client = _FakeClient(_lesson_artifact("direct_instruction"))
     monkeypatch.setattr(
-        engine_module,
+        session_generate_module,
         "build_model_runtime",
         lambda **_kwargs: ModelRuntime(
             provider="test",
             model="fake-session-generate",
-            client=_FakeClient(_lesson_artifact("direct_instruction")),
+            client=fake_client,
             temperature=0.2,
             max_tokens=4096,
             max_tokens_source="test",
             provider_settings={},
+        ),
+    )
+    monkeypatch.setattr(
+        session_generate_module,
+        "run_agent_loop",
+        lambda **_kwargs: AgentResult(
+            final_text=json.dumps(_lesson_artifact("direct_instruction")),
+            tool_calls=[],
+            messages=[],
         ),
     )
 
@@ -426,11 +422,11 @@ def test_session_generate_execute_accepts_canonical_lesson_shape(monkeypatch, tm
     assert result.artifact["lesson_shape"] == "direct_instruction"
 
 
-def test_openai_structured_output_uses_json_mode(monkeypatch, tmp_path: Path):
+def test_session_generate_execute_records_agent_tooling(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     fake_client = _FakeClient(_lesson_artifact("direct_instruction"))
     monkeypatch.setattr(
-        engine_module,
+        session_generate_module,
         "build_model_runtime",
         lambda **_kwargs: ModelRuntime(
             provider="openai",
@@ -442,22 +438,31 @@ def test_openai_structured_output_uses_json_mode(monkeypatch, tmp_path: Path):
             provider_settings={},
         ),
     )
+    monkeypatch.setattr(
+        session_generate_module,
+        "run_agent_loop",
+        lambda **_kwargs: AgentResult(
+            final_text=json.dumps(_lesson_artifact("direct_instruction")),
+            tool_calls=[],
+            messages=[],
+        ),
+    )
 
     engine = AgentEngine(build_skill_registry())
     result = engine.execute("session_generate", _session_generate_envelope())
 
     assert result.artifact["lesson_shape"] == "direct_instruction"
-    assert fake_client.structured_output_method == "json_mode"
+    assert result.trace.agent_trace["active_tools"] == ["search_lesson_images"]
 
 
-def test_ollama_structured_output_does_not_use_openai_method(monkeypatch, tmp_path: Path):
+def test_session_generate_rejects_visuals_without_image_search_tool_use(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     fake_client = _FakeClient(_lesson_artifact("direct_instruction"))
     monkeypatch.setattr(
-        engine_module,
+        session_generate_module,
         "build_model_runtime",
         lambda **_kwargs: ModelRuntime(
-            provider="ollama",
+            provider="test",
             model="fake-session-generate",
             client=fake_client,
             temperature=0.2,
@@ -466,9 +471,27 @@ def test_ollama_structured_output_does_not_use_openai_method(monkeypatch, tmp_pa
             provider_settings={},
         ),
     )
+    artifact = _lesson_artifact("direct_instruction")
+    artifact["visual_aids"] = [
+        {
+            "id": "cloud-photo",
+            "title": "Cumulus cloud reference",
+            "kind": "reference_image",
+            "url": ALLOWED_CLOUD_URL,
+            "alt": "White cumulus clouds against a blue sky.",
+        }
+    ]
+    artifact["blocks"][0]["visual_aid_ids"] = ["cloud-photo"]
+    monkeypatch.setattr(
+        session_generate_module,
+        "run_agent_loop",
+        lambda **_kwargs: AgentResult(
+            final_text=json.dumps(artifact),
+            tool_calls=[],
+            messages=[],
+        ),
+    )
 
     engine = AgentEngine(build_skill_registry())
-    result = engine.execute("session_generate", _session_generate_envelope())
-
-    assert result.artifact["lesson_shape"] == "direct_instruction"
-    assert fake_client.structured_output_method is None
+    with pytest.raises(ContractValidationError):
+        engine.execute("session_generate", _session_generate_envelope())

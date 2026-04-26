@@ -13,6 +13,7 @@ from learning_core.skills.progression_revise.scripts.main import ProgressionRevi
 from learning_core.skills.session_evaluate.scripts.main import SessionEvaluateSkill
 from learning_core.skills.session_generate.scripts.main import SessionGenerateSkill
 from learning_core.skills.source_interpret.scripts.main import SourceInterpretSkill
+from learning_core.skills.topic_suggest.scripts.main import TopicSuggestSkill
 from learning_core.skills.widget_transition.scripts.main import WidgetTransitionSkill
 
 
@@ -69,6 +70,10 @@ def build_skill_registry() -> SkillRegistry:
     registry.register(
         "session_evaluate",
         SessionEvaluateSkill(),
+    )
+    registry.register(
+        "topic_suggest",
+        TopicSuggestSkill(),
     )
 
     return registry

@@ -36,6 +36,11 @@ from learning_core.contracts.source_interpret import (
     SourceInterpretationArtifact,
     SourceInterpretationRequest,
 )
+from learning_core.contracts.topic_suggestions import (
+    TopicSuggestArtifact,
+    TopicSuggestRequest,
+    TopicSuggestion,
+)
 from learning_core.contracts.widgets import (
     EngineKind,
     InteractiveWidgetPayload,
@@ -81,6 +86,9 @@ __all__ = [
     "EngineKind",
     "InteractiveWidgetPayload",
     "SurfaceKind",
+    "TopicSuggestArtifact",
+    "TopicSuggestRequest",
+    "TopicSuggestion",
     "UserAuthoredContext",
     "WidgetTransitionArtifact",
     "WidgetTransitionRequest",

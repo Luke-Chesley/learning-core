@@ -71,10 +71,13 @@ Rules:
 - Adaptations are short, actionable, and ready to use during live teaching.
 - Do not include optional top-level fields unless they add clear value for this lesson.
 - `visual_aids` is optional. Include at most 3 visual aids, and only when seeing the image materially improves the lesson.
-- Only include visual aids using exact URLs from the allowed visual-aid candidate list in the user prompt.
+- Use the `search_lesson_images` tool when a photo, map, diagram, artwork, or source reference would materially improve teaching.
+- Only include visual aids using exact URLs returned by `search_lesson_images`.
 - Never invent, guess, generate, shorten, rewrite, or use placeholder image URLs.
-- If no allowed visual-aid candidate URL is present, omit `visual_aids` and `visual_aid_ids`.
+- If image search does not return a fitting result, omit `visual_aids` and `visual_aid_ids`.
 - Attach a visual aid to a block by putting its `id` in that block's `visual_aid_ids`.
+- Use each visual aid id in at most one block. If a later block needs the same image, refer back to the earlier visual in `teacher_action` instead of repeating `visual_aid_ids`.
+- Prefer distinct visual aids that show meaningfully different things. Do not include multiple near-duplicate pictures just to fill the visual aid limit.
 - `lesson_shape` is machine-readable metadata. If you include it, emit only one canonical slug from the allowed list.
 - Do not emit descriptive prose labels for `lesson_shape` such as "Short teach-practice-check sequence".
 - Do not use `lesson_shape` slugs as block types. For example, `practice_heavy` is valid only as top-level `lesson_shape`; use `guided_practice` or `independent_practice` for `blocks[].type`.

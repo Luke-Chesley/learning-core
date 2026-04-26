@@ -3,16 +3,24 @@ from __future__ import annotations
 import json
 import re
 
+from langchain_core.messages import HumanMessage, SystemMessage
+
+from learning_core.agent import ToolCallEvent, run_agent_loop
 from learning_core.contracts.lesson_draft import (
     LESSON_BLOCK_TYPE_VALUES,
     LESSON_SHAPE_VALUES,
-    validate_lesson_visual_aid_url,
 )
+from learning_core.contracts.operation import OperationEnvelope
 from learning_core.contracts.session_plan import SessionPlanArtifact, SessionPlanGenerationRequest
-from learning_core.observability.traces import PromptPreview
+from learning_core.observability.provider_logs import write_provider_exchange_log
+from learning_core.observability.traces import ExecutionLineage, ExecutionTrace, PromptPreview
+from learning_core.runtime.errors import ContractValidationError, ProviderExecutionError
 from learning_core.runtime.policy import ExecutionPolicy
+from learning_core.runtime.providers import build_model_runtime
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.prompt_utils import append_user_authored_context
+from learning_core.runtime.skill import SkillExecutionResult
+from learning_core.skills.session_generate.scripts.image_search import search_lesson_images
 
 _EXACT_SCRIPT_PATTERNS = (
     re.compile(r"\bexact(?:ly)? what to say\b", re.IGNORECASE),
@@ -93,39 +101,51 @@ def _infer_total_minutes(payload: SessionPlanGenerationRequest, context) -> int:
     return 30
 
 
-def _visual_aid_candidates(payload: SessionPlanGenerationRequest) -> list[dict[str, object]]:
-    if not payload.context:
-        return []
+def _build_tool_call_log(tool_calls: list[ToolCallEvent]) -> list[dict[str, object]]:
+    return [
+        {
+            "tool": tool_call.tool_name,
+            "args": tool_call.tool_args,
+            "output_preview": str(tool_call.tool_output)[:500],
+        }
+        for tool_call in tool_calls
+    ]
 
-    candidates = payload.context.get("visualAidCandidates")
-    if not isinstance(candidates, list):
-        return []
 
-    normalized: list[dict[str, object]] = []
-    seen_urls: set[str] = set()
-    for candidate in candidates:
-        if not isinstance(candidate, dict):
-            continue
-        url = candidate.get("url")
-        title = candidate.get("title")
-        if not isinstance(url, str) or not url.strip():
-            continue
-        try:
-            validate_lesson_visual_aid_url(url)
-        except ValueError:
-            continue
-        if url in seen_urls:
-            continue
-        seen_urls.add(url)
-        normalized.append(
-            {
-                "id": candidate.get("id") if isinstance(candidate.get("id"), str) else f"visual-{len(normalized) + 1}",
-                "title": title if isinstance(title, str) and title.strip() else "Visual aid",
-                "url": url,
-                "sourceName": candidate.get("sourceName") if isinstance(candidate.get("sourceName"), str) else None,
-            }
+def _extract_tool_names_used(tool_calls: list[ToolCallEvent]) -> set[str]:
+    return {tool_call.tool_name for tool_call in tool_calls}
+
+
+def _extract_json(text: str) -> str:
+    match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+
+    start = text.find("{")
+    if start == -1:
+        return text.strip()
+
+    depth = 0
+    end = start
+    for index in range(start, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index
+                break
+    return text[start : end + 1]
+
+
+def _agent_text_content(response) -> str:
+    content = getattr(response, "content", "")
+    if isinstance(content, list):
+        return "".join(
+            item.get("text", "") if isinstance(item, dict) else str(item)
+            for item in content
         )
-    return normalized[:6]
+    return str(content)
 
 
 class SessionGenerateSkill(StructuredOutputSkill):
@@ -134,8 +154,10 @@ class SessionGenerateSkill(StructuredOutputSkill):
     output_model = SessionPlanArtifact
     policy = ExecutionPolicy(
         skill_name="session_generate",
-        skill_version="2026-04-20",
+        skill_version="2026-04-25",
         max_tokens=8000,
+        allowed_tools=("search_lesson_images",),
+        max_loop_steps=6,
     )
 
     def build_user_prompt(self, payload: SessionPlanGenerationRequest, context) -> str:
@@ -182,8 +204,6 @@ class SessionGenerateSkill(StructuredOutputSkill):
             learner_name = context.app_context.learner_id
 
         total_minutes = _infer_total_minutes(payload, context)
-        visual_aid_candidates = _visual_aid_candidates(payload)
-
         lines = [
             f"Generate a structured lesson plan for {learner_name or 'the learner'} on "
             f"{payload.context.get('dailyWorkspaceSnapshot', {}).get('date', 'today') if payload.context else 'today'}.",
@@ -208,8 +228,11 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 "- Never use a lesson_shape slug as blocks[].type. For a practice-heavy lesson, set top-level lesson_shape to practice_heavy and use block types like guided_practice or independent_practice.",
                 "- Use visual_aids only when seeing the image materially improves teaching, such as clouds, maps, diagrams, artwork, or source images.",
                 "- Include at most 3 visual aids.",
-                "- Use only exact URLs from the allowed visual-aid candidate list below. Never invent, generate, guess, rewrite, or use placeholder image URLs.",
-                "- If no allowed visual-aid candidate fits the lesson, omit visual_aids and visual_aid_ids.",
+                "- Use search_lesson_images when a photo, map, diagram, artwork, or source reference would materially improve a block.",
+                "- Use only exact URLs returned by search_lesson_images. Never invent, generate, guess, rewrite, or use placeholder image URLs.",
+                "- If image search does not return a fitting visual, omit visual_aids and visual_aid_ids.",
+                "- Use each visual aid id in at most one block. If a later block needs the same image, refer back to the earlier visual in teacher_action instead of repeating visual_aid_ids.",
+                "- Prefer distinct visual aids that show meaningfully different things. Do not include multiple near-duplicate pictures just to fill the visual aid limit.",
                 "",
                 "Teacher guidance rules:",
                 "- Assume the adult may be capable but not topic-expert unless the request clearly says otherwise.",
@@ -242,26 +265,6 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 [
                     "- Preserve distinct expectations for the learners instead of collapsing into one shared task.",
                     "- Make the split visible inside block actions, adaptations, or teacher notes so the parent can run it without guessing.",
-                ]
-            )
-
-        if visual_aid_candidates:
-            lines.extend(
-                [
-                    "",
-                    "Allowed visual-aid candidates:",
-                    *[
-                        f"{index + 1}. id: {candidate['id']}; title: {candidate['title']}; url: {candidate['url']}"
-                        + (f"; source: {candidate['sourceName']}" if candidate.get("sourceName") else "")
-                        for index, candidate in enumerate(visual_aid_candidates)
-                    ],
-                ]
-            )
-        else:
-            lines.extend(
-                [
-                    "",
-                    "Allowed visual-aid candidates: none. Omit visual_aids and visual_aid_ids.",
                 ]
             )
 
@@ -331,13 +334,170 @@ class SessionGenerateSkill(StructuredOutputSkill):
                     f"- Top-level lesson_shape, when present, must be one of: {', '.join(LESSON_SHAPE_VALUES)}.",
                     "- Never put lesson_shape slugs such as practice_heavy, balanced, or project_based in blocks[].type.",
                     "- If the intended lesson shape is practice-heavy, keep lesson_shape as practice_heavy and use guided_practice or independent_practice blocks.",
-                    "- Every visual_aids[].url must be copied exactly from the allowed visual-aid candidate list.",
-                    "- If there are no allowed visual-aid candidates, omit visual_aids and visual_aid_ids.",
+                    "- Every visual_aids[].url must be copied exactly from search_lesson_images tool results.",
+                    "- If image search did not return a fitting result, omit visual_aids and visual_aid_ids.",
                     "- Do not invent, generate, guess, rewrite, or use placeholder image URLs.",
+                    "- Use each visual aid id in at most one block; remove repeated visual_aid_ids from later blocks.",
                     "- Keep block minutes aligned to total_minutes and keep teacher_action runnable by a non-expert adult.",
                     "",
                     "Previous invalid JSON:",
                     raw_json,
                 ]
             ),
+        )
+
+    def execute(self, engine, payload: SessionPlanGenerationRequest, context) -> SkillExecutionResult:
+        preview = self.build_prompt_preview(payload, context)
+        model_runtime = build_model_runtime(
+            task_name=context.operation_name,
+            task_kind=self.policy.task_kind,
+            temperature=self.policy.temperature,
+            max_tokens=self.policy.max_tokens,
+        )
+        provider_request = engine._provider_request_payload(
+            context=context,
+            skill=self,
+            model_runtime=model_runtime,
+            payload=payload,
+            provider_messages=[
+                {"role": "system", "content": preview.system_prompt},
+                {"role": "user", "content": preview.user_prompt},
+            ],
+            response_mode="agent",
+        )
+        tools = [search_lesson_images]
+        active_tool_names = [tool.name for tool in tools]
+
+        try:
+            agent_result = run_agent_loop(
+                llm=model_runtime.client,
+                system_prompt=preview.system_prompt,
+                user_prompt=preview.user_prompt,
+                tools=tools,
+                max_steps=6,
+            )
+        except Exception as error:
+            write_provider_exchange_log(
+                request=provider_request,
+                response={
+                    "status": "error",
+                    "error_type": error.__class__.__name__,
+                    "error": str(error),
+                    "active_tools": active_tool_names,
+                },
+            )
+            raise ProviderExecutionError(str(error)) from error
+
+        raw_text = agent_result.final_text
+        tool_call_log = _build_tool_call_log(agent_result.tool_calls)
+        tool_names_used = _extract_tool_names_used(agent_result.tool_calls)
+        json_text = _extract_json(raw_text)
+        repair_attempted = False
+        repair_succeeded = False
+        validation_error_text = None
+
+        try:
+            artifact = self.output_model.model_validate(json.loads(json_text))
+        except Exception as first_error:
+            validation_error_text = str(first_error)
+            repair_attempted = True
+            repair_preview = self.build_validation_retry_preview(
+                payload=payload,
+                context=context,
+                raw_artifact=json_text,
+                error=first_error,
+            )
+            try:
+                repair_response = model_runtime.client.invoke(
+                    [
+                        SystemMessage(content=repair_preview.system_prompt),
+                        HumanMessage(content=repair_preview.user_prompt),
+                    ]
+                )
+                repair_text = _agent_text_content(repair_response)
+                repair_json = _extract_json(repair_text)
+                artifact = self.output_model.model_validate(json.loads(repair_json))
+                repair_succeeded = True
+                raw_text = repair_text
+                json_text = repair_json
+            except Exception as repair_error:
+                write_provider_exchange_log(
+                    request=provider_request,
+                    response={
+                        "status": "validation_error",
+                        "initial_error": validation_error_text,
+                        "repair_error": str(repair_error),
+                        "raw_agent_response": agent_result.final_text,
+                        "tool_calls": tool_call_log,
+                        "active_tools": active_tool_names,
+                    },
+                )
+                raise ContractValidationError(
+                    f"Validation failed after repair. Initial: {validation_error_text}. Repair: {repair_error}"
+                ) from repair_error
+
+        visual_urls = [visual_aid.url for visual_aid in artifact.visual_aids]
+        if visual_urls and "search_lesson_images" not in tool_names_used:
+            validation_error = ContractValidationError(
+                "Lesson visual aids require search_lesson_images tool usage."
+            )
+            write_provider_exchange_log(
+                request=provider_request,
+                response={
+                    "status": "semantic_validation_error",
+                    "error": str(validation_error),
+                    "visual_urls": visual_urls,
+                    "raw_agent_response": raw_text,
+                    "tool_calls": tool_call_log,
+                    "active_tools": active_tool_names,
+                },
+            )
+            raise validation_error
+
+        write_provider_exchange_log(
+            request=provider_request,
+            response={
+                "status": "success",
+                "raw_agent_response": raw_text,
+                "validated_artifact": artifact.model_dump(mode="json", exclude_none=True),
+                "tool_calls": tool_call_log,
+                "active_tools": active_tool_names,
+                "repair_attempted": repair_attempted,
+                "repair_succeeded": repair_succeeded,
+                "validation_error": validation_error_text,
+            },
+        )
+
+        lineage = ExecutionLineage(
+            operation_name=context.operation_name,
+            skill_name=self.name,
+            skill_version=self.policy.skill_version,
+            provider=model_runtime.provider,
+            model=model_runtime.model,
+        )
+        trace = ExecutionTrace(
+            request_id=context.request_id,
+            operation_name=context.operation_name,
+            allowed_tools=list(self.policy.allowed_tools),
+            prompt_preview=preview,
+            request_envelope=OperationEnvelope(
+                input=payload.model_dump(mode="json"),
+                app_context=context.app_context,
+                presentation_context=context.presentation_context,
+                user_authored_context=context.user_authored_context,
+                request_id=context.request_id,
+            ),
+            agent_trace={
+                "tool_calls": tool_call_log,
+                "active_tools": active_tool_names,
+                "visual_urls": visual_urls,
+                "repair_attempted": repair_attempted,
+                "repair_succeeded": repair_succeeded,
+                "validation_error": validation_error_text,
+            },
+        )
+        return SkillExecutionResult(
+            artifact=artifact,
+            lineage=lineage,
+            trace=trace,
         )
