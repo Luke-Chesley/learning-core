@@ -23,6 +23,7 @@ Added `learning_core/workflow_cards/` with:
 The first card set wraps the existing prompt builders rather than rewriting prompts:
 
 - `bounded_day_generation`
+- `teaching_support`
 - `source_interpret`
 - `session_synthesis`
 - `proposal_generation`

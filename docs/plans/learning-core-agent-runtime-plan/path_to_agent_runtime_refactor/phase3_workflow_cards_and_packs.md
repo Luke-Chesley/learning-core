@@ -102,6 +102,7 @@ Every workflow card should declare:
 ### Candidate cards for first migration
 
 - `bounded_day_generation`
+- `teaching_support`
 - `session_synthesis`
 - `reporting`
 

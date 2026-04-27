@@ -24,6 +24,7 @@ Added first-class response-type modules under `learning_core/response_types/` fo
 - `curriculum_artifact`
 - `curriculum_artifact_revision`
 - `progression_artifact`
+- `teaching_guide_artifact`
 - `intake_turn`
 - `source_interpretation`
 - `summary`

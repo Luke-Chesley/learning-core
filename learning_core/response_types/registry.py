@@ -12,6 +12,7 @@ from learning_core.response_types.lesson_draft import LESSON_DRAFT_RESPONSE_TYPE
 from learning_core.response_types.progression_artifact import PROGRESSION_ARTIFACT_RESPONSE_TYPE
 from learning_core.response_types.source_interpretation import SOURCE_INTERPRETATION_RESPONSE_TYPE
 from learning_core.response_types.summary import SUMMARY_RESPONSE_TYPE
+from learning_core.response_types.teaching_guide import TEACHING_GUIDE_RESPONSE_TYPE
 from learning_core.response_types.widget_transition import WIDGET_TRANSITION_RESPONSE_TYPE
 
 
@@ -29,6 +30,7 @@ RESPONSE_TYPE_REGISTRY: dict[str, ResponseTypeDefinition] = {
         PROGRESSION_ARTIFACT_RESPONSE_TYPE,
         SOURCE_INTERPRETATION_RESPONSE_TYPE,
         SUMMARY_RESPONSE_TYPE,
+        TEACHING_GUIDE_RESPONSE_TYPE,
         WIDGET_TRANSITION_RESPONSE_TYPE,
     )
 }

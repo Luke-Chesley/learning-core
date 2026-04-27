@@ -21,6 +21,7 @@ These operations now use the kernel plus the shared structured-output provider p
 - `curriculum_intake`
 - `progression_generate`
 - `progression_revise`
+- `teaching_guide_generate`
 - `session_evaluate`
 - `curriculum_update_propose`
 

@@ -27,13 +27,14 @@ Why:
 
 ### Wave 2
 
+- `teaching_guide_generate`
 - `session_evaluate`
 - `activity_feedback`
 - `curriculum_update_propose`
 
 Why:
 
-- these naturally benefit from shared evaluation/proposal response types
+- these naturally benefit from shared teaching support, evaluation, and proposal response types
 - they sit closer to future event-driven agent loops
 
 ### Wave 3

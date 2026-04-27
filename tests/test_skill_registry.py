@@ -25,4 +25,5 @@ def test_registry_contains_required_operations():
         "session_evaluate",
         "curriculum_intake",
         "copilot_chat",
+        "teaching_guide_generate",
     }.issubset(operation_names)

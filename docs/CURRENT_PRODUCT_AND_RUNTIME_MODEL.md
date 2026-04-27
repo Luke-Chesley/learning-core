@@ -9,10 +9,10 @@
 
 The product wedge is:
 
-1. bring what the parent already has
-2. create a usable curriculum and opening window
-3. reach Today fast
-4. keep the week and records nearby
+1. bring what the parent already has for K-8 homeschool
+2. help the parent understand the material well enough to teach it
+3. support a teachable lesson, guided questions, practice, and assessment
+4. keep state-aware, export-friendly records nearby
 
 This repo should support that wedge directly.
 Do not treat broader cross-domain positioning or billing work as the current launch target.
@@ -47,6 +47,7 @@ For the current product, the main chain is:
 Downstream operations then support bounded execution:
 
 - `session_generate` for a specific lesson or day slice
+- `teaching_guide_generate` for parent-facing teaching support tied to the current lesson
 - `activity_generate` for lesson-scoped learner activity generation
 - `session_evaluate` for post-session synthesis
 - `copilot_chat` for grounded parent-facing assistance
@@ -85,9 +86,9 @@ Older docs sometimes describe `launchPlan` as if it were part of every `curricul
 The current runtime layer is organized around:
 
 - `task_profiles`
-  current execution intent such as `source_interpret`, `long_horizon_planning`, `bounded_day_generation`, and `interactive_assistance`
+  current execution intent such as `source_interpret`, `long_horizon_planning`, `bounded_day_generation`, `teaching_support`, and `interactive_assistance`
 - `response_types`
-  current contracts such as `source_interpretation`, `curriculum_artifact`, `lesson_draft`, `activity_spec`, and `summary`
+  current contracts such as `source_interpretation`, `curriculum_artifact`, `lesson_draft`, `teaching_guide_artifact`, `activity_spec`, and `summary`
 - `workflow_cards`
   bounded prompt and execution recipes for the current task families
 - `packs`
@@ -108,6 +109,16 @@ Current rules:
 - the app validates, approves, dispatches, and persists any real mutation
 
 `learning-core` never gets direct authority to mutate product state.
+
+## Teaching Guide Boundary
+
+`teaching_guide_generate` returns a typed teaching support artifact only.
+
+It may include parent explanation, teachable sequence, guided questions, practice support, quick checks, and repair suggestions.
+It does not persist notes, evidence, attendance, progress, records, curriculum, plans, or activity attempts.
+
+The app owns whether a Teaching Guide is stored, superseded, rendered, or promoted through explicit parent actions into notes, evidence, or records.
+`activity_feedback` remains bounded component-level learner feedback, while Teaching Guide and parent review support can be richer adult-facing repair guidance.
 
 ## Deferred
 

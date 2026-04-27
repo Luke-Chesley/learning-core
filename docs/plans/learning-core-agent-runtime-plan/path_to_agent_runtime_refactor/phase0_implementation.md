@@ -77,8 +77,9 @@ learning_core/
 | --- | --- | --- | --- |
 | `source_interpret` | `source_interpret` | `source_interpretation` | `source_interpret` |
 | `session_generate` | `bounded_day_generation` | `lesson_draft` | `bounded_day_generation` |
+| `teaching_guide_generate` | `teaching_support` | `teaching_guide_artifact` | `teaching_support` |
 | `activity_generate` | `adaptive_or_bounded_activity_generation` | `activity_spec` | `activity_generation` |
-| `activity_feedback` | `activity_evaluation` | `evaluation` | `activity_evaluation` |
+| `activity_feedback` | `activity_evaluation` | `activity_feedback` | `activity_evaluation` |
 | `widget_transition` | `interactive_assistance` | `widget_transition` | `widget_transition` |
 | `session_evaluate` | `session_synthesis` | `evaluation` | `session_synthesis` |
 | `curriculum_update_propose` | `proposal_generation` | `proposal` | `proposal_generation` |

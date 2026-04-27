@@ -89,6 +89,7 @@ learning_core/
     finalization.py
   response_types/
     lesson_draft.py
+    teaching_guide_artifact.py
     activity_spec.py
     intake_turn.py
     curriculum_artifact.py
@@ -98,6 +99,7 @@ learning_core/
   workflow_cards/
     onboarding_intake/
     bounded_day_generation/
+    teaching_support/
     long_horizon_planning/
     session_synthesis/
     reporting/

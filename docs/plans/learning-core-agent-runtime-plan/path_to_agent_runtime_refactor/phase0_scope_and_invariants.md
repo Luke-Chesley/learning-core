@@ -93,6 +93,7 @@ Examples:
 - curriculum artifact
 - progression artifact
 - lesson draft
+- teaching guide artifact
 - activity artifact
 - proposal
 - evaluation summary
@@ -117,8 +118,9 @@ Do not allow freeform text to become the default output type.
 | `progression_generate` | `bounded_or_long_horizon_planning` | `progression_artifact` | May later merge with planning card resolution |
 | `progression_revise` | `artifact_revision` | `progression_artifact` | Preserve reviewability |
 | `session_generate` | `bounded_day_generation` | `lesson_draft` | This should become one of the primary paths |
+| `teaching_guide_generate` | `teaching_support` | `teaching_guide_artifact` | Artifact only; app owns persistence and parent-approved saved records |
 | `activity_generate` | `adaptive_or_bounded_activity_generation` | `activity_spec` | Treat as the gold-standard implementation shape |
-| `activity_feedback` | `activity_evaluation` | `evaluation` or `summary` | Keep bounded |
+| `activity_feedback` | `activity_evaluation` | `activity_feedback` | Keep bounded to component-level learner feedback |
 | `session_evaluate` | `session_synthesis` | `evaluation` or `summary` | Core future event-driven agent path |
 | `curriculum_update_propose` | `proposal_generation` | `proposal` | Approval aware |
 | `copilot_chat` | `interactive_assistance` | `summary` or `proposal` | Keep distinct from write-heavy flows |

@@ -40,6 +40,7 @@ def test_list_operations_includes_required_cutover_operations():
         "curriculum_intake",
         "copilot_chat",
         "topic_suggest",
+        "teaching_guide_generate",
     }.issubset(operation_names)
 
 

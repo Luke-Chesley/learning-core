@@ -8,7 +8,7 @@ It does not own UI, auth, product persistence, or direct product mutations.
 ## Current Product Context
 
 - Primary consuming app: `../homeschool-v2`
-- Current wedge: bring what you already have, create a usable curriculum and opening window, open Today fast, and keep the week and records nearby.
+- Current wedge: help a parent-led K-8 homeschool parent move from source material to parent explanation, teachable lesson, guided questions, practice, assessment, and state-aware/export-friendly records.
 - Billing is out of scope for the current launch-prep work.
 
 ## Read This First
@@ -32,8 +32,9 @@ At the product level, `homeschool-v2` currently treats this repo as the AI side 
 3. Opening-window and day-1 handoff are downstream planning concerns. They are not part of the canonical `curriculum_generate` artifact contract.
 4. `progression_generate` helps turn the curriculum into schedulable order for the app-side planning system.
 5. `session_generate` creates a bounded lesson draft for a specific day or slot.
-6. `activity_generate` creates lesson-scoped learner activities.
-7. `copilot_chat` provides grounded adult-facing assistance. It may summarize or propose, but the app must validate and apply any real mutation itself.
+6. `teaching_guide_generate` returns a parent-facing teaching support artifact for explanation, guided questions, practice, quick checks, and repair support.
+7. `activity_generate` creates lesson-scoped learner activities.
+8. `copilot_chat` provides grounded adult-facing assistance. It may summarize or propose, but the app must validate and apply any real mutation itself.
 
 `curriculum_generate` is the single curriculum-creation skill.
 It supports two explicit request modes:
@@ -78,8 +79,9 @@ Internally, those operations map onto the shared runtime layer.
 | `curriculum_generate` | create the durable curriculum artifact | `long_horizon_planning` | `curriculum_artifact` |
 | `progression_generate` | produce schedulable curriculum ordering and structure | `long_horizon_planning` | `progression_artifact` |
 | `session_generate` | create a bounded day lesson draft | `bounded_day_generation` | `lesson_draft` |
+| `teaching_guide_generate` | create parent-facing teaching support for the current lesson | `teaching_support` | `teaching_guide_artifact` |
 | `activity_generate` | create lesson-scoped learner activities | `adaptive_or_bounded_activity_generation` | `activity_spec` |
-| `activity_feedback` | return bounded learner-feedback responses | `activity_evaluation` | `activity_feedback` |
+| `activity_feedback` | return bounded component-level learner-feedback responses | `activity_evaluation` | `activity_feedback` |
 | `widget_transition` | execute deterministic widget transitions | `interactive_assistance` | `widget_transition` |
 | `curriculum_intake` | handle intake dialogue turns | `intake_dialogue` | `intake_turn` |
 | `curriculum_revise` | revise a curriculum artifact | `artifact_revision` | `curriculum_artifact_revision` |
@@ -179,6 +181,10 @@ learning_core/
       SKILL.md
       scripts/
         main.py
+    teaching_guide_generate/
+      SKILL.md
+      scripts/
+        main.py
     curriculum_intake/
       SKILL.md
       scripts/
@@ -237,6 +243,8 @@ Internal orchestration helpers live behind the engine and are not the main publi
 - Product repos persist artifacts; `learning-core` returns typed artifacts, lineage, and traces.
 - Product repos send structured request envelopes only. They do not send prompt fragments or raw system prompts.
 - `learning-core` never mutates app state directly.
+- Teaching Guide artifacts are generated support only. The app owns persistence, supersession, parent approval, and any saved notes, evidence, or records.
+- `activity_feedback` remains bounded component-level learner feedback; Teaching Guide and parent review support can be richer, adult-facing repair guidance, but still returns artifacts only.
 - The legacy generic gateway surface is deleted. Apps call named operations only.
 - Backend domain logic is canonical for engine-backed widgets. Frontend libraries are rendering helpers, not the source of truth.
 

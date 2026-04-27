@@ -29,6 +29,7 @@ response_types/
   curriculum_artifact.py
   progression_artifact.py
   lesson_draft.py
+  teaching_guide_artifact.py
   activity_spec.py
   proposal.py
   evaluation.py
@@ -50,6 +51,7 @@ Response types are generic learning-ops outputs, not homeschool screens.
 Good examples:
 
 - lesson draft
+- teaching guide artifact
 - proposal
 - evaluation summary
 - curriculum artifact
@@ -72,6 +74,7 @@ Create a central `learning_core/runtime/task_profiles.py` or similar registry.
 - `source_interpret`
 - `long_horizon_planning`
 - `bounded_day_generation`
+- `teaching_support`
 - `adaptive_or_bounded_activity_generation`
 - `activity_evaluation`
 - `session_synthesis`
@@ -111,6 +114,14 @@ A task profile should define:
 - tools: evidence read tools + synthesis tools
 - runtime mode: bounded loop
 - approval required: false for draft output, true if operational proposal is emitted
+
+`teaching_support` might default to:
+
+- response type: `teaching_guide_artifact`
+- latency class: `interactive`
+- tools: read-only curriculum, session, activity, and record context
+- runtime mode: single-pass with contract repair
+- approval required: false for the artifact, true before the app saves notes, evidence, or records
 
 ## Operation Mapping Layer
 
