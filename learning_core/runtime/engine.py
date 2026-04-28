@@ -246,6 +246,26 @@ class AgentEngine:
 
         return text[start : end + 1]
 
+    def _parse_json_fragment(self, text: str) -> object:
+        stripped = text.strip()
+        try:
+            parsed = json.loads(stripped)
+        except Exception as initial_error:
+            if '\\"' not in stripped:
+                raise
+
+            try:
+                return json.loads(stripped.replace('\\"', '"'))
+            except Exception:
+                raise initial_error
+
+        if isinstance(parsed, str):
+            nested = parsed.strip()
+            if nested.startswith(("{", "[")):
+                return self._parse_json_fragment(nested)
+
+        return parsed
+
     def _extract_structured_output_error_artifact(self, error: Exception) -> dict | list | None:
         message = str(error)
         marker_index = message.find("completion ")
@@ -255,7 +275,7 @@ class AgentEngine:
         raw_fragment = message[marker_index + len("completion ") :]
         try:
             extracted = self._extract_json(raw_fragment)
-            parsed = json.loads(extracted)
+            parsed = self._parse_json_fragment(extracted)
         except Exception:
             return None
 
@@ -766,7 +786,7 @@ class AgentEngine:
         extracted_json = self._extract_json(raw_text)
 
         try:
-            raw_artifact = json.loads(extracted_json)
+            raw_artifact = self._parse_json_fragment(extracted_json)
         except Exception as error:
             raise ContractValidationError(
                 "Structured-output fallback returned invalid JSON: "
