@@ -671,6 +671,9 @@ class ActivityGenerateSkill(SkillDefinition):
                     f"Invalid JSON:\n```json\n{json_text}\n```\n\n"
                     "Make the smallest set of corrections needed to satisfy the contract. "
                     "Keep IDs, overall composition, and intent stable unless the contract failure makes that impossible.\n\n"
+                    "For map_surface/map_geojson widgets: surface.basemapStyle must be one of none, light, terrain, "
+                    "or satellite. layers[].stylePreset must be one of political, physical, historical, climate, "
+                    "route, or custom. Do not swap these enum sets during repair.\n\n"
                     "Return only the corrected JSON object. No text outside the JSON."
                 )
                 repair_response = model_runtime.client.invoke(

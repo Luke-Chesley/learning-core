@@ -109,14 +109,19 @@ def _resolve_max_tokens(task_name: str, task_kind: str, policy_max_tokens: int |
     if operation_override is not None:
         return operation_override, operation_env_name
 
+    def default_with_policy_floor(value: int, source: str) -> tuple[int, str]:
+        if policy_max_tokens is not None and policy_max_tokens > value:
+            return policy_max_tokens, f"skill_policy_over_{source}"
+        return value, source
+
     task_kind_env_name = f"LEARNING_CORE_{task_kind.upper()}_MAX_TOKENS"
     task_kind_override = _parse_optional_int(os.getenv(task_kind_env_name))
     if task_kind_override is not None:
-        return task_kind_override, task_kind_env_name
+        return default_with_policy_floor(task_kind_override, task_kind_env_name)
 
     global_override = _parse_optional_int(os.getenv("LEARNING_CORE_MAX_TOKENS"))
     if global_override is not None:
-        return global_override, "LEARNING_CORE_MAX_TOKENS"
+        return default_with_policy_floor(global_override, "LEARNING_CORE_MAX_TOKENS")
 
     if policy_max_tokens is not None:
         return policy_max_tokens, "skill_policy"

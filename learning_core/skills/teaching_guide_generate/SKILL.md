@@ -17,3 +17,21 @@ Rules:
 - Each misconception repair must include exactly three `easier_examples`.
 - Do not claim legal compliance, accreditation, school approval, state-law certainty, diagnosis, or that an AI is the teacher.
 - Keep recordkeeping suggestions observational and parent-owned. Do not present them as legal advice.
+
+Required top-level contract:
+
+- `title`: string
+- `audience`: `parent`
+- `guidance_mode`: requested mode
+- `lesson_focus`: string
+- `parent_brief`: object with `summary`, optional `why_it_matters`, optional `time_needed_minutes`, and `materials`
+- `teach_it`: object with `setup`, `steps`, `vocabulary`, and optional `worked_example`
+- `teach_it.vocabulary`: array of objects with `term`, `definition`, and optional `use_in_sentence`
+- `guided_questions`: array of objects with `question`, `listen_for`, and optional `follow_up`
+- `common_misconceptions`: array of objects with `misconception`, optional `why_it_happens`, `repair_move`, and exactly three `easier_examples`
+- `practice_plan`: object with optional `quick_warmup`, `parent_moves`, and optional `independent_try`
+- `check_understanding`: object with `prompts`, `evidence_of_understanding`, optional `if_stuck`, and optional `if_ready`
+- `adaptation_moves`: array of objects with `signal` and `move`
+- `recordkeeping`: array of objects with `note` and optional `evidence_to_save`
+- `outsource_flags`: array of short flags or decision-aid notes
+- `adult_review_required`: boolean

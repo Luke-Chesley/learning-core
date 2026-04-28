@@ -64,9 +64,10 @@ Shared generation rules:
 - Choose a `planningModel`:
   - `single_lesson`: one-day material.
   - `content_map`: small or medium curriculum where the app can route teachable items flexibly.
-  - `session_sequence`: explicit session-counted or timeboxed plan.
+  - `session_sequence`: explicit session-counted plan, such as "15 sessions", "30 sessions", or an authored numbered day/session sequence.
   - `source_sequence`: ordered source such as a workbook, book, chapter list, or unit sequence.
   - `reference_map`: broad source that will be entered selectively.
+- A week/month/semester horizon alone is not enough reason to use `session_sequence`; without an exact session count, prefer `content_map` or `source_sequence` and let launch/session planning choose the opening days.
 - Units group teachable arcs. They are not scripts, but they must not be vague containers.
 - Skills are durable route/planning handles. Their titles must be teachable and content-specific.
 - Avoid generic skills. A skill title must name the concrete content, concept, procedure, text, problem type, artifact, or source section the learner will work with.
@@ -92,6 +93,12 @@ Shared generation rules:
 - For timeboxed plans, `deliverySequence.length` must equal `pacing.totalSessions`.
 - For curriculum requests with `planningConstraints.totalSessions`, `deliverySequence.length` must equal `planningConstraints.totalSessions` and `pacing.totalSessions`.
 - For `planningModel: "session_sequence"`, each delivery item must have its own teachable item and its own primary skill. Do not reuse the same teachable item or primary skill across sessions; create session-specific review, practice, application, or project skills when the same broad concept repeats.
+- For large exact-session plans, such as 20 or more sessions, preserve every session while keeping the artifact compact:
+  - Use one primary skill, one content anchor, one teachable item, and one delivery sequence item per session unless the source explicitly needs more.
+  - Keep strings short and concrete.
+  - Use at most two short details per content anchor.
+  - Use one or two short misconceptions, parent notes, and evidence suggestions per session.
+  - Do not include unspecified metadata, long rationales, repeated summaries, or repeated prose.
 - The final project/performance, if requested, must be represented in `projectArc` and in one or more delivery sequence items.
 - Keep the curriculum generally applicable to K-8 parent-led homeschool unless the request says otherwise.
 - `source.rationale` must always be an array of strings, even when there is only one rationale.
@@ -238,7 +245,11 @@ Important top-level structure rule:
 - Do not include `progression`.
 
 Important membership rules:
-- Units reference skills only by `skillIds`.
-- Skills and teachable items reference content only by `contentAnchorIds`.
-- Delivery sequence items reference one `teachableItemId`.
+- Treat IDs as a closed inventory. Every referenced `skillId`, `unitRef`, `anchorId`, and `teachableItemId` must be declared in the matching top-level array.
+- Do not reference a future or convenient ID such as `skill-7` unless that exact object exists in top-level `skills`.
+- Units reference skills only by existing `skills[].skillId` values.
+- Teachable items reference content only by existing `contentAnchors[].anchorId` values and skills only by existing `skills[].skillId` values.
+- Delivery sequence items reference one existing `teachableItems[].itemId`.
+- Delivery sequence items may only use `skillIds` already listed on the referenced teachable item.
 - Do not repeat a second natural-language copy of skill membership inside units.
+- For `planningModel: "session_sequence"`, each delivery item must use a unique existing teachable item and a unique existing primary skill, where the primary skill is the first value in `deliverySequence[].skillIds`.

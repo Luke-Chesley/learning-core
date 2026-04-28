@@ -31,7 +31,19 @@ _LESSON_DRAFT = {
     "primary_objectives": ["Locate western states", "Explain state borders"],
     "success_criteria": ["Select California", "Name one bordering state"],
     "total_minutes": 30,
-    "blocks": [],
+    "blocks": [
+        {
+            "type": "demonstration",
+            "title": "Model map selection",
+            "minutes": 30,
+            "purpose": "Show how to use borders to locate a state.",
+            "teacher_action": "Point to California and one bordering state.",
+            "learner_action": "Select California and name one neighbor.",
+            "check_for": "Learner selects the state and names one neighbor.",
+            "materials_needed": [],
+            "optional": False,
+        }
+    ],
     "materials": [],
     "teacher_notes": [],
     "adaptations": [],

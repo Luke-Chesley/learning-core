@@ -45,6 +45,10 @@ LESSON_VISUAL_AID_ALLOWED_HOSTS = (
     "images-assets.nasa.gov",
 )
 
+MAX_SHORT_STRING = 200
+MAX_ACTION_STRING = 400
+MAX_BLOCK_TITLE = 100
+
 LessonShape: TypeAlias = Literal[
     "balanced",
     "direct_instruction",
@@ -110,18 +114,18 @@ class LessonVisualAid(StrictModel):
 
 
 class LessonAdaptation(StrictModel):
-    trigger: str
-    action: str
+    trigger: str = Field(max_length=80)
+    action: str = Field(max_length=MAX_SHORT_STRING)
 
 
 class LessonBlock(StrictModel):
     type: LessonBlockType
-    title: str
+    title: str = Field(max_length=MAX_BLOCK_TITLE)
     minutes: int
-    purpose: str
-    teacher_action: str
-    learner_action: str
-    check_for: str | None = None
+    purpose: str = Field(max_length=MAX_SHORT_STRING)
+    teacher_action: str = Field(max_length=MAX_ACTION_STRING)
+    learner_action: str = Field(max_length=MAX_ACTION_STRING)
+    check_for: str | None = Field(default=None, max_length=MAX_SHORT_STRING)
     materials_needed: list[str] = Field(default_factory=list)
     visual_aid_ids: list[str] = Field(default_factory=list)
     optional: bool = False
@@ -148,7 +152,38 @@ class StructuredLessonDraft(StrictModel):
     accommodations: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_visual_aid_references(self) -> "StructuredLessonDraft":
+    def validate_app_parity_rules(self) -> "StructuredLessonDraft":
+        block_total = sum(block.minutes for block in self.blocks)
+        allowed_delta = (self.total_minutes * 15 + 99) // 100
+        if abs(block_total - self.total_minutes) > allowed_delta:
+            raise ValueError(
+                f"Block minutes total ({block_total}) differs from total_minutes "
+                f"({self.total_minutes}) by more than 15%."
+            )
+
+        instructional_types = {
+            "model",
+            "guided_practice",
+            "independent_practice",
+            "demonstration",
+            "read_aloud",
+            "discussion",
+            "project_work",
+        }
+        if not any(block.type in instructional_types for block in self.blocks):
+            raise ValueError(
+                "Lesson must include at least one instructional block."
+            )
+
+        check_types = {"check_for_understanding", "reflection"}
+        if not (
+            any(block.type in check_types for block in self.blocks)
+            or any(block.check_for for block in self.blocks)
+        ):
+            raise ValueError(
+                "Lesson must include at least one visible check."
+            )
+
         visual_aid_ids = {visual_aid.id for visual_aid in self.visual_aids}
         for block in self.blocks:
             for visual_aid_id in block.visual_aid_ids:

@@ -104,6 +104,7 @@ class ProgressionGenerateSkill(StructuredOutputSkill):
         repaired_edges: list[dict] | object = edges
         if isinstance(edges, list):
             repaired_edges = []
+            seen_edge_pairs: set[tuple[str, str]] = set()
             for edge in edges:
                 if not isinstance(edge, dict):
                     repaired_edges.append(edge)
@@ -115,6 +116,17 @@ class ProgressionGenerateSkill(StructuredOutputSkill):
                         repaired_value = _repair_skill_ref(value, catalog_refs)
                         changed = changed or repaired_value != value
                         repaired_edge[key] = repaired_value
+                from_ref = repaired_edge.get("fromSkillRef")
+                to_ref = repaired_edge.get("toSkillRef")
+                if isinstance(from_ref, str) and isinstance(to_ref, str):
+                    if from_ref == to_ref:
+                        changed = True
+                        continue
+                    edge_pair = (from_ref, to_ref)
+                    if edge_pair in seen_edge_pairs:
+                        changed = True
+                        continue
+                    seen_edge_pairs.add(edge_pair)
                 repaired_edges.append(repaired_edge)
 
         if not changed:

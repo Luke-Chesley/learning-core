@@ -210,6 +210,46 @@ def test_progression_artifact_rejects_duplicate_edge_pairs_with_different_kinds(
         )
 
 
+def test_progression_repair_removes_duplicate_edge_pairs():
+    raw_artifact = {
+        "phases": [
+            {
+                "title": "Foundations",
+                "description": "Start with safety.",
+                "skillRefs": ["skill:kitchen/foundations/knife-safety"],
+            },
+            {
+                "title": "Application",
+                "description": "Apply the routine.",
+                "skillRefs": ["skill:kitchen/application/make-snack"],
+            },
+        ],
+        "edges": [
+            {
+                "fromSkillRef": "skill:kitchen/foundations/knife-safety",
+                "toSkillRef": "skill:kitchen/application/make-snack",
+                "kind": "hardPrerequisite",
+            },
+            {
+                "fromSkillRef": "skill:kitchen/foundations/knife-safety",
+                "toSkillRef": "skill:kitchen/application/make-snack",
+                "kind": "recommendedBefore",
+            },
+        ],
+    }
+
+    repaired = ProgressionGenerateSkill().repair_invalid_artifact(
+        raw_artifact=raw_artifact,
+        payload=_payload(),
+        context=_context(),
+        error=ValueError("duplicate edge"),
+    )
+
+    artifact = ProgressionArtifact.model_validate(repaired)
+    assert len(artifact.edges) == 1
+    assert artifact.edges[0].kind == "hardPrerequisite"
+
+
 def test_progression_repair_recovers_uniquely_shortened_skill_refs():
     payload = ProgressionGenerationRequest.model_validate(
         {

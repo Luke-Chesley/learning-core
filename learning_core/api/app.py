@@ -4,6 +4,7 @@ import os
 
 import uvicorn
 from fastapi import FastAPI, Header
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from learning_core.contracts.operation import OperationEnvelope
@@ -57,7 +58,7 @@ def create_app() -> FastAPI:
         x_learning_core_key: str | None = Header(default=None),
     ):
         await _authorize(x_learning_core_key)
-        preview = engine.preview(operation_name, request.model_dump(mode="json"))
+        preview = await run_in_threadpool(engine.preview, operation_name, request.model_dump(mode="json"))
         return preview.model_dump()
 
     @app.post("/v1/operations/{operation_name}/execute")
@@ -67,7 +68,7 @@ def create_app() -> FastAPI:
         x_learning_core_key: str | None = Header(default=None),
     ):
         await _authorize(x_learning_core_key)
-        result = engine.execute(operation_name, request.model_dump(mode="json"))
+        result = await run_in_threadpool(engine.execute, operation_name, request.model_dump(mode="json"))
         return result.model_dump()
 
     return app

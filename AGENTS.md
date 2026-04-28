@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Shared Skill Activation
-- Use the global Codex skill `learning-cross-repo-workflow` when a task touches `homeschool-v2`, `codex-agent-loop-harness`, activity generation, widget/runtime changes, learner activity QA, or cross-repo debugging.
+- Use the global Codex skill `learning-cross-repo-workflow` when a task touches `homeschool-v2`, `harnesses/browser-ux`, activity generation, widget/runtime changes, learner activity QA, or cross-repo debugging.
 - The canonical skill lives at `/home/luke/.codex/skills/learning-cross-repo-workflow/SKILL.md`. Do not create a repo-local copy of that skill.
 - For real browser execution, follow that skill and use the global `playwright` skill instead of repeatedly writing new inline Playwright scripts when repo docs or harness files already cover the flow.
 - Some older docs still mention legacy pre-move paths like `/home/luke/Desktop/homeschool-v2` and `/home/luke/Desktop/learning-core`; normalize those to the live workspace under `/home/luke/Desktop/learning/...` unless the filesystem proves otherwise.

@@ -31,10 +31,11 @@ _LESSON_DRAFT = {
         {
             "type": "model",
             "title": "Model it",
-            "minutes": 10,
+            "minutes": 35,
             "purpose": "Show the method",
             "teacher_action": "Demonstrate on whiteboard",
             "learner_action": "Take notes",
+            "check_for": "Learner starts the first problem correctly.",
             "materials_needed": [],
             "optional": False,
         }
@@ -463,6 +464,24 @@ def test_chess_preview_auto_injects_ui_specs():
     assert "Auto-included widget specifications" in preview.user_prompt
     assert "board_surface__chess" in preview.user_prompt
     assert "interactive_widget" in preview.user_prompt
+
+
+def test_geography_preview_distinguishes_map_basemap_and_layer_style_enums():
+    payload = _make_payload(
+        subject="Geography",
+        linked_skill_titles=["Locate regions on a map"],
+        lesson_draft={
+            **_LESSON_DRAFT,
+            "title": "Map regions",
+            "lesson_focus": "Use a map to locate and compare regions.",
+        },
+    )
+
+    preview = ActivityGenerateSkill().build_prompt_preview(payload, _make_context())
+
+    assert "surface.basemapStyle" in preview.system_prompt
+    assert "political/physical/historical/climate/route/custom belong only in `layers[].stylePreset`" in preview.system_prompt
+    assert "map_surface__geojson" in preview.user_prompt
 
 
 def test_registry_index_rows_include_explicit_paths():

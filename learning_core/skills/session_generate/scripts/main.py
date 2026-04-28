@@ -240,6 +240,8 @@ class SessionGenerateSkill(StructuredOutputSkill):
                 "- When a block depends on specialized vocabulary or a domain-specific move, briefly define or model it inside teacher_action on first use.",
                 "- learner_action should describe what the learner actually says, points to, writes, builds, or practices.",
                 "- check_for should tell the adult what to hear, see, or collect as evidence.",
+                "- Field limits must match the app: block titles under 100 characters; purpose and check_for under 200 characters; teacher_action and learner_action under 400 characters.",
+                "- Aim for teacher_action and learner_action under 300 characters; split long actions into another block or move nonessential detail into teacher_notes.",
             ]
         )
 
@@ -339,6 +341,10 @@ class SessionGenerateSkill(StructuredOutputSkill):
                     "- Do not invent, generate, guess, rewrite, or use placeholder image URLs.",
                     "- Use each visual aid id in at most one block; remove repeated visual_aid_ids from later blocks.",
                     "- Keep block minutes aligned to total_minutes and keep teacher_action runnable by a non-expert adult.",
+                    "- Keep block titles under 100 characters; purpose and check_for under 200 characters; teacher_action and learner_action under 400 characters.",
+                    "- Shorten any overlong teacher_action or learner_action aggressively; target under 300 characters instead of preserving every word.",
+                    "- Block minutes must sum to total_minutes within 15%. Add, remove, or resize blocks until the total fits.",
+                    "- Include at least one instructional block and at least one visible check.",
                     "",
                     "Previous invalid JSON:",
                     raw_json,

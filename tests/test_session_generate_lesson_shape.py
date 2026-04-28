@@ -137,6 +137,23 @@ def test_structured_lesson_draft_accepts_canonical_lesson_shape():
     assert artifact.lesson_shape == "direct_instruction"
 
 
+def test_structured_lesson_draft_rejects_app_overlong_block_action():
+    artifact = _lesson_artifact("direct_instruction")
+    artifact["blocks"][0]["teacher_action"] = "x" * 401
+
+    with pytest.raises(ValidationError, match="at most 400"):
+        StructuredLessonDraft.model_validate(artifact)
+
+
+def test_structured_lesson_draft_rejects_app_misaligned_block_minutes():
+    artifact = _lesson_artifact("direct_instruction")
+    artifact["blocks"][0]["minutes"] = 5
+    artifact["blocks"][1]["minutes"] = 5
+
+    with pytest.raises(ValidationError, match="Block minutes total"):
+        StructuredLessonDraft.model_validate(artifact)
+
+
 def test_structured_lesson_draft_accepts_allowed_visual_aid_reference():
     artifact = _lesson_artifact("direct_instruction")
     artifact["visual_aids"] = [
@@ -214,6 +231,8 @@ def test_session_generate_prompt_preview_constrains_lesson_shape_values():
         assert block_type in preview.user_prompt
     assert "machine-readable metadata" in preview.system_prompt
     assert "do not emit descriptive prose labels" in preview.system_prompt.lower()
+    assert "`teacher_action` and `learner_action` under 400 characters" in preview.system_prompt
+    assert "Field limits must match the app" in preview.user_prompt
     assert "Never use a lesson_shape slug as blocks[].type" in preview.user_prompt
     assert (
         "Lesson shape preference (canonical lesson_shape slug; reuse exactly if included): "
@@ -294,6 +313,8 @@ def test_session_generate_validation_retry_corrects_block_type_values():
     assert "Every visual_aids[].url must be copied exactly from search_lesson_images" in preview.user_prompt
     assert "Do not invent, generate, guess, rewrite, or use placeholder image URLs." in preview.user_prompt
     assert "Use each visual aid id in at most one block" in preview.user_prompt
+    assert "target under 300 characters" in preview.user_prompt
+    assert "Block minutes must sum to total_minutes within 15%" in preview.user_prompt
 
 
 def test_session_generate_prompt_preview_adds_script_first_constraints():

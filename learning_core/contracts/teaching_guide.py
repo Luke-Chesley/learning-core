@@ -42,10 +42,10 @@ def _validate_safe_text(value: str | None, *, max_words: int = 60) -> str | None
 
 class VocabularyItem(StrictModel):
     term: str = Field(min_length=1, max_length=80)
-    parent_friendly_definition: str = Field(min_length=1, max_length=240)
+    definition: str = Field(min_length=1, max_length=240)
     use_in_sentence: str | None = Field(default=None, max_length=180)
 
-    @field_validator("term", "parent_friendly_definition", "use_in_sentence", mode="before")
+    @field_validator("term", "definition", "use_in_sentence", mode="before")
     @classmethod
     def normalize_text_fields(cls, value):
         return _validate_safe_text(value, max_words=35)

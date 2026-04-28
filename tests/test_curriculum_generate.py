@@ -93,6 +93,10 @@ def test_curriculum_generate_prompt_preview_mentions_source_entry_fields():
     assert "Primary source text:" in preview.user_prompt
 
 
+def test_curriculum_generate_policy_has_room_for_session_sequence_artifacts():
+    assert CurriculumGenerateSkill.policy.max_tokens >= 32000
+
+
 def test_curriculum_generate_prompt_uses_planning_constraints_for_curriculum_request():
     payload = CurriculumGenerationRequest.model_validate(
         {
@@ -120,8 +124,58 @@ def test_curriculum_generate_prompt_uses_planning_constraints_for_curriculum_req
     assert "planningConstraints.totalSessions is 30" in preview.user_prompt
     assert "planningModel session_sequence" in preview.user_prompt
     assert "one concrete" in preview.user_prompt
+    assert "Session sequence structural contract:" in preview.user_prompt
+    assert "Treat IDs as a closed inventory" in preview.user_prompt
+    assert "primary skillId and must be unique" in preview.user_prompt
+    assert "Large exact-session artifact compactness contract:" in preview.user_prompt
+    assert "Use exactly one primary skill, one content anchor, one teachable item, and one deliverySequence item per session" in preview.user_prompt
     assert '"totalSessions": 30' in preview.user_prompt
     assert '"gradeLevel": "4th grade"' in preview.user_prompt
+
+
+def test_curriculum_generate_prompt_infers_exact_sessions_from_source_entry_label():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "entryStrategy": "timebox_start",
+            "entryLabel": "30 sessions",
+            "continuationMode": "timebox",
+            "deliveryPattern": "mixed",
+            "recommendedHorizon": "two_weeks",
+            "sourceText": "I want to teach a 4th grader Maine history in 30 sessions.",
+            "detectedChunks": ["4th grader Maine history", "30 sessions"],
+            "assumptions": ["The 30 sessions are the explicit total delivery constraint."],
+            "planningConstraints": None,
+        }
+    )
+
+    preview = CurriculumGenerateSkill().build_prompt_preview(payload, _context())
+
+    assert "planningConstraints.totalSessions is 30" in preview.user_prompt
+    assert "Large exact-session artifact compactness contract:" in preview.user_prompt
+
+
+def test_curriculum_generate_validation_retry_calls_out_unique_session_primary_skills():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "deliveryPattern": "mixed",
+            "sourceText": "Create a 5-session practical cooking curriculum.",
+        }
+    )
+
+    preview = CurriculumGenerateSkill().build_validation_retry_preview(
+        payload=payload,
+        context=_context(),
+        raw_artifact={"planningModel": "session_sequence", "deliverySequence": []},
+        error=ValueError('planningModel "session_sequence" requires each deliverySequence item to use a unique primary skillId.'),
+    )
+
+    assert "unique first skillIds entry as its primary skillId" in preview.user_prompt
+    assert "session-specific review, practice, application, or project skills" in preview.user_prompt
+    assert "Treat IDs as a closed inventory" in preview.user_prompt
 
 
 def test_curriculum_generate_prompt_preview_mentions_conversation_fields():
@@ -129,6 +183,7 @@ def test_curriculum_generate_prompt_preview_mentions_conversation_fields():
 
     assert "Request mode: conversation_intake" in preview.user_prompt
     assert "Scale guidance:" in preview.user_prompt
+    assert "Do not use planningModel session_sequence unless the conversation gives an exact session count" in preview.user_prompt
     assert "Conversation transcript:" in preview.user_prompt
     assert "Teach my daughter fractions this summer" in preview.user_prompt
     assert "Granularity guidance:" in preview.user_prompt

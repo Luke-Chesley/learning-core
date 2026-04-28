@@ -64,7 +64,7 @@ def _artifact_payload(**overrides):
             "vocabulary": [
                 {
                     "term": "equivalent",
-                    "parent_friendly_definition": "Different names for the same amount.",
+                    "definition": "Different names for the same amount.",
                 }
             ],
             "worked_example": "One half covers the same length as two fourths.",
@@ -170,7 +170,41 @@ def test_teaching_guide_prompt_preview_mentions_guardrails_and_context():
     assert "Audience: parent" in preview.user_prompt
     assert "Equivalent fractions" in preview.user_prompt
     assert "Do not include legal compliance" in preview.user_prompt
+    assert "teach_it.vocabulary: [{ term, definition, use_in_sentence? }]" in preview.user_prompt
+    assert "guided_questions: [{ question, listen_for, follow_up? }]" in preview.user_prompt
+    assert "parent_brief" in preview.system_prompt
     assert "Do not invent source facts" in preview.system_prompt
+
+
+def test_teaching_guide_validation_retry_corrects_compact_legacy_shape():
+    skill = TeachingGuideGenerateSkill()
+    raw_artifact = {
+        "audience": "parent",
+        "guidance_mode": "preteach",
+        "title": "Parent map guide",
+        "lesson_focus": "Locate a state and name nearby places.",
+        "what_to_say": ["Find the state on the map."],
+        "teaching_tips": ["Keep the map visible."],
+        "guided_questions": ["Can you point to the state?"],
+        "common_misconceptions": ["A neighbor state shares a border."],
+        "quick_support": ["Start with the compass rose."],
+        "recordkeeping_note": "Save a short note.",
+    }
+    error = ValueError("parent_brief Field required")
+
+    retry = skill.build_validation_retry_preview(
+        payload=_request(),
+        context=_context(),
+        raw_artifact=raw_artifact,
+        error=error,
+    )
+
+    assert retry is not None
+    assert "previous JSON did not validate" in retry.user_prompt
+    assert "`guided_questions` must contain objects, not strings." in retry.user_prompt
+    assert "`common_misconceptions` must contain objects, not strings." in retry.user_prompt
+    assert "`teach_it.vocabulary` items must use `definition`" in retry.user_prompt
+    assert "what_to_say" in retry.user_prompt
 
 
 def test_teaching_guide_operation_is_registered_for_runtime_surfaces():

@@ -7,6 +7,7 @@ from learning_core.contracts.teaching_guide import (
     TeachingGuideArtifact,
     TeachingGuideGenerationRequest,
 )
+from learning_core.observability.traces import PromptPreview
 from learning_core.runtime.policy import ExecutionPolicy
 from learning_core.skills.base import StructuredOutputSkill
 from learning_core.skills.prompt_utils import append_user_authored_context
@@ -30,6 +31,28 @@ class TeachingGuideGenerateSkill(StructuredOutputSkill):
         max_tokens=4500,
         latency_class="interactive",
     )
+
+    def _contract_summary(self) -> str:
+        return "\n".join(
+            [
+                "Required TeachingGuideArtifact fields:",
+                "- title: string",
+                "- audience: parent",
+                "- guidance_mode: requested mode",
+                "- lesson_focus: string",
+                "- parent_brief: { summary, why_it_matters?, time_needed_minutes?, materials }",
+                "- teach_it: { setup, steps, vocabulary, worked_example? }",
+                "- teach_it.vocabulary: [{ term, definition, use_in_sentence? }]",
+                "- guided_questions: [{ question, listen_for, follow_up? }]",
+                "- common_misconceptions: [{ misconception, why_it_happens?, repair_move, easier_examples: string[3] }]",
+                "- practice_plan: { quick_warmup?, parent_moves, independent_try? }",
+                "- check_understanding: { prompts, evidence_of_understanding, if_stuck?, if_ready? }",
+                "- adaptation_moves: [{ signal, move }]",
+                "- recordkeeping: [{ note, evidence_to_save? }]",
+                "- outsource_flags: string[]",
+                "- adult_review_required: boolean",
+            ]
+        )
 
     def build_user_prompt(self, payload: TeachingGuideGenerationRequest, context) -> str:
         lines = [
@@ -70,43 +93,51 @@ class TeachingGuideGenerateSkill(StructuredOutputSkill):
             "- Include common misconceptions when the basis supports them.",
             "- Every misconception repair must include exactly three easier_examples.",
             "- Do not include legal compliance, accreditation, school approval, state-law certainty, diagnosis, or AI-teacher claims.",
+            "",
+            self._contract_summary(),
         ]
         append_user_authored_context(lines, context)
         lines.extend(["", "Generate the teaching guide artifact."])
         return "\n".join(lines)
 
     def repair_invalid_artifact(self, *, raw_artifact, payload, context, error):
-        if not isinstance(raw_artifact, dict):
-            return None
+        return None
 
-        repaired = dict(raw_artifact)
-        repaired["audience"] = "parent"
-        repaired.setdefault("guidance_mode", payload.guidance_mode)
-        repaired.setdefault("adult_review_required", False)
-
-        flags = repaired.get("outsource_flags")
-        if not isinstance(flags, list):
-            repaired["outsource_flags"] = []
-
-        misconceptions = repaired.get("common_misconceptions")
-        if isinstance(misconceptions, list):
-            repaired_misconceptions = []
-            for item in misconceptions:
-                if not isinstance(item, dict):
-                    continue
-                fixed = dict(item)
-                examples = fixed.get("easier_examples")
-                if isinstance(examples, list):
-                    examples = [str(example) for example in examples if str(example).strip()]
-                else:
-                    examples = []
-                while len(examples) < 3:
-                    examples.append("Use a simpler example from the provided lesson.")
-                fixed["easier_examples"] = examples[:3]
-                repaired_misconceptions.append(fixed)
-            repaired["common_misconceptions"] = repaired_misconceptions
-
-        return repaired
+    def build_validation_retry_preview(
+        self,
+        *,
+        payload: TeachingGuideGenerationRequest,
+        context,
+        raw_artifact,
+        error,
+    ):
+        raw_json = json.dumps(raw_artifact, indent=2, default=str)
+        return PromptPreview(
+            system_prompt=self.read_skill_markdown(),
+            user_prompt="\n".join(
+                [
+                    self.build_user_prompt(payload, context),
+                    "",
+                    "The previous JSON did not validate against the TeachingGuideArtifact contract.",
+                    "Return one corrected JSON object only. Preserve the intended teaching support while fixing schema violations.",
+                    "",
+                    "Validation error:",
+                    str(error),
+                    "",
+                    "Correction rules:",
+                    "- Use the exact top-level fields in the contract summary.",
+                    "- `guided_questions` must contain objects, not strings.",
+                        "- `common_misconceptions` must contain objects, not strings.",
+                        "- `teach_it.vocabulary` items must use `definition`, not `simple_definition`.",
+                        "- Each misconception object must include exactly three `easier_examples`.",
+                    "- Use `parent_brief`, `teach_it`, `practice_plan`, and `check_understanding`; do not replace them with informal field names.",
+                    "- Do not add fields outside the contract.",
+                    "",
+                    "Previous invalid JSON:",
+                    raw_json,
+                ]
+            ),
+        )
 
     def validate_artifact_semantics(self, *, artifact, payload, context) -> list[str]:
         issues: list[str] = []

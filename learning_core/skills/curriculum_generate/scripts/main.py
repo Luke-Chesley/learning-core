@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumGenerationRequest
 from learning_core.observability.traces import PromptPreview
@@ -21,13 +22,47 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
     policy = ExecutionPolicy(
         skill_name="curriculum_generate",
         skill_version="2026-04-19",
-        max_tokens=12000,
+        max_tokens=32000,
     )
+
+    def _explicit_total_sessions(self, payload: CurriculumGenerationRequest) -> int | None:
+        if payload.planningConstraints and payload.planningConstraints.totalSessions is not None:
+            return payload.planningConstraints.totalSessions
+
+        candidate_text = " ".join(
+            value
+            for value in [
+                payload.entryLabel or "",
+                payload.sourceText or "",
+                " ".join(payload.detectedChunks or []),
+            ]
+            if value
+        )
+        match = re.search(r"\b(\d{1,3})\s+(?:sessions?|days?)\b", candidate_text, re.IGNORECASE)
+        if not match:
+            return None
+        parsed = int(match.group(1))
+        return parsed if parsed > 0 else None
+
+    def _large_session_sequence_guidance(self, payload: CurriculumGenerationRequest) -> list[str]:
+        total_sessions = self._explicit_total_sessions(payload)
+        if total_sessions is None or total_sessions < 20:
+            return []
+        return [
+            "Large exact-session artifact compactness contract:",
+            f"- This request has {total_sessions} sessions. Preserve all {total_sessions} sessions, but keep each object compact.",
+            "- Use exactly one primary skill, one content anchor, one teachable item, and one deliverySequence item per session unless the source explicitly requires more.",
+            "- Keep titles specific and short; put the concrete curriculum substance in the anchor summary, namedAnchors, vocabulary, misconception, assessmentCue, and sessionFocus.",
+            "- contentAnchors[].details should contain at most two short details for large session sequences.",
+            "- teachableItems[].parentNotes, misconceptions, and deliverySequence[].evidenceToSave should usually contain one or two short entries.",
+            "- Do not include unspecified metadata such as academicYear.",
+            "- Do not write long rationales, long summaries, or repeated prose; compactness is part of the contract for large session_sequence artifacts.",
+        ]
 
     def _scale_guidance(self, payload: CurriculumGenerationRequest) -> str:
         if payload.requestMode == "source_entry":
             planning_constraints = payload.planningConstraints
-            total_sessions = planning_constraints.totalSessions if planning_constraints else None
+            total_sessions = self._explicit_total_sessions(payload)
             if total_sessions is not None:
                 return (
                     f"Use planningModel session_sequence. planningConstraints.totalSessions is {total_sessions}; "
@@ -76,7 +111,12 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             return "Prefer curriculumScale week and keep the structure compact; one unit can be enough, but it still needs concrete teachableItems."
         if expectations and expectations.totalSessionsUpperBound is not None and expectations.totalSessionsUpperBound <= 5:
             return "Prefer curriculumScale micro or week; avoid fake course hierarchy, but include concrete session/content detail."
-        return "Choose the smallest honest curriculumScale from the conversation, from micro/week through module/course, and make the content map concrete."
+        return (
+            "Choose the smallest honest curriculumScale from the conversation, from micro/week through module/course, "
+            "and make the content map concrete. Do not use planningModel session_sequence unless the conversation gives "
+            "an exact session count or an authored numbered day/session sequence; a week or month horizon alone should "
+            "usually be content_map or source_sequence."
+        )
 
     def build_user_prompt(self, payload: CurriculumGenerationRequest, context) -> str:
         lines = [
@@ -176,6 +216,16 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
         lines.extend(
             [
                 "",
+                "Session sequence structural contract:",
+                "- Treat IDs as a closed inventory: every referenced skillId, unitRef, anchorId, and teachableItemId must be declared in its matching top-level array.",
+                "- Do not reference a future or convenient ID such as skill-7 unless that exact object exists in top-level skills.",
+                "- If you choose planningModel session_sequence, every deliverySequence item is one concrete session.",
+                "- Each session must reference a unique teachableItemId.",
+                "- The first skillIds entry for each session is its primary skillId and must be unique across the deliverySequence.",
+                "- If a broad concept repeats, create a narrower session-specific skill for the new review, practice, application, or project move.",
+                "- The deliverySequence skillIds must be a subset of the referenced teachable item's skillIds.",
+                *self._large_session_sequence_guidance(payload),
+                "",
                 "Return the durable curriculum artifact only.",
             ]
         )
@@ -212,8 +262,15 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     "- Every `teachableItems[].unitRef` must match an existing unit.",
                     "- Every `teachableItems[].skillIds` value must match an existing skill.",
                     "- Every `teachableItems[].contentAnchorIds` value must match an existing content anchor.",
+                    "- Treat IDs as a closed inventory; do not reference any skillId, unitRef, anchorId, or teachableItemId that is not declared in the matching top-level array.",
+                    "- If the invalid JSON references a missing ID, either declare the missing top-level object with concrete content or replace the reference with the correct existing ID.",
                     "- If planningModel is session_sequence and totalSessions is present, deliverySequence must contain exactly one item per session.",
+                    "- If planningModel is session_sequence, every deliverySequence item must reference a unique teachableItemId.",
+                    "- If planningModel is session_sequence, every deliverySequence item must use a unique first skillIds entry as its primary skillId.",
+                    "- When a broad concept repeats across sessions, split it into session-specific review, practice, application, or project skills instead of reusing the same primary skillId.",
+                    "- Every deliverySequence skillIds value must also appear in the referenced teachable item's skillIds.",
                     "- Delivery sequence positions must be contiguous and start at 1.",
+                    "- If the artifact is large or the prior output was truncated, preserve the sequence while shortening strings, limiting details arrays, and removing repeated prose.",
                     "- `estimatedWeeks`, `estimatedSessions`, `totalWeeks`, `sessionsPerWeek`, `sessionMinutes`, and `totalSessions` must be positive integers when present.",
                     "- Do not use `0` for any estimate. Use `1` for a very small unit or omit the estimate.",
                     "- Do not add `document`, `skillRefs`, `lessons`, `launchPlan`, or `progression`.",

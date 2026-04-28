@@ -126,6 +126,25 @@ def test_max_tokens_env_precedence_overrides_skill_policy(monkeypatch):
     assert runtime.max_tokens_source == "LEARNING_CORE_COPILOT_CHAT_MAX_TOKENS"
 
 
+def test_task_default_max_tokens_does_not_undercut_skill_policy(monkeypatch):
+    monkeypatch.setenv("LEARNING_CORE_PROVIDER", "openai")
+    monkeypatch.setenv("LEARNING_CORE_DEFAULT_TEMPERATURE", "0.2")
+    monkeypatch.setenv("LEARNING_CORE_MAX_TOKENS", "2048")
+    monkeypatch.setenv("LEARNING_CORE_GENERATION_MAX_TOKENS", "12000")
+    monkeypatch.setenv("LEARNING_CORE_GENERATION_MODEL", "gpt-5.4-mini")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    runtime = build_model_runtime(
+        task_name="curriculum_generate",
+        task_kind="generation",
+        temperature=None,
+        max_tokens=32000,
+    )
+
+    assert runtime.max_tokens == 32000
+    assert runtime.max_tokens_source == "skill_policy_over_LEARNING_CORE_GENERATION_MAX_TOKENS"
+
+
 def test_openai_runtime_reuses_matching_client_instances(monkeypatch):
     monkeypatch.setenv("LEARNING_CORE_PROVIDER", "openai")
     monkeypatch.setenv("LEARNING_CORE_DEFAULT_TEMPERATURE", "0.2")

@@ -170,15 +170,14 @@ def board_annotations(
     arrows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     highlights = [square.strip().lower() for square in (highlight_squares or []) if square.strip()]
-    normalized_arrows = []
-    for arrow in arrows or []:
-        normalized_arrows.append(
-            {
-                "fromSquare": str(arrow["fromSquare"]).strip().lower(),
-                "toSquare": str(arrow["toSquare"]).strip().lower(),
-                "color": str(arrow.get("color", "green")).strip().lower(),
-            }
-        )
+    normalized_arrows = [
+        {
+            "fromSquare": str(arrow["fromSquare"]).strip().lower(),
+            "toSquare": str(arrow["toSquare"]).strip().lower(),
+            "color": str(arrow.get("color", "green")).strip().lower(),
+        }
+        for arrow in arrows or []
+    ]
     return {
         "highlightSquares": highlights,
         "arrows": normalized_arrows,
