@@ -93,6 +93,11 @@ class _FallbackClient:
         return _FakeTextResponse(json.dumps(self.artifact))
 
 
+class _EscapedFallbackClient(_FallbackClient):
+    def invoke(self, _messages):
+        return _FakeTextResponse(json.dumps(self.artifact).replace('"', r'\"'))
+
+
 class _RepairFallbackClient:
     def __init__(self, structured_artifact: dict, repaired_artifact: dict) -> None:
         self.structured_artifact = structured_artifact
@@ -422,6 +427,30 @@ def test_source_interpret_falls_back_to_text_json_on_retryable_provider_error(
             provider="openai",
             model="fake-source-interpret",
             client=_FallbackClient(_artifact()),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
+
+    assert result.artifact["sourceKind"] == "timeboxed_plan"
+    assert result.artifact["recommendedHorizon"] == "one_week"
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
+
+
+def test_source_interpret_fallback_accepts_escaped_json_text(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-source-interpret",
+            client=_EscapedFallbackClient(_artifact()),
             temperature=0.2,
             max_tokens=2048,
             max_tokens_source="test",
