@@ -26,20 +26,57 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
 
     def _scale_guidance(self, payload: CurriculumGenerationRequest) -> str:
         if payload.requestMode == "source_entry":
-            if payload.sourceKind in {"bounded_material", "timeboxed_plan"}:
-                return "Prefer curriculumScale micro or week when the source is day-sized or week-sized."
+            planning_constraints = payload.planningConstraints
+            total_sessions = planning_constraints.totalSessions if planning_constraints else None
+            if total_sessions is not None:
+                return (
+                    f"Use planningModel session_sequence. planningConstraints.totalSessions is {total_sessions}; "
+                    "pacing.totalSessions and deliverySequence must preserve that number exactly. Create one concrete "
+                    "deliverySequence item, teachable item, and primary skill per session."
+                )
+            if payload.sourceKind == "curriculum_request":
+                return (
+                    "This is a parent-authored curriculum request. Build a concrete model-suggested curriculum map "
+                    "from the stated topic, grade, learner context, and planningConstraints. Use session_sequence "
+                    "when a total session count is present; otherwise choose the smallest honest planning model."
+                )
+            if payload.sourceKind == "timeboxed_plan":
+                return (
+                    "Use planningModel session_sequence. Preserve the requested session count; "
+                    "deliverySequence must contain one concrete item per session. Use curriculumScale module "
+                    "unless the timebox is only a single day or week."
+                )
+            if payload.sourceKind == "bounded_material":
+                return (
+                    "Keep the curriculum bounded, but choose planningModel single_lesson, content_map, "
+                    "or session_sequence based on the source shape. Include concrete teachableItems and contentAnchors."
+                )
             if payload.sourceKind == "comprehensive_source":
-                return "Prefer curriculumScale reference_source or course when the artifact should represent a broader source."
+                return (
+                    "Prefer curriculumScale reference_source or course with planningModel reference_map or source_sequence. "
+                    "Represent the broader source with concrete content anchors rather than a shallow starter slice."
+                )
+            if payload.sourceKind == "structured_sequence":
+                return (
+                    "Use planningModel source_sequence unless an explicit session count calls for session_sequence. "
+                    "Preserve the source order with concrete teachableItems."
+                )
             if payload.recommendedHorizon in {"single_day", "few_days", "one_week"}:
-                return "Prefer the smallest honest scale; a compact curriculum does not need course-shaped hierarchy."
-            return "Choose the smallest honest curriculumScale that still preserves the durable curriculum scope."
+                return (
+                    "Prefer the smallest honest scale, but still include a teachable content map. "
+                    "A compact curriculum does not need course-shaped hierarchy."
+                )
+            return (
+                "Choose the smallest honest curriculumScale that still preserves the durable curriculum scope, "
+                "and include concrete contentAnchors, teachableItems, and deliverySequence when the source is sequenced."
+            )
 
         expectations = payload.pacingExpectations
         if expectations and expectations.totalWeeks is not None and expectations.totalWeeks <= 1:
-            return "Prefer curriculumScale week and keep the structure compact; one unit can be enough."
+            return "Prefer curriculumScale week and keep the structure compact; one unit can be enough, but it still needs concrete teachableItems."
         if expectations and expectations.totalSessionsUpperBound is not None and expectations.totalSessionsUpperBound <= 5:
-            return "Prefer curriculumScale micro or week; avoid fake course hierarchy."
-        return "Choose the smallest honest curriculumScale from the conversation, from micro/week through module/course."
+            return "Prefer curriculumScale micro or week; avoid fake course hierarchy, but include concrete session/content detail."
+        return "Choose the smallest honest curriculumScale from the conversation, from micro/week through module/course, and make the content map concrete."
 
     def build_user_prompt(self, payload: CurriculumGenerationRequest, context) -> str:
         lines = [
@@ -61,6 +98,11 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     f"Continuation mode: {payload.continuationMode}",
                     f"Delivery pattern: {payload.deliveryPattern}",
                     f"Recommended horizon: {payload.recommendedHorizon}",
+                    "",
+                    "Planning constraints:",
+                    payload.planningConstraints.model_dump_json(indent=2)
+                    if payload.planningConstraints
+                    else "{}",
                     "",
                     "Assumptions:",
                     (payload.assumptions or []) and "\n".join(
@@ -163,8 +205,15 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     "Correction rules:",
                     "- `source.rationale` must be an array of strings, never one string.",
                     "- `curriculumScale`, when present, must be one of micro, week, module, course, or reference_source.",
+                    "- `planningModel` must be one of content_map, session_sequence, source_sequence, single_lesson, or reference_map.",
                     "- `skills[].domainTitle`, `skills[].strandTitle`, and `skills[].goalGroupTitle` are optional; do not invent fake hierarchy just to satisfy a course-shaped template.",
+                    "- Every skill must be grounded by `contentAnchorIds` or by a `teachableItems[].skillIds` reference.",
                     "- Every unit must include `skillIds` that match existing top-level `skills[].skillId` values.",
+                    "- Every `teachableItems[].unitRef` must match an existing unit.",
+                    "- Every `teachableItems[].skillIds` value must match an existing skill.",
+                    "- Every `teachableItems[].contentAnchorIds` value must match an existing content anchor.",
+                    "- If planningModel is session_sequence and totalSessions is present, deliverySequence must contain exactly one item per session.",
+                    "- Delivery sequence positions must be contiguous and start at 1.",
                     "- `estimatedWeeks`, `estimatedSessions`, `totalWeeks`, `sessionsPerWeek`, `sessionMinutes`, and `totalSessions` must be positive integers when present.",
                     "- Do not use `0` for any estimate. Use `1` for a very small unit or omit the estimate.",
                     "- Do not add `document`, `skillRefs`, `lessons`, `launchPlan`, or `progression`.",

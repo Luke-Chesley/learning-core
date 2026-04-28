@@ -115,6 +115,7 @@ class ProgressionArtifact(StrictModel):
 class SkillCatalogItem(StrictModel):
     skillRef: str
     title: str
+    description: str | None = None
     domainTitle: str | None = None
     strandTitle: str | None = None
     goalGroupTitle: str | None = None
@@ -126,6 +127,12 @@ class SkillCatalogItem(StrictModel):
     requiresAdultSupport: bool | None = None
     safetyCritical: bool | None = None
     isAuthenticApplication: bool | None = None
+    focusQuestion: str | None = None
+    contentAnchors: list[str] = Field(default_factory=list)
+    namedAnchors: list[str] = Field(default_factory=list)
+    vocabulary: list[str] = Field(default_factory=list)
+    learnerOutcome: str | None = None
+    assessmentCue: str | None = None
 
 
 class ProgressionUnitAnchor(StrictModel):

@@ -47,6 +47,8 @@ Use the skill metadata:
 - procedure skills often precede integration/application skills.
 - application/authentic-task skills can appear earlier in task_first mode when supported appropriately.
 - review-oriented skills should usually reinforce earlier foundations rather than replace them.
+- contentAnchors, namedAnchors, focusQuestion, learnerOutcome, and assessmentCue tell you what the skill is really teaching.
+- Prefer sequencing based on concrete content relationships over broad verb labels. For example, a map-location skill can precede an historical-story skill because the place context supports the story, not because "identify" always comes before "describe."
 
 Edge semantics:
 - hardPrerequisite: use only when mastery of the source skill truly gates the target skill.

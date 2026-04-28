@@ -15,6 +15,7 @@ SourceKind = Literal[
     "timeboxed_plan",
     "structured_sequence",
     "comprehensive_source",
+    "curriculum_request",
     "topic_seed",
     "shell_request",
     "ambiguous",
@@ -87,6 +88,18 @@ class SourceInterpretationRequest(StrictModel):
     titleCandidate: str | None = None
 
 
+class SourcePlanningConstraints(StrictModel):
+    totalSessions: int | None = Field(default=None, ge=1, le=500)
+    totalWeeks: int | None = Field(default=None, ge=1, le=104)
+    sessionsPerWeek: int | None = Field(default=None, ge=1, le=14)
+    sessionMinutes: int | None = Field(default=None, ge=1, le=240)
+    gradeLevel: str | None = None
+    learnerContext: str | None = None
+    practiceCadence: str | None = None
+    finalProjectRequested: bool | None = None
+    notes: list[str] = Field(default_factory=list)
+
+
 class SourceInterpretationArtifact(StrictModel):
     sourceKind: SourceKind
     entryStrategy: SourceEntryStrategy
@@ -98,6 +111,7 @@ class SourceInterpretationArtifact(StrictModel):
     recommendedHorizon: SourceInterpretationHorizon
     assumptions: list[str]
     detectedChunks: list[str] = Field(min_length=1, max_length=20)
+    planningConstraints: SourcePlanningConstraints = Field(default_factory=SourcePlanningConstraints)
     followUpQuestion: str | None = None
     needsConfirmation: bool
 

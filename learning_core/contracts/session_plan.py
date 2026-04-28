@@ -22,6 +22,15 @@ class LessonDraftRouteItem(StrictModel):
     objective: str
     lessonLabel: str
     note: str | None = None
+    focusQuestion: str | None = None
+    contentAnchors: list[str] = Field(default_factory=list)
+    namedAnchors: list[str] = Field(default_factory=list)
+    vocabulary: list[str] = Field(default_factory=list)
+    learnerOutcome: str | None = None
+    assessmentCue: str | None = None
+    misconceptions: list[str] = Field(default_factory=list)
+    parentNotes: list[str] = Field(default_factory=list)
+    evidenceToSave: list[str] = Field(default_factory=list)
 
 
 class TeacherContext(StrictModel):

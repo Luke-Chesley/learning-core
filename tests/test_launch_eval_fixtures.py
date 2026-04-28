@@ -16,6 +16,7 @@ SUPPORTED_SOURCE_KINDS = {
     "timeboxed_plan",
     "structured_sequence",
     "comprehensive_source",
+    "curriculum_request",
     "topic_seed",
     "shell_request",
     "ambiguous",

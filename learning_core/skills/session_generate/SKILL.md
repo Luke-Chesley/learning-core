@@ -67,6 +67,18 @@ Rules:
 - `learner_action` should describe observable learner behavior, not abstract outcomes.
 - `check_for` should tell the adult exactly what to hear, see, or collect as evidence.
 - Align blocks to the provided route items and objectives without forcing route order as a script.
+- Treat route item content fields as authoritative curriculum substance:
+  - `focusQuestion`
+  - `contentAnchors`
+  - `namedAnchors`
+  - `vocabulary`
+  - `learnerOutcome`
+  - `assessmentCue`
+  - `misconceptions`
+  - `parentNotes`
+  - `evidenceToSave`
+- Do not replace concrete route item content with generic skills. If a route item names specific facts, examples, terms, people, places, problems, or source sections, those must appear in the lesson draft.
+- If route item content is thin, keep the lesson honest and practical rather than inventing unsupported source facts.
 - If total time is tight, mark lower-priority blocks as optional:true.
 - Adaptations are short, actionable, and ready to use during live teaching.
 - Do not include optional top-level fields unless they add clear value for this lesson.

@@ -47,9 +47,12 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- Preserve unchanged branches unless the parent explicitly asked for a broader rewrite.",
                 "- Preserve domain -> strand -> goal group labels when they are meaningful in the existing curriculum.",
                 "- Do not force course-shaped hierarchy onto short curricula; skillId plus title is enough for tiny or week-sized scopes.",
-                "- Preserve teachable granularity while keeping the hierarchy coherent.",
+                "- Preserve concrete teachable granularity while keeping the hierarchy coherent.",
+                "- Preserve or revise contentAnchors, teachableItems, deliverySequence, and projectArc so the curriculum still owns what to teach.",
                 "- Units should remain coarse curriculum groupings, not lesson plans.",
                 "- Return one flat skills list plus units that reference those skills by skillId.",
+                "- Every skill must be grounded in contentAnchorIds or teachableItems.",
+                "- If planningModel is session_sequence, deliverySequence must contain one item per session.",
                 "- Return the full revised curriculum artifact when action is \"apply\".",
                 "- If the request is too vague to apply safely, ask one precise clarification question.",
             ]
@@ -95,8 +98,14 @@ class CurriculumReviseSkill(StructuredOutputSkill):
             "intakeSummary",
             "pacing",
             "curriculumScale",
+            "planningModel",
             "skills",
             "units",
+            "contentAnchors",
+            "teachableItems",
+            "deliverySequence",
+            "projectArc",
+            "sourceCoverage",
             "document",
         }
         document = artifact.get("document")
@@ -136,6 +145,10 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                         "strandTitle": strand_title,
                         "goalGroupTitle": goal_group_title,
                         "title": title,
+                        "description": title,
+                        "contentAnchorIds": [f"anchor-{ordinal}"],
+                        "practiceCue": f"Practice {title}.",
+                        "assessmentCue": f"Look for visible evidence of {title}.",
                     }
                 )
 
@@ -166,13 +179,57 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 unit.pop("skillTitles", None)
                 repaired_units.append(unit)
 
+            content_anchors = [
+                {
+                    "anchorId": f"anchor-{index}",
+                    "title": skill["title"],
+                    "summary": skill.get("description") or skill["title"],
+                    "details": [],
+                    "sourceRefs": [{"label": "Revision document repair"}],
+                    "grounding": "source_grounded",
+                }
+                for index, skill in enumerate(skills, start=1)
+            ]
+            first_unit_ref = repaired_units[0].get("unitRef") if repaired_units else "unit:1:revised"
+            unit_ref_by_skill_id = {}
+            for unit in repaired_units:
+                unit_skill_ids = unit.get("skillIds", [])
+                if not isinstance(unit_skill_ids, list):
+                    continue
+                for skill_id in unit_skill_ids:
+                    if isinstance(skill_id, str):
+                        unit_ref_by_skill_id[skill_id] = unit.get("unitRef", first_unit_ref)
+            teachable_items = [
+                {
+                    "itemId": f"item-{index}",
+                    "unitRef": unit_ref_by_skill_id.get(skill["skillId"], first_unit_ref),
+                    "title": skill["title"],
+                    "focusQuestion": f"What should the learner understand or do for {skill['title']}?",
+                    "contentAnchorIds": skill["contentAnchorIds"],
+                    "namedAnchors": [skill["title"]],
+                    "vocabulary": [],
+                    "learnerOutcome": skill.get("description") or skill["title"],
+                    "assessmentCue": skill.get("assessmentCue") or skill["title"],
+                    "misconceptions": [],
+                    "parentNotes": [],
+                    "skillIds": [skill["skillId"]],
+                    "estimatedSessions": 1,
+                    "sourceRefs": [{"label": "Revision document repair"}],
+                }
+                for index, skill in enumerate(skills, start=1)
+            ]
             repaired_artifact = {
                 "source": repaired_artifact.get("source"),
                 "intakeSummary": repaired_artifact.get("intakeSummary"),
                 "pacing": repaired_artifact.get("pacing"),
                 "curriculumScale": repaired_artifact.get("curriculumScale"),
+                "planningModel": repaired_artifact.get("planningModel") or "content_map",
                 "skills": skills,
                 "units": repaired_units,
+                "contentAnchors": content_anchors,
+                "teachableItems": teachable_items,
+                "deliverySequence": [],
+                "sourceCoverage": [],
             }
             repaired["artifact"] = repaired_artifact
             return repaired
@@ -198,9 +255,11 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- The previous response was invalid.",
                 "- Return only one corrected JSON object.",
                 "- The top-level shape must be exactly assistantMessage, action, changeSummary, and optional artifact.",
-                "- When action is apply, artifact may contain only source, intakeSummary, pacing, curriculumScale, skills, and units.",
-                "- Every skill belongs in artifact.skills with skillId and title; domainTitle, strandTitle, and goalGroupTitle are optional.",
+                "- When action is apply, artifact must contain source, intakeSummary, pacing, curriculumScale, planningModel, skills, units, contentAnchors, and teachableItems.",
+                "- Every skill belongs in artifact.skills with skillId, title, description, contentAnchorIds, practiceCue, and assessmentCue; domainTitle, strandTitle, and goalGroupTitle are optional.",
                 "- Units may reference those skills only through units[].skillIds.",
+                "- Teachable items must reference existing unitRef, skillIds, and contentAnchorIds.",
+                "- If planningModel is session_sequence and pacing.totalSessions is present, deliverySequence must have one item per session.",
                 "- Preserve the intended curriculum content while fixing the JSON structure.",
             ]
         )

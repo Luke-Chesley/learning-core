@@ -16,6 +16,7 @@ Output shape:
     "timeboxed_plan",
     "structured_sequence",
     "comprehensive_source",
+    "curriculum_request",
     "topic_seed",
     "shell_request",
     "ambiguous"
@@ -53,53 +54,53 @@ Output shape:
   ],
   "assumptions": string[],
   "detectedChunks": string[],
+  "planningConstraints": {
+    "totalSessions": number or null,
+    "totalWeeks": number or null,
+    "sessionsPerWeek": number or null,
+    "sessionMinutes": number or null,
+    "gradeLevel": string or null,
+    "learnerContext": string or null,
+    "practiceCadence": string or null,
+    "finalProjectRequested": boolean or null,
+    "notes": string[]
+  },
   "followUpQuestion": string or null,
   "needsConfirmation": boolean
 }
 
-Invalid example:
-{
-  "sourceKind": "topic_seed",
-  "suggestedTitle": "Teach chess",
-  "confidence": "high"
-}
-
-Valid minimal example:
-{
-  "sourceKind": "topic_seed",
-  "entryStrategy": "scaffold_only",
-  "entryLabel": null,
-  "continuationMode": "manual_review",
-  "deliveryPattern": "mixed",
-  "suggestedTitle": "Teach chess openings",
-  "confidence": "high",
-  "recommendedHorizon": "starter_module",
-  "assumptions": [],
-  "detectedChunks": ["Teach chess openings"],
-  "followUpQuestion": null,
-  "needsConfirmation": false
-}
-
 Interpretation rules:
-- Classify the source itself, not what the parent or educator wishes the system could generate.
+- Classify the intake into the right planning handoff. Source interpretation does not generate curriculum, but it must extract the constraints curriculum generation needs.
 - When attached source files are present, treat those files as the primary source. Use raw or extracted text as supporting context, not as a replacement for the file.
 - A source may be valid even if it is large. Do not reject a whole book, workbook, or long PDF just because it is larger than the initial planning horizon.
 
 Source kind rules:
 - Use `bounded_material` for one bounded lesson, one worksheet page, one assignment page, one chapter excerpt, one small assigned range, or another clearly day-sized chunk.
-- Use `timeboxed_plan` for schedules or assignment lists that are already organized by time, such as a week plan or a two-week plan.
+- Use `timeboxed_plan` for schedules, assignment lists, calendars, or existing plans that are already organized by sessions, days, lessons, or weeks.
 - Use `structured_sequence` for outlines, tables of contents, unit ladders, ordered topic sequences, or other structured progressions that are not obviously the full source itself.
 - Use `comprehensive_source` for a whole book, workbook, long PDF, teacher guide, course text, or other source that clearly exceeds a short starting plan.
-- Use `topic_seed` for open-ended topic requests without a concrete sequence or bounded source.
+- Use `curriculum_request` when the parent is asking the app to design a curriculum, module, or course from a topic/goal plus explicit scope or delivery constraints.
+- Use `topic_seed` for loose topic exploration without a requested curriculum/module/course, explicit pacing, or delivery constraints.
 - Use `shell_request` when the user is clearly asking for a lightweight scaffold rather than source interpretation, or when there is effectively no interpretable source.
 - Use `ambiguous` when the source is too thin, contradictory, or noisy to classify confidently.
+
+Planning constraints:
+- Always include `planningConstraints`.
+- For `curriculum_request`, extract any explicit delivery constraints into `planningConstraints` instead of encoding them only in prose.
+- Set `planningConstraints.totalSessions` when the request includes an explicit total count of sessions, lessons, days, or equivalent delivery units.
+- Set `planningConstraints.totalWeeks`, `sessionsPerWeek`, or `sessionMinutes` only when stated or directly implied.
+- Set `planningConstraints.gradeLevel` when the request includes a grade level, age band, or similar learner-level cue.
+- Set `planningConstraints.learnerContext` when the request includes learner readiness, confidence, acceleration, struggle, or prior-knowledge notes.
+- Set `planningConstraints.practiceCadence` when the request includes review or practice frequency, intensity, or format.
+- Set `planningConstraints.finalProjectRequested` when the request includes a final project, performance, portfolio, presentation, or culminating task.
+- Use `planningConstraints.notes` for short constraints that do not fit another field. Do not put lesson plans or generated scope here.
 
 Entry strategy rules:
 - Use `use_as_is` when the source is already a bounded starting chunk.
 - Use `explicit_range` when the user already narrowed the scope, such as “pages 1–12”, “chapter 1 only”, or “start with unit 2”.
 - Use `sequential_start` when the source is an ordered sequence and the safest start is the beginning of that sequence.
 - Use `section_start` when the source is a larger structured source and the safest start is the first meaningful section, chapter, or unit.
-- Use `timebox_start` when the source itself is already bounded by time, such as a week or two-week plan.
+- Use `timebox_start` when the source itself is already bounded by time or by an explicit number of sessions, lessons, or days.
 - Use `scaffold_only` for topic seeds or explicit shell requests.
 - `entryLabel` should be a short human-readable starting point when useful, such as:
   - "chapter 1"
@@ -128,6 +129,7 @@ Horizon rules:
 - Use `one_week` for a week-sized plan or a clearly usable one-week starting window.
 - Use `two_weeks` for a two-week plan or a large source with a clearly bounded opening that supports a safe two-week start.
 - Use `starter_module` for topic-seed starts or shell-style starts that need a small bounded module rather than a timeboxed schedule.
+- For `curriculum_request`, use `recommendedHorizon` for the opening delivery window only. Do not let the opening horizon erase `planningConstraints.totalSessions` or other total-scope constraints.
 - Do not maximize scope just because more could be imagined.
 - Do not treat a whole book as “generate the whole curriculum now.”
 - For a comprehensive source, infer the best bounded starting point and recommend the horizon from that entry point, not from the full source size.

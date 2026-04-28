@@ -68,6 +68,8 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                 "coverageStrategy": "Launch inside the interpreted opening slice.",
                 "coverageNotes": [],
             },
+            "curriculumScale": "week",
+            "planningModel": "session_sequence",
             "skills": [
                 {
                     "skillId": "skill-1",
@@ -75,6 +77,10 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                     "strandTitle": "Pages 1-12",
                     "goalGroupTitle": "Workbook launch",
                     "title": "Warm-up from page 1",
+                    "description": "Use the first page to orient to the workbook routine.",
+                    "contentAnchorIds": ["anchor-1"],
+                    "practiceCue": "Complete the first warm-up example.",
+                    "assessmentCue": "Learner can explain the page-one example.",
                 },
                 {
                     "skillId": "skill-2",
@@ -82,6 +88,10 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                     "strandTitle": "Pages 1-12",
                     "goalGroupTitle": "Workbook launch",
                     "title": "Guided practice from pages 2-6",
+                    "description": "Work the guided examples on pages 2 through 6.",
+                    "contentAnchorIds": ["anchor-2"],
+                    "practiceCue": "Solve one guided example together.",
+                    "assessmentCue": "Learner follows the model with support.",
                 },
                 {
                     "skillId": "skill-3",
@@ -89,6 +99,10 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                     "strandTitle": "Pages 1-12",
                     "goalGroupTitle": "Workbook launch",
                     "title": "Independent practice from pages 7-12",
+                    "description": "Try the independent practice from pages 7 through 12.",
+                    "contentAnchorIds": ["anchor-3"],
+                    "practiceCue": "Complete one independent problem.",
+                    "assessmentCue": "Learner completes the problem and checks the answer.",
                 },
             ],
             "units": [
@@ -101,6 +115,22 @@ def test_execute_generate_from_source_returns_curriculum_generate_result(monkeyp
                     "skillIds": ["skill-1", "skill-2", "skill-3"],
                 }
             ],
+            "contentAnchors": [
+                {"anchorId": "anchor-1", "title": "Page 1 warm-up", "summary": "The first page introduces the workbook routine.", "details": [], "sourceRefs": [{"label": "pages 1-12"}], "grounding": "source_grounded"},
+                {"anchorId": "anchor-2", "title": "Pages 2-6 guided practice", "summary": "Pages 2 through 6 provide supported examples.", "details": [], "sourceRefs": [{"label": "pages 1-12"}], "grounding": "source_grounded"},
+                {"anchorId": "anchor-3", "title": "Pages 7-12 independent practice", "summary": "Pages 7 through 12 provide independent practice.", "details": [], "sourceRefs": [{"label": "pages 1-12"}], "grounding": "source_grounded"},
+            ],
+            "teachableItems": [
+                {"itemId": "item-1", "unitRef": "unit:1:pages-1-12", "title": "Workbook warm-up", "focusQuestion": "How does the first example work?", "contentAnchorIds": ["anchor-1"], "namedAnchors": ["page 1"], "vocabulary": [], "learnerOutcome": "Learner explains the first example.", "assessmentCue": "Learner can repeat the routine.", "misconceptions": [], "parentNotes": [], "skillIds": ["skill-1"], "estimatedSessions": 1, "sourceRefs": [{"label": "pages 1-12"}]},
+                {"itemId": "item-2", "unitRef": "unit:1:pages-1-12", "title": "Guided workbook examples", "focusQuestion": "What does the model show?", "contentAnchorIds": ["anchor-2"], "namedAnchors": ["pages 2-6"], "vocabulary": [], "learnerOutcome": "Learner solves one guided example.", "assessmentCue": "Learner follows the model.", "misconceptions": [], "parentNotes": [], "skillIds": ["skill-2"], "estimatedSessions": 1, "sourceRefs": [{"label": "pages 1-12"}]},
+                {"itemId": "item-3", "unitRef": "unit:1:pages-1-12", "title": "Independent workbook practice", "focusQuestion": "Can the learner try the routine alone?", "contentAnchorIds": ["anchor-3"], "namedAnchors": ["pages 7-12"], "vocabulary": [], "learnerOutcome": "Learner completes one independent problem.", "assessmentCue": "Learner checks the answer.", "misconceptions": [], "parentNotes": [], "skillIds": ["skill-3"], "estimatedSessions": 1, "sourceRefs": [{"label": "pages 1-12"}]},
+            ],
+            "deliverySequence": [
+                {"sequenceId": "session-1", "position": 1, "label": "Session 1", "title": "Warm-up from page 1", "sessionFocus": "Use page 1 to learn the workbook routine.", "teachableItemId": "item-1", "contentAnchorIds": ["anchor-1"], "skillIds": ["skill-1"], "estimatedMinutes": 30, "evidenceToSave": [], "reviewOf": []},
+                {"sequenceId": "session-2", "position": 2, "label": "Session 2", "title": "Guided practice from pages 2-6", "sessionFocus": "Work guided examples from pages 2 through 6.", "teachableItemId": "item-2", "contentAnchorIds": ["anchor-2"], "skillIds": ["skill-2"], "estimatedMinutes": 30, "evidenceToSave": [], "reviewOf": []},
+                {"sequenceId": "session-3", "position": 3, "label": "Session 3", "title": "Independent practice from pages 7-12", "sessionFocus": "Try independent practice from pages 7 through 12.", "teachableItemId": "item-3", "contentAnchorIds": ["anchor-3"], "skillIds": ["skill-3"], "estimatedMinutes": 30, "evidenceToSave": [], "reviewOf": []},
+            ],
+            "sourceCoverage": [],
         },
         lineage=ExecutionLineage(
             operation_name="curriculum_generate",

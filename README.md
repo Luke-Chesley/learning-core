@@ -43,13 +43,17 @@ It supports two explicit request modes:
 - `conversation_intake`: conversation-first generation grounded in learner messages, goals, and pacing hints
 
 The output is one durable curriculum artifact.
-That artifact is intentionally flat:
+That artifact is a teachable content map, not just a broad skill outline:
 
-- `skills[]` is the authoritative generated skill catalog
-- `units[].skillIds` links units to those skills
+- `contentAnchors[]` names the facts, examples, terms, source sections, procedures, artifacts, problems, or historical examples to teach.
+- `teachableItems[]` turns those anchors into parent-teachable slices with focus questions, vocabulary, learner outcomes, assessment cues, misconceptions, and notes.
+- `skills[]` is still the authoritative route/planning handle, but each skill must be concrete and grounded in content anchors or teachable items.
+- `units[].skillIds` links units to those skills.
+- `planningModel` tells the app whether this is a single lesson, flexible content map, authored source sequence, reference map, or explicit `session_sequence`.
+- `deliverySequence[]` is required when the source has an explicit session/timebox sequence; for session-counted plans it has one item per session.
 
 The model does not author a second nested curriculum tree or canonical path refs.
-`homeschool-v2` derives the persisted document tree and canonical `skillRefs` after validation.
+`homeschool-v2` derives the persisted document tree and canonical `skillRefs` after validation, then carries the content map into route items, Today, and `session_generate`.
 
 The app owns import, persistence, progression handoff, and opening-window or day-1 flow selection.
 

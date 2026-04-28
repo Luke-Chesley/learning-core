@@ -130,6 +130,9 @@ class SourceInterpretSkill(StructuredOutputSkill):
         if repaired.get("entryLabel") is None:
             repaired["entryLabel"] = None
 
+        if repaired.get("planningConstraints") is None:
+            repaired["planningConstraints"] = {}
+
         if repaired.get("followUpQuestion") is None:
             repaired["followUpQuestion"] = None
 
@@ -159,11 +162,11 @@ class SourceInterpretSkill(StructuredOutputSkill):
                 "- Return only one corrected JSON object.",
                 "- Every response must include all required keys.",
                 "- `recommendedHorizon`, `entryStrategy`, `continuationMode`, and `deliveryPattern` are required and may never be omitted.",
+                "- `planningConstraints` is required; use an empty object when no constraints were stated.",
                 "- Do not infer missing enum fields from sourceKind using fallback defaults. Repair only nullables, assumptions, detectedChunks, and needsConfirmation when allowed.",
                 "- If the source is weak or ambiguous, choose conservative grounded values instead of omitting required fields.",
                 "- This skill is interpretation-only, not planning.",
-                '- Invalid example: {"sourceKind":"topic_seed","suggestedTitle":"Chess","confidence":"high"}',
-                '- Valid example: {"sourceKind":"topic_seed","entryStrategy":"scaffold_only","entryLabel":null,"continuationMode":"manual_review","deliveryPattern":"mixed","suggestedTitle":"Teach chess openings","confidence":"high","recommendedHorizon":"starter_module","assumptions":[],"detectedChunks":["Teach chess openings"],"followUpQuestion":null,"needsConfirmation":false}',
+                "- Include all required contract fields explicitly in the corrected JSON.",
             ]
         )
         user_prompt = "\n".join(

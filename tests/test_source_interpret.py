@@ -45,6 +45,7 @@ def _artifact(
             "Wednesday: decimal review",
             "Friday: percent game",
         ],
+        "planningConstraints": {},
         "followUpQuestion": None,
         "needsConfirmation": False,
     }
@@ -196,6 +197,8 @@ def test_source_interpret_prompt_preview_lists_new_taxonomy_and_guardrails():
     assert "timeboxed_plan" in preview.system_prompt
     assert "structured_sequence" in preview.system_prompt
     assert "comprehensive_source" in preview.system_prompt
+    assert "curriculum_request" in preview.system_prompt
+    assert "planningConstraints" in preview.system_prompt
     assert "shell_request" in preview.system_prompt
     assert "entryStrategy" in preview.system_prompt
     assert "continuationMode" in preview.system_prompt
@@ -466,7 +469,7 @@ def test_source_interpret_retries_with_repair_prompt_on_validation_error(
 ):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     structured_artifact = {
-        "suggestedTitle": "Teach chess",
+        "suggestedTitle": "Plan a topic study",
         "confidence": "high",
         "assumptions": [],
         "detectedChunks": [],
@@ -505,6 +508,60 @@ def test_source_interpret_retries_with_repair_prompt_on_validation_error(
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "validation_repair"
 
 
+def test_source_interpret_accepts_curriculum_request_planning_constraints(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="test",
+            model="fake-source-interpret",
+            client=_FakeClient(
+                _artifact(
+                    source_kind="curriculum_request",
+                    entry_strategy="scaffold_only",
+                    entry_label=None,
+                    continuation_mode="manual_review",
+                    delivery_pattern="mixed",
+                    recommended_horizon="two_weeks",
+                    suggestedTitle="Create a sample subject sequence",
+                    detectedChunks=["sample subject", "30 sessions"],
+                    planningConstraints={
+                        "totalSessions": 30,
+                        "gradeLevel": "4th grade",
+                        "learnerContext": "low prior knowledge",
+                        "practiceCadence": "daily bite-sized practice",
+                        "notes": [],
+                    },
+                )
+            ),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+    envelope = _envelope()
+    envelope["input"]["rawText"] = (
+        "I want a 30-session curriculum for an upper-elementary learner, "
+        "with low prior knowledge and daily bite-sized practice."
+    )
+    envelope["input"]["extractedText"] = envelope["input"]["rawText"]
+
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", envelope)
+
+    assert result.artifact["sourceKind"] == "curriculum_request"
+    assert result.artifact["entryStrategy"] == "scaffold_only"
+    assert result.artifact.get("entryLabel") is None
+    assert result.artifact["continuationMode"] == "manual_review"
+    assert result.artifact["deliveryPattern"] == "mixed"
+    assert result.artifact["recommendedHorizon"] == "two_weeks"
+    assert result.artifact["planningConstraints"]["totalSessions"] == 30
+    assert result.artifact["planningConstraints"]["gradeLevel"] == "4th grade"
+    assert result.artifact["planningConstraints"]["learnerContext"] == "low prior knowledge"
+    assert result.artifact["planningConstraints"]["practiceCadence"] == "daily bite-sized practice"
+
+
 def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_generate(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     captured_requests: list[tuple[str, dict]] = []
@@ -532,6 +589,8 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                 "coverageStrategy": "Stay inside the initial launch slice.",
                 "coverageNotes": [],
             },
+            "curriculumScale": "week",
+            "planningModel": "session_sequence",
             "skills": [
                 {
                     "skillId": "skill-1",
@@ -539,6 +598,10 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                     "strandTitle": "Chapter 1",
                     "goalGroupTitle": "Kitchen launch",
                     "title": "Kitchen setup",
+                    "description": "Set up the kitchen workspace and identify the first recipe tools.",
+                    "contentAnchorIds": ["anchor-1"],
+                    "practiceCue": "Name the tools and where they go.",
+                    "assessmentCue": "Learner can place the tools safely with adult support.",
                 }
             ],
             "units": [
@@ -549,6 +612,40 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                     "skillIds": ["skill-1"],
                 },
             ],
+            "contentAnchors": [
+                {
+                    "anchorId": "anchor-1",
+                    "title": "Kitchen setup",
+                    "summary": "Chapter 1 starts with setting up the kitchen workspace and tools.",
+                    "details": [],
+                    "sourceRefs": [{"label": "chapter 1"}],
+                    "grounding": "source_grounded",
+                }
+            ],
+            "teachableItems": [
+                {
+                    "itemId": "item-1",
+                    "unitRef": "unit:chapter-1",
+                    "title": "Set up the kitchen workspace",
+                    "focusQuestion": "What tools and spaces do we need before cooking?",
+                    "contentAnchorIds": ["anchor-1"],
+                    "namedAnchors": ["workspace", "tools", "recipe"],
+                    "vocabulary": ["workspace", "tool"],
+                    "learnerOutcome": "Learner names and places the first tools with adult support.",
+                    "assessmentCue": "Learner points to the workspace and tools.",
+                    "misconceptions": [],
+                    "parentNotes": [],
+                    "skillIds": ["skill-1"],
+                    "estimatedSessions": 3,
+                    "sourceRefs": [{"label": "chapter 1"}],
+                }
+            ],
+            "deliverySequence": [
+                {"sequenceId": "session-1", "position": 1, "label": "Session 1", "title": "Name the kitchen workspace", "sessionFocus": "Identify the safe workspace and first tools.", "teachableItemId": "item-1", "contentAnchorIds": ["anchor-1"], "skillIds": ["skill-1"], "estimatedMinutes": 25, "evidenceToSave": [], "reviewOf": []},
+                {"sequenceId": "session-2", "position": 2, "label": "Session 2", "title": "Set out the tools", "sessionFocus": "Set out tools for the first recipe with adult support.", "teachableItemId": "item-1", "contentAnchorIds": ["anchor-1"], "skillIds": ["skill-1"], "estimatedMinutes": 25, "evidenceToSave": [], "reviewOf": []},
+                {"sequenceId": "session-3", "position": 3, "label": "Session 3", "title": "Practice setup and cleanup", "sessionFocus": "Repeat setup and cleanup for the recipe routine.", "teachableItemId": "item-1", "contentAnchorIds": ["anchor-1"], "skillIds": ["skill-1"], "estimatedMinutes": 25, "evidenceToSave": [], "reviewOf": []},
+            ],
+            "sourceCoverage": [],
         },
         lineage=ExecutionLineage(
             operation_name="curriculum_generate",
@@ -588,6 +685,11 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
                     "recommendedHorizon": "one_week",
                     "assumptions": ["Honor the explicit chapter 1 request."],
                     "detectedChunks": ["chapter 1", "chapter 2"],
+                    "planningConstraints": {
+                        "totalSessions": 6,
+                        "gradeLevel": "K-1",
+                        "notes": ["Use short sessions."],
+                    },
                     "followUpQuestion": None,
                     "needsConfirmation": False,
                 },
@@ -633,6 +735,8 @@ def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_
     assert curriculum_call["input"]["titleCandidate"] == "Week 1"
     assert curriculum_call["input"]["detectedChunks"] == ["chapter 1", "chapter 2"]
     assert curriculum_call["input"]["assumptions"] == ["Honor the explicit chapter 1 request."]
+    assert curriculum_call["input"]["planningConstraints"]["totalSessions"] == 6
+    assert curriculum_call["input"]["planningConstraints"]["gradeLevel"] == "K-1"
     assert result.operation_name == "curriculum_generate"
     assert "launchPlan" not in result.artifact
     assert result.trace.agent_trace["substeps"][0]["artifact"]["recommendedHorizon"] == "one_week"

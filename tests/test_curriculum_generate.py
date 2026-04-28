@@ -87,9 +87,41 @@ def test_curriculum_generate_prompt_preview_mentions_source_entry_fields():
     assert "Source kind: comprehensive_source" in preview.user_prompt
     assert "Delivery pattern: concept_first" in preview.user_prompt
     assert "Scale guidance:" in preview.user_prompt
+    assert "Planning constraints:" in preview.user_prompt
     assert "Attached source files:" in preview.user_prompt
     assert "egypt-reader.pdf" in preview.user_prompt
     assert "Primary source text:" in preview.user_prompt
+
+
+def test_curriculum_generate_prompt_uses_planning_constraints_for_curriculum_request():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "entryStrategy": "scaffold_only",
+            "entryLabel": None,
+            "continuationMode": "manual_review",
+            "deliveryPattern": "mixed",
+            "recommendedHorizon": "two_weeks",
+            "sourceText": "Create a 30-session upper-elementary curriculum for a sample subject.",
+            "detectedChunks": ["sample subject", "30 sessions"],
+            "assumptions": ["No attached source files were provided."],
+            "planningConstraints": {
+                "totalSessions": 30,
+                "gradeLevel": "4th grade",
+                "learnerContext": "low prior knowledge",
+                "practiceCadence": "daily bite-sized practice",
+            },
+        }
+    )
+
+    preview = CurriculumGenerateSkill().build_prompt_preview(payload, _context())
+
+    assert "planningConstraints.totalSessions is 30" in preview.user_prompt
+    assert "planningModel session_sequence" in preview.user_prompt
+    assert "one concrete" in preview.user_prompt
+    assert '"totalSessions": 30' in preview.user_prompt
+    assert '"gradeLevel": "4th grade"' in preview.user_prompt
 
 
 def test_curriculum_generate_prompt_preview_mentions_conversation_fields():
@@ -109,9 +141,10 @@ def test_curriculum_generate_prompt_allows_scale_matched_hierarchy():
     preview = CurriculumGenerateSkill().build_prompt_preview(_conversation_payload(), _context())
 
     assert "Choose a curriculum scale" in preview.system_prompt
+    assert "teachable content map" in preview.system_prompt
     assert "micro" in preview.system_prompt
     assert "week" in preview.system_prompt
-    assert "Do not force domain/strand/goal-group hierarchy" in preview.system_prompt
+    assert "Avoid generic skills" in preview.system_prompt
 
 
 def test_curriculum_generate_builds_openai_file_message_blocks_for_source_entry():
@@ -236,6 +269,7 @@ def _artifact_payload():
             "coverageStrategy": "Strategy",
         },
         "curriculumScale": "module",
+        "planningModel": "content_map",
         "skills": [
             {
                 "skillId": "skill-1",
@@ -243,6 +277,10 @@ def _artifact_payload():
                 "strandTitle": "Concrete Fraction Sense",
                 "goalGroupTitle": "Comparing and relating simple fractions",
                 "title": "Compare fractions with the same denominator",
+                "description": "Use fraction strips to compare thirds with thirds and fourths with fourths.",
+                "contentAnchorIds": ["anchor-1"],
+                "practiceCue": "Compare 2/4 and 3/4 with strips.",
+                "assessmentCue": "Learner can explain that same denominators mean same-size pieces.",
             },
             {
                 "skillId": "skill-2",
@@ -250,6 +288,10 @@ def _artifact_payload():
                 "strandTitle": "Concrete Fraction Sense",
                 "goalGroupTitle": "Comparing and relating simple fractions",
                 "title": "Explain why two fourths equals one half",
+                "description": "Fold or shade four equal parts and show that two parts match one half.",
+                "contentAnchorIds": ["anchor-2"],
+                "practiceCue": "Shade two of four equal rectangles and compare with one half.",
+                "assessmentCue": "Learner can match 2/4 to 1/2 with a visual model.",
             },
         ],
         "units": [
@@ -260,6 +302,60 @@ def _artifact_payload():
                 "skillIds": ["skill-1", "skill-2"],
             },
         ],
+        "contentAnchors": [
+            {
+                "anchorId": "anchor-1",
+                "title": "Same denominator comparisons",
+                "summary": "Fractions with the same denominator use equal-size parts, so compare numerators.",
+                "details": ["Use thirds with thirds and fourths with fourths."],
+                "sourceRefs": [{"label": "test source"}],
+                "grounding": "source_grounded",
+            },
+            {
+                "anchorId": "anchor-2",
+                "title": "Two fourths equals one half",
+                "summary": "Two of four equal parts covers the same amount as one of two equal parts.",
+                "details": ["Use folded paper or strips."],
+                "sourceRefs": [{"label": "test source"}],
+                "grounding": "source_grounded",
+            },
+        ],
+        "teachableItems": [
+            {
+                "itemId": "item-1",
+                "unitRef": "unit:1:compare",
+                "title": "Same-size pieces",
+                "focusQuestion": "Why can we compare numerators when denominators match?",
+                "contentAnchorIds": ["anchor-1"],
+                "namedAnchors": ["thirds", "fourths", "numerator", "denominator"],
+                "vocabulary": ["numerator", "denominator"],
+                "learnerOutcome": "Learner compares same-denominator fractions with a model.",
+                "assessmentCue": "Learner explains that the pieces are the same size.",
+                "misconceptions": ["Comparing denominator size instead of piece count."],
+                "parentNotes": ["Use strips before symbols."],
+                "skillIds": ["skill-1"],
+                "estimatedSessions": 1,
+                "sourceRefs": [{"label": "test source"}],
+            },
+            {
+                "itemId": "item-2",
+                "unitRef": "unit:1:compare",
+                "title": "Two fourths as one half",
+                "focusQuestion": "How can two fourths cover the same amount as one half?",
+                "contentAnchorIds": ["anchor-2"],
+                "namedAnchors": ["half", "fourth", "equal parts"],
+                "vocabulary": ["equivalent"],
+                "learnerOutcome": "Learner shows 2/4 and 1/2 cover the same area.",
+                "assessmentCue": "Learner matches 2/4 to 1/2 with a visual.",
+                "misconceptions": ["Thinking 2/4 is bigger because 4 is bigger than 2."],
+                "parentNotes": ["Fold paper into halves and fourths."],
+                "skillIds": ["skill-2"],
+                "estimatedSessions": 1,
+                "sourceRefs": [{"label": "test source"}],
+            },
+        ],
+        "deliverySequence": [],
+        "sourceCoverage": [],
     }
 
 
@@ -287,9 +383,24 @@ def test_curriculum_artifact_accepts_week_scale_without_hierarchy_labels():
                 "coverageStrategy": "Observe and classify common cloud types this week.",
             },
             "curriculumScale": "week",
+            "planningModel": "content_map",
             "skills": [
-                {"skillId": "skill-1", "title": "Observe cloud shape and height"},
-                {"skillId": "skill-2", "title": "Match cloud observations to likely weather"},
+                {
+                    "skillId": "skill-1",
+                    "title": "Observe cloud shape and height",
+                    "description": "Look at cloud shape and whether clouds seem low or high.",
+                    "contentAnchorIds": ["anchor-1"],
+                    "practiceCue": "Sketch one cloud and describe its shape.",
+                    "assessmentCue": "Learner can name one visible cloud feature.",
+                },
+                {
+                    "skillId": "skill-2",
+                    "title": "Match cloud observations to likely weather",
+                    "description": "Connect dark or tall clouds with likely rain and flat fair-weather clouds with calmer weather.",
+                    "contentAnchorIds": ["anchor-2"],
+                    "practiceCue": "Match a cloud sketch to a weather guess.",
+                    "assessmentCue": "Learner gives one observation-based weather guess.",
+                },
             ],
             "units": [
                 {
@@ -301,6 +412,113 @@ def test_curriculum_artifact_accepts_week_scale_without_hierarchy_labels():
                     "skillIds": ["skill-1", "skill-2"],
                 }
             ],
+            "contentAnchors": [
+                {
+                    "anchorId": "anchor-1",
+                    "title": "Cloud shape and height",
+                    "summary": "Clouds can be observed by shape and whether they look low, middle, or high.",
+                    "details": [],
+                    "sourceRefs": [{"label": "Cloud week"}],
+                    "grounding": "model_suggested",
+                },
+                {
+                    "anchorId": "anchor-2",
+                    "title": "Clouds and weather clues",
+                    "summary": "Some cloud observations can be used as simple clues about possible weather.",
+                    "details": [],
+                    "sourceRefs": [{"label": "Cloud week"}],
+                    "grounding": "model_suggested",
+                },
+            ],
+            "teachableItems": [
+                {
+                    "itemId": "item-1",
+                    "unitRef": "unit:1:clouds-week",
+                    "title": "Cloud observation walk",
+                    "focusQuestion": "What do we notice about the cloud shape and height?",
+                    "contentAnchorIds": ["anchor-1"],
+                    "namedAnchors": ["shape", "height", "sky"],
+                    "vocabulary": ["observe", "shape"],
+                    "learnerOutcome": "Learner sketches one cloud and describes one feature.",
+                    "assessmentCue": "Learner names a visible feature.",
+                    "misconceptions": [],
+                    "parentNotes": [],
+                    "skillIds": ["skill-1"],
+                    "estimatedSessions": 2,
+                    "sourceRefs": [{"label": "Cloud week"}],
+                },
+                {
+                    "itemId": "item-2",
+                    "unitRef": "unit:1:clouds-week",
+                    "title": "Cloud weather clue",
+                    "focusQuestion": "What weather might this cloud suggest?",
+                    "contentAnchorIds": ["anchor-2"],
+                    "namedAnchors": ["rain", "fair weather", "dark cloud"],
+                    "vocabulary": ["weather"],
+                    "learnerOutcome": "Learner makes one weather guess from a cloud observation.",
+                    "assessmentCue": "Learner connects the guess to an observation.",
+                    "misconceptions": [],
+                    "parentNotes": [],
+                    "skillIds": ["skill-2"],
+                    "estimatedSessions": 2,
+                    "sourceRefs": [{"label": "Cloud week"}],
+                },
+            ],
+            "deliverySequence": [
+                {
+                    "sequenceId": "session-1",
+                    "position": 1,
+                    "label": "Session 1",
+                    "title": "Sketch cloud shape",
+                    "sessionFocus": "Observe and sketch one cloud shape.",
+                    "teachableItemId": "item-1",
+                    "contentAnchorIds": ["anchor-1"],
+                    "skillIds": ["skill-1"],
+                    "estimatedMinutes": 20,
+                    "evidenceToSave": ["Cloud sketch"],
+                    "reviewOf": [],
+                },
+                {
+                    "sequenceId": "session-2",
+                    "position": 2,
+                    "label": "Session 2",
+                    "title": "Sort high and low clouds",
+                    "sessionFocus": "Compare whether clouds look low or high.",
+                    "teachableItemId": "item-1",
+                    "contentAnchorIds": ["anchor-1"],
+                    "skillIds": ["skill-1"],
+                    "estimatedMinutes": 20,
+                    "evidenceToSave": ["Observation note"],
+                    "reviewOf": [],
+                },
+                {
+                    "sequenceId": "session-3",
+                    "position": 3,
+                    "label": "Session 3",
+                    "title": "Guess weather from clouds",
+                    "sessionFocus": "Use cloud clues to make a simple weather guess.",
+                    "teachableItemId": "item-2",
+                    "contentAnchorIds": ["anchor-2"],
+                    "skillIds": ["skill-2"],
+                    "estimatedMinutes": 20,
+                    "evidenceToSave": ["Weather guess note"],
+                    "reviewOf": [],
+                },
+                {
+                    "sequenceId": "session-4",
+                    "position": 4,
+                    "label": "Session 4",
+                    "title": "Review cloud journal",
+                    "sessionFocus": "Review sketches and choose the clearest weather clue.",
+                    "teachableItemId": "item-2",
+                    "contentAnchorIds": ["anchor-2"],
+                    "skillIds": ["skill-2"],
+                    "estimatedMinutes": 20,
+                    "evidenceToSave": ["Cloud journal page"],
+                    "reviewOf": ["Cloud shape and height"],
+                },
+            ],
+            "sourceCoverage": [],
         }
     )
 
@@ -349,3 +567,46 @@ def test_curriculum_artifact_rejects_zero_estimated_sessions():
 
     with pytest.raises(ValueError, match="estimatedSessions"):
         CurriculumArtifact.model_validate(payload)
+
+
+def test_curriculum_artifact_requires_one_sequence_item_per_timeboxed_session():
+    payload = _artifact_payload()
+    payload["planningModel"] = "session_sequence"
+    payload["pacing"]["totalSessions"] = 2
+    payload["deliverySequence"] = [
+        {
+            "sequenceId": "session-1",
+            "position": 1,
+            "label": "Session 1",
+            "title": "Compare same-denominator fractions",
+            "sessionFocus": "Use strips to compare 2/4 and 3/4.",
+            "teachableItemId": "item-1",
+            "contentAnchorIds": ["anchor-1"],
+            "skillIds": ["skill-1"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": ["Marked fraction strip"],
+            "reviewOf": [],
+        }
+    ]
+
+    with pytest.raises(ValueError, match="one deliverySequence item per total session"):
+        CurriculumArtifact.model_validate(payload)
+
+    payload["deliverySequence"].append(
+        {
+            "sequenceId": "session-2",
+            "position": 2,
+            "label": "Session 2",
+            "title": "Explain two fourths as one half",
+            "sessionFocus": "Fold paper to match 2/4 and 1/2.",
+            "teachableItemId": "item-2",
+            "contentAnchorIds": ["anchor-2"],
+            "skillIds": ["skill-2"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": ["Folded paper model"],
+            "reviewOf": ["same-denominator comparison"],
+        }
+    )
+
+    artifact = CurriculumArtifact.model_validate(payload)
+    assert [item.position for item in artifact.deliverySequence] == [1, 2]

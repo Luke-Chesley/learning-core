@@ -15,9 +15,18 @@ from learning_core.contracts.source_interpret import (
     SourceInterpretationHorizon,
     SourceKind,
     SourcePackageContext,
+    SourcePlanningConstraints,
 )
 
 CurriculumScale = Literal["micro", "week", "module", "course", "reference_source"]
+CurriculumPlanningModel = Literal[
+    "content_map",
+    "session_sequence",
+    "source_sequence",
+    "single_lesson",
+    "reference_map",
+]
+ContentAnchorGrounding = Literal["source_grounded", "parent_request", "model_suggested"]
 
 
 class CurriculumChatMessage(StrictModel):
@@ -109,6 +118,10 @@ class CurriculumSkill(StrictModel):
     strandTitle: str | None = None
     goalGroupTitle: str | None = None
     title: str
+    description: str | None = None
+    contentAnchorIds: list[str] = Field(default_factory=list, max_length=24)
+    practiceCue: str | None = None
+    assessmentCue: str | None = None
 
     def canonical_skill_ref(self) -> str:
         return canonical_skill_ref_from_titles(
@@ -126,6 +139,73 @@ class CurriculumUnit(StrictModel):
     estimatedWeeks: int | None = Field(default=None, gt=0, le=52)
     estimatedSessions: int | None = Field(default=None, gt=0, le=160)
     skillIds: list[str] = Field(min_length=1, max_length=64)
+
+
+class SourceReference(StrictModel):
+    label: str
+    locator: str | None = None
+    description: str | None = None
+
+
+class ContentAnchor(StrictModel):
+    anchorId: str
+    title: str
+    summary: str
+    details: list[str] = Field(default_factory=list, max_length=12)
+    sourceRefs: list[SourceReference] = Field(default_factory=list, max_length=12)
+    grounding: ContentAnchorGrounding = "source_grounded"
+
+
+class TeachableItem(StrictModel):
+    itemId: str
+    unitRef: str
+    title: str
+    focusQuestion: str
+    contentAnchorIds: list[str] = Field(min_length=1, max_length=16)
+    namedAnchors: list[str] = Field(min_length=1, max_length=24)
+    vocabulary: list[str] = Field(default_factory=list, max_length=24)
+    learnerOutcome: str
+    assessmentCue: str
+    misconceptions: list[str] = Field(default_factory=list, max_length=10)
+    parentNotes: list[str] = Field(default_factory=list, max_length=10)
+    skillIds: list[str] = Field(min_length=1, max_length=24)
+    estimatedSessions: int | None = Field(default=None, gt=0, le=40)
+    sourceRefs: list[SourceReference] = Field(default_factory=list, max_length=12)
+
+
+class DeliverySequenceItem(StrictModel):
+    sequenceId: str
+    position: int = Field(gt=0, le=500)
+    label: str
+    title: str
+    sessionFocus: str
+    teachableItemId: str
+    contentAnchorIds: list[str] = Field(default_factory=list, max_length=16)
+    skillIds: list[str] = Field(min_length=1, max_length=24)
+    estimatedMinutes: int | None = Field(default=None, gt=0, le=360)
+    projectMilestone: str | None = None
+    evidenceToSave: list[str] = Field(default_factory=list, max_length=8)
+    reviewOf: list[str] = Field(default_factory=list, max_length=8)
+
+
+class ProjectMilestone(StrictModel):
+    title: str
+    sessionPositions: list[int] = Field(default_factory=list, max_length=20)
+    description: str
+    evidenceToSave: list[str] = Field(default_factory=list, max_length=8)
+
+
+class ProjectArc(StrictModel):
+    goal: str
+    milestones: list[ProjectMilestone] = Field(default_factory=list, max_length=12)
+    presentationOptions: list[str] = Field(default_factory=list, max_length=8)
+    evidenceToSave: list[str] = Field(default_factory=list, max_length=8)
+
+
+class SourceCoverageItem(StrictModel):
+    sourceRef: str
+    coveredByItemIds: list[str] = Field(default_factory=list, max_length=40)
+    notes: str | None = None
 
 
 def iter_document_skill_entries(
@@ -179,8 +259,14 @@ class CurriculumArtifact(StrictModel):
     intakeSummary: str
     pacing: CurriculumPacing
     curriculumScale: CurriculumScale | None = None
+    planningModel: CurriculumPlanningModel = "content_map"
     skills: list[CurriculumSkill] = Field(min_length=1, max_length=400)
     units: list[CurriculumUnit] = Field(min_length=1, max_length=20)
+    contentAnchors: list[ContentAnchor] = Field(min_length=1, max_length=600)
+    teachableItems: list[TeachableItem] = Field(min_length=1, max_length=500)
+    deliverySequence: list[DeliverySequenceItem] = Field(default_factory=list, max_length=500)
+    projectArc: ProjectArc | None = None
+    sourceCoverage: list[SourceCoverageItem] = Field(default_factory=list, max_length=120)
 
     @model_validator(mode="after")
     def validate_refs(self) -> "CurriculumArtifact":
@@ -218,6 +304,146 @@ class CurriculumArtifact(StrictModel):
             if not unit.skillIds:
                 raise ValueError(f'CurriculumArtifact unit "{unit.title}" requires at least one skillId.')
 
+        anchor_ids = [anchor.anchorId for anchor in self.contentAnchors]
+        if len(set(anchor_ids)) != len(anchor_ids):
+            raise ValueError("CurriculumArtifact requires unique contentAnchors[].anchorId values.")
+
+        known_anchor_ids = set(anchor_ids)
+        for skill in self.skills:
+            missing_anchor_ids = [
+                anchor_id
+                for anchor_id in skill.contentAnchorIds
+                if anchor_id not in known_anchor_ids
+            ]
+            if missing_anchor_ids:
+                raise ValueError(
+                    f'CurriculumArtifact skill "{skill.title}" references unknown contentAnchorIds: '
+                    + ", ".join(sorted(missing_anchor_ids))
+                )
+
+        teachable_item_ids = [item.itemId for item in self.teachableItems]
+        if len(set(teachable_item_ids)) != len(teachable_item_ids):
+            raise ValueError("CurriculumArtifact requires unique teachableItems[].itemId values.")
+
+        unit_ref_set = set(unit_refs)
+        skill_ids_with_teachable_items: set[str] = set()
+        for item in self.teachableItems:
+            if item.unitRef not in unit_ref_set:
+                raise ValueError(
+                    f'CurriculumArtifact teachable item "{item.title}" references unknown unitRef "{item.unitRef}".'
+                )
+
+            missing_skill_ids = [skill_id for skill_id in item.skillIds if skill_id not in known_skill_ids]
+            if missing_skill_ids:
+                raise ValueError(
+                    f'CurriculumArtifact teachable item "{item.title}" references unknown skillIds: '
+                    + ", ".join(sorted(missing_skill_ids))
+                )
+            skill_ids_with_teachable_items.update(item.skillIds)
+
+            missing_anchor_ids = [
+                anchor_id
+                for anchor_id in item.contentAnchorIds
+                if anchor_id not in known_anchor_ids
+            ]
+            if missing_anchor_ids:
+                raise ValueError(
+                    f'CurriculumArtifact teachable item "{item.title}" references unknown contentAnchorIds: '
+                    + ", ".join(sorted(missing_anchor_ids))
+                )
+
+        skills_without_content = [
+            skill.skillId
+            for skill in self.skills
+            if not skill.contentAnchorIds and skill.skillId not in skill_ids_with_teachable_items
+        ]
+        if skills_without_content:
+            raise ValueError(
+                "Every skill must be grounded by contentAnchorIds or a teachable item. Missing: "
+                + ", ".join(sorted(skills_without_content))
+            )
+
+        item_by_id = {item.itemId: item for item in self.teachableItems}
+        sequence_ids = [item.sequenceId for item in self.deliverySequence]
+        if len(set(sequence_ids)) != len(sequence_ids):
+            raise ValueError("CurriculumArtifact requires unique deliverySequence[].sequenceId values.")
+
+        seen_positions: set[int] = set()
+        seen_sequence_teachable_item_ids: set[str] = set()
+        seen_sequence_primary_skill_ids: set[str] = set()
+        for sequence_item in self.deliverySequence:
+            if sequence_item.position in seen_positions:
+                raise ValueError("CurriculumArtifact requires unique deliverySequence[].position values.")
+            seen_positions.add(sequence_item.position)
+
+            teachable_item = item_by_id.get(sequence_item.teachableItemId)
+            if not teachable_item:
+                raise ValueError(
+                    f'CurriculumArtifact delivery item "{sequence_item.title}" references unknown teachableItemId '
+                    f'"{sequence_item.teachableItemId}".'
+                )
+            if self.planningModel == "session_sequence":
+                if sequence_item.teachableItemId in seen_sequence_teachable_item_ids:
+                    raise ValueError(
+                        'planningModel "session_sequence" requires each deliverySequence item to use a unique teachableItemId.'
+                    )
+                seen_sequence_teachable_item_ids.add(sequence_item.teachableItemId)
+
+                primary_skill_id = sequence_item.skillIds[0]
+                if primary_skill_id in seen_sequence_primary_skill_ids:
+                    raise ValueError(
+                        'planningModel "session_sequence" requires each deliverySequence item to use a unique primary skillId.'
+                    )
+                seen_sequence_primary_skill_ids.add(primary_skill_id)
+
+            missing_skill_ids = [
+                skill_id for skill_id in sequence_item.skillIds if skill_id not in known_skill_ids
+            ]
+            if missing_skill_ids:
+                raise ValueError(
+                    f'CurriculumArtifact delivery item "{sequence_item.title}" references unknown skillIds: '
+                    + ", ".join(sorted(missing_skill_ids))
+                )
+
+            if not set(sequence_item.skillIds).issubset(set(teachable_item.skillIds)):
+                raise ValueError(
+                    f'CurriculumArtifact delivery item "{sequence_item.title}" must use skillIds from its teachable item.'
+                )
+
+            if not sequence_item.contentAnchorIds:
+                sequence_item.contentAnchorIds = list(teachable_item.contentAnchorIds)
+
+            missing_anchor_ids = [
+                anchor_id
+                for anchor_id in sequence_item.contentAnchorIds
+                if anchor_id not in known_anchor_ids
+            ]
+            if missing_anchor_ids:
+                raise ValueError(
+                    f'CurriculumArtifact delivery item "{sequence_item.title}" references unknown contentAnchorIds: '
+                    + ", ".join(sorted(missing_anchor_ids))
+                )
+
+        if self.deliverySequence:
+            expected_positions = list(range(1, len(self.deliverySequence) + 1))
+            actual_positions = sorted(seen_positions)
+            if actual_positions != expected_positions:
+                raise ValueError(
+                    "CurriculumArtifact deliverySequence positions must be contiguous and start at 1."
+                )
+
+        if self.planningModel == "session_sequence":
+            if not self.deliverySequence:
+                raise ValueError('planningModel "session_sequence" requires deliverySequence.')
+            if self.pacing.totalSessions is not None and self.pacing.totalSessions <= 80:
+                if len(self.deliverySequence) != self.pacing.totalSessions:
+                    raise ValueError(
+                        'planningModel "session_sequence" requires one deliverySequence item per total session.'
+                    )
+
+        if self.planningModel == "single_lesson" and len(self.deliverySequence) > 1:
+            raise ValueError('planningModel "single_lesson" may include at most one deliverySequence item.')
+
         return self
 
 
@@ -239,6 +465,7 @@ class CurriculumGenerationRequest(StrictModel):
     sourceFiles: list[SourceInputFile] = Field(default_factory=list)
     detectedChunks: list[str] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
+    planningConstraints: SourcePlanningConstraints | None = None
 
     messages: list[CurriculumChatMessage] = Field(default_factory=list)
     requirementHints: dict[str, Any] | None = None

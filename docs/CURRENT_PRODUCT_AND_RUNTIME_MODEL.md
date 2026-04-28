@@ -76,6 +76,12 @@ It supports:
 - `requestMode: "conversation_intake"`
 
 The output is one durable curriculum artifact.
+It is a teachable content map, not just a unit/skill outline:
+
+- `contentAnchors[]` names the facts, examples, source sections, terms, procedures, artifacts, problems, or historical examples to teach.
+- `teachableItems[]` groups those anchors into teachable parent-facing slices.
+- `skills[]` remains the app route/planning handle, but skills must be concrete and content-grounded.
+- `deliverySequence[]` is required for explicit timeboxed/session-counted plans and should contain one item per requested session.
 
 Opening-window selection is downstream of the curriculum artifact.
 Older docs sometimes describe `launchPlan` as if it were part of every `curriculum_generate` response, but that is not the current canonical contract.

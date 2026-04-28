@@ -79,10 +79,13 @@ def build_skill_catalog(skills: list[CurriculumSkill]) -> list[SkillCatalogItem]
             SkillCatalogItem(
                 skillRef=skill.canonical_skill_ref(),
                 title=skill.title,
+                description=skill.description,
                 domainTitle=skill.domainTitle,
                 strandTitle=skill.strandTitle,
                 goalGroupTitle=skill.goalGroupTitle,
                 ordinal=ordinal,
+                contentAnchors=skill.contentAnchorIds,
+                assessmentCue=skill.assessmentCue,
             )
         )
     return skill_catalog
