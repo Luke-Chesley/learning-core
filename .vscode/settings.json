@@ -1,7 +1,10 @@
 {
   "git.repositoryScanIgnoredFolders": [
-    ".worktrees"
+    ".worktrees",
+    "**/.worktrees",
+    "../symphony/workspaces"
   ],
+  "git.detectWorktrees": false,
   "scm.repositories.selectionMode": "single",
   "scm.alwaysShowRepositories": false
 }
