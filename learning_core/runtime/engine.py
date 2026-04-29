@@ -796,6 +796,23 @@ class AgentEngine:
         try:
             artifact = skill.output_model.model_validate(raw_artifact)
         except Exception as error:
+            if strategy != "validation_repair":
+                repair_preview = skill.build_validation_retry_preview(
+                    payload=payload,
+                    context=context,
+                    raw_artifact=raw_artifact,
+                    error=error,
+                )
+                if repair_preview is not None:
+                    return self._run_text_json_fallback_with_preview(
+                        skill=skill,
+                        payload=payload,
+                        context=context,
+                        structured_error=error,
+                        preview=repair_preview,
+                        strategy="validation_repair",
+                    )
+
             raise ContractValidationError(
                 f"Structured-output fallback returned an invalid artifact: {error}"
             ) from error

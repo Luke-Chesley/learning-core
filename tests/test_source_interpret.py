@@ -98,6 +98,21 @@ class _EscapedFallbackClient(_FallbackClient):
         return _FakeTextResponse(json.dumps(self.artifact).replace('"', r'\"'))
 
 
+class _InvalidThenRepairFallbackClient:
+    def __init__(self, invalid_artifact: dict, repaired_artifact: dict) -> None:
+        self.invalid_artifact = invalid_artifact
+        self.repaired_artifact = repaired_artifact
+        self.text_calls = 0
+
+    def with_structured_output(self, _output_model, **_kwargs):
+        return _ExplodingStructuredInvoker()
+
+    def invoke(self, _messages):
+        self.text_calls += 1
+        artifact = self.invalid_artifact if self.text_calls == 1 else self.repaired_artifact
+        return _FakeTextResponse(json.dumps(artifact))
+
+
 class _RepairFallbackClient:
     def __init__(self, structured_artifact: dict, repaired_artifact: dict) -> None:
         self.structured_artifact = structured_artifact
@@ -464,6 +479,50 @@ def test_source_interpret_fallback_accepts_escaped_json_text(monkeypatch, tmp_pa
     assert result.artifact["recommendedHorizon"] == "one_week"
     assert result.trace.agent_trace is not None
     assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "text_json"
+
+
+def test_source_interpret_fallback_retries_invalid_text_json_with_validation_prompt(
+    monkeypatch, tmp_path: Path
+):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    invalid_artifact = {
+        "suggestedTitle": "Plan a topic study",
+        "confidence": "high",
+        "assumptions": [],
+        "detectedChunks": [],
+        "needsConfirmation": False,
+    }
+    client = _InvalidThenRepairFallbackClient(
+        invalid_artifact,
+        _artifact(
+            source_kind="topic_seed",
+            entry_strategy="scaffold_only",
+            entry_label=None,
+            continuation_mode="manual_review",
+            recommended_horizon="starter_module",
+        ),
+    )
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="openai",
+            model="fake-source-interpret",
+            client=client,
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", _envelope())
+
+    assert client.text_calls == 2
+    assert result.artifact["sourceKind"] == "topic_seed"
+    assert result.artifact["entryStrategy"] == "scaffold_only"
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "validation_repair"
 
 
 def test_source_interpret_rejects_missing_required_enum_fields(monkeypatch, tmp_path: Path):
