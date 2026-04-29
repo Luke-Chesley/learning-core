@@ -91,6 +91,20 @@ Planning constraints:
 - Set `planningConstraints.totalWeeks`, `sessionsPerWeek`, or `sessionMinutes` when stated or directly implied by horizon/cadence language.
 - When both total weeks and sessions per week are explicit or directly implied, set `planningConstraints.totalSessions` to their product.
 - Treat phrases like "this week", "in 4 weeks", "in 6 weeks", "this month", "one focused session per week", "two lessons and one review day each week", "four short days and one project day", and "20 minutes per day" as pacing cues rather than burying them only in prose.
+- Use good-taste soft defaults for common parent horizon phrases instead of asking a follow-up only because the phrase is colloquial:
+  - "this month" means about 4 weeks
+  - "for the summer" or "over the summer" means about 8 weeks unless the parent gives dates
+  - "semester" means about 16 weeks
+  - "quarter" means about 9 weeks
+  - "full school year" means about 36 weeks
+- Use good-taste soft defaults for cadence phrases:
+  - "one focused session per week" means 1 session per week
+  - "twice a week" means 2 sessions per week
+  - "three sessions per week" or "three lessons per week" means 3 sessions per week
+  - "short frequent sessions" means about 3 sessions per week unless a different cadence is stated
+  - "daily bite-sized practice" means about 5 sessions per week
+- Use age-appropriate duration defaults when duration is missing: short sessions for preschool/kindergarten/age 5-6 should usually be about 10 minutes; short sessions for older learners should usually be about 20 minutes.
+- Defaults are not hard curriculum diagnoses. Put default assumptions in `planningConstraints.notes`, and only set `totalSessions` when the session count is explicit or when both horizon and cadence are explicitly stated.
 - Set `planningConstraints.gradeLevel` when the request includes a grade level, age band, or similar learner-level cue.
 - Set `planningConstraints.learnerContext` when the request includes learner readiness, confidence, acceleration, struggle, or prior-knowledge notes.
 - Set `planningConstraints.practiceCadence` when the request includes review or practice frequency, intensity, or format.

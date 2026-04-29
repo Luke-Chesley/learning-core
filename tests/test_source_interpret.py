@@ -650,6 +650,106 @@ def test_source_interpret_accepts_curriculum_request_planning_constraints(monkey
     assert result.artifact["planningConstraints"]["practiceCadence"] == "daily bite-sized practice"
 
 
+def test_source_interpret_enriches_seasonal_cadence_defaults(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="test",
+            model="fake-source-interpret",
+            client=_FakeClient(
+                _artifact(
+                    source_kind="curriculum_request",
+                    entry_strategy="scaffold_only",
+                    entry_label=None,
+                    continuation_mode="manual_review",
+                    delivery_pattern="mixed",
+                    recommended_horizon="starter_module",
+                    suggestedTitle="Summer memory training",
+                    detectedChunks=[
+                        "5-year-old",
+                        "memory training",
+                        "for the summer",
+                        "short frequent sessions",
+                    ],
+                    planningConstraints={
+                        "totalSessions": None,
+                        "totalWeeks": None,
+                        "sessionsPerWeek": None,
+                        "sessionMinutes": None,
+                        "gradeLevel": "age 5",
+                        "practiceCadence": "short frequent sessions",
+                        "notes": [],
+                    },
+                    followUpQuestion="What exact summer duration should I use?",
+                    needsConfirmation=True,
+                )
+            ),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+    envelope = _envelope()
+    envelope["input"]["rawText"] = (
+        "I want to teach a 5-year-old memory training for the summer, "
+        "with clear success criteria, using short frequent sessions."
+    )
+    envelope["input"]["extractedText"] = envelope["input"]["rawText"]
+
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", envelope)
+
+    constraints = result.artifact["planningConstraints"]
+    assert constraints["totalWeeks"] == 8
+    assert constraints["sessionsPerWeek"] == 3
+    assert constraints["sessionMinutes"] == 10
+    assert "totalSessions" not in constraints
+    assert any("summer horizon" in note for note in constraints["notes"])
+    assert result.trace.agent_trace is not None
+    assert result.trace.agent_trace["structured_output_fallback"]["strategy"] == "semantic_deterministic_repair"
+
+
+def test_source_interpret_computes_total_sessions_for_explicit_horizon_and_cadence(monkeypatch, tmp_path: Path):
+    monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
+    monkeypatch.setattr(
+        engine_module,
+        "build_model_runtime",
+        lambda **_kwargs: ModelRuntime(
+            provider="test",
+            model="fake-source-interpret",
+            client=_FakeClient(
+                _artifact(
+                    source_kind="curriculum_request",
+                    entry_strategy="scaffold_only",
+                    entry_label=None,
+                    continuation_mode="manual_review",
+                    delivery_pattern="mixed",
+                    recommended_horizon="two_weeks",
+                    suggestedTitle="Fractions sequence",
+                    detectedChunks=["8 weeks", "three sessions per week"],
+                    planningConstraints={},
+                )
+            ),
+            temperature=0.2,
+            max_tokens=2048,
+            max_tokens_source="test",
+            provider_settings={},
+        ),
+    )
+    envelope = _envelope()
+    envelope["input"]["rawText"] = "Teach fractions in 8 weeks with three sessions per week."
+    envelope["input"]["extractedText"] = envelope["input"]["rawText"]
+
+    result = AgentEngine(build_skill_registry()).execute("source_interpret", envelope)
+
+    constraints = result.artifact["planningConstraints"]
+    assert constraints["totalWeeks"] == 8
+    assert constraints["sessionsPerWeek"] == 3
+    assert constraints["totalSessions"] == 24
+
+
 def test_generate_from_source_threads_new_interpretation_fields_into_curriculum_generate(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("LEARNING_CORE_LOG_DIR", str(tmp_path / "logs"))
     captured_requests: list[tuple[str, dict]] = []

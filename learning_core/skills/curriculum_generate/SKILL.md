@@ -75,6 +75,8 @@ Shared generation rules:
   - When one or more pacing values are missing, choose conservative assumptions from the horizon, cadence language, learner needs, and scope; explain the assumption in `coverageNotes`.
   - `totalSessions` should normally equal `totalWeeks * sessionsPerWeek`. If the source uses an irregular cadence, choose the nearest honest weekly cadence and explain the irregularity in `coverageNotes`.
   - `sessionMinutes` is the expected parent-led learning block for one session, not an unbounded total for every possible follow-up activity.
+  - If `planningConstraints.totalWeeks` and `planningConstraints.sessionsPerWeek` are present but `planningConstraints.totalSessions` is absent, treat the product as a soft scale budget rather than an exact session-by-session contract.
+  - For seasonal or multiweek curriculum requests such as "for the summer", do not collapse the durable curriculum to a two-week starter. Create enough distinct teachable skills/items for the full arc, with review and application handles, while still leaving daily lesson scripts to `session_generate`.
   - For short horizons, trim scope before compressing too much content into each session.
   - As a general ceiling, avoid more than 10 new durable skills per week unless the source explicitly requires it. When a request is broader than the pacing can support, name the intentionally deferred topics or skills in `coverageNotes`.
 - Units group teachable arcs. They are not scripts, but they must not be vague containers.

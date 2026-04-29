@@ -136,6 +136,39 @@ def test_curriculum_generate_prompt_uses_planning_constraints_for_curriculum_req
     assert "Explicit planningConstraints to preserve: totalSessions=30" in preview.user_prompt
 
 
+def test_curriculum_generate_prompt_uses_soft_multweek_pacing_budget_without_forcing_session_sequence():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "entryStrategy": "scaffold_only",
+            "entryLabel": None,
+            "continuationMode": "manual_review",
+            "deliveryPattern": "mixed",
+            "recommendedHorizon": "starter_module",
+            "sourceText": "Teach a 5-year-old memory training for the summer using short frequent sessions.",
+            "detectedChunks": ["5-year-old", "memory training", "for the summer", "short frequent sessions"],
+            "assumptions": ["Summer was defaulted to 8 weeks."],
+            "planningConstraints": {
+                "totalWeeks": 8,
+                "sessionsPerWeek": 3,
+                "sessionMinutes": 10,
+                "gradeLevel": "age 5",
+                "practiceCadence": "short frequent sessions",
+                "notes": ["Defaulted summer to 8 weeks."],
+            },
+        }
+    )
+
+    preview = CurriculumGenerateSkill().build_prompt_preview(payload, _context())
+
+    assert "about 24 sessions" in preview.user_prompt
+    assert "not a rigid request for one generated skill per session" in preview.user_prompt
+    assert "do not force planningModel session_sequence" in preview.user_prompt
+    assert "does not collapse the curriculum into a tiny starter" in preview.user_prompt
+    assert "Use planningModel session_sequence. planningConstraints.totalSessions is" not in preview.user_prompt
+
+
 def test_curriculum_generate_prompt_infers_exact_sessions_from_source_entry_label():
     payload = CurriculumGenerationRequest.model_validate(
         {

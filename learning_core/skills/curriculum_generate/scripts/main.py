@@ -44,6 +44,14 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
         parsed = int(match.group(1))
         return parsed if parsed > 0 else None
 
+    def _soft_pacing_total_sessions(self, payload: CurriculumGenerationRequest) -> int | None:
+        constraints = payload.planningConstraints
+        if not constraints or constraints.totalSessions is not None:
+            return None
+        if constraints.totalWeeks is None or constraints.sessionsPerWeek is None:
+            return None
+        return constraints.totalWeeks * constraints.sessionsPerWeek
+
     def _large_session_sequence_guidance(self, payload: CurriculumGenerationRequest) -> list[str]:
         total_sessions = self._explicit_total_sessions(payload)
         if total_sessions is None or total_sessions < 20:
@@ -86,6 +94,15 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             ]
             if present:
                 lines.append(f"- Explicit planningConstraints to preserve: {', '.join(present)}.")
+            soft_total_sessions = self._soft_pacing_total_sessions(payload)
+            if soft_total_sessions is not None:
+                lines.extend(
+                    [
+                        f"- Inferred pacing budget: totalWeeks x sessionsPerWeek suggests about {soft_total_sessions} sessions.",
+                        "- Because planningConstraints.totalSessions is not explicit, treat that as scale guidance, not a rigid request for one generated skill per session.",
+                        "- Do not collapse a seasonal or multiweek curriculum request into a two-week starter when totalWeeks/sessionsPerWeek are present.",
+                    ]
+                )
         elif payload.requestMode == "conversation_intake" and payload.pacingExpectations:
             expectations = payload.pacingExpectations
             present = [
@@ -114,6 +131,15 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     "deliverySequence item, teachable item, and primary skill per session."
                 )
             if payload.sourceKind == "curriculum_request":
+                soft_total_sessions = self._soft_pacing_total_sessions(payload)
+                if soft_total_sessions is not None:
+                    return (
+                        "This is a parent-authored curriculum request with inferred horizon/cadence constraints. "
+                        f"Use the stated totalWeeks and sessionsPerWeek as a real curriculum-scale budget of about {soft_total_sessions} sessions, "
+                        "but do not force planningModel session_sequence unless planningConstraints.totalSessions is present. "
+                        "Prefer content_map for flexible route planning, create enough distinct skills and teachableItems for the full multiweek arc, "
+                        "and include review/application handles so downstream planning does not collapse the curriculum into a tiny starter."
+                    )
                 return (
                     "This is a parent-authored curriculum request. Build a concrete model-suggested curriculum map "
                     "from the stated topic, grade, learner context, and planningConstraints. Use session_sequence "
