@@ -48,6 +48,7 @@ LESSON_VISUAL_AID_ALLOWED_HOSTS = (
 MAX_SHORT_STRING = 200
 MAX_ACTION_STRING = 400
 MAX_BLOCK_TITLE = 100
+MAX_MATERIAL_NAME = 120
 
 LessonShape: TypeAlias = Literal[
     "balanced",
@@ -118,6 +119,26 @@ class LessonAdaptation(StrictModel):
     action: str = Field(max_length=MAX_SHORT_STRING)
 
 
+class LessonRequiredMaterial(StrictModel):
+    name: str = Field(max_length=MAX_MATERIAL_NAME)
+    quantity: str | None = Field(default=None, max_length=80)
+    category: str = Field(max_length=60)
+    required: bool = True
+    why_needed: str = Field(max_length=MAX_SHORT_STRING)
+    used_in_blocks: list[str] = Field(default_factory=list)
+    easy_substitutes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_material_text(self) -> "LessonRequiredMaterial":
+        if not self.name.strip():
+            raise ValueError("Material name cannot be blank.")
+        if not self.category.strip():
+            raise ValueError("Material category cannot be blank.")
+        if not self.why_needed.strip():
+            raise ValueError("Material why_needed cannot be blank.")
+        return self
+
+
 class LessonBlock(StrictModel):
     type: LessonBlockType
     title: str = Field(max_length=MAX_BLOCK_TITLE)
@@ -140,6 +161,7 @@ class StructuredLessonDraft(StrictModel):
     total_minutes: int
     blocks: list[LessonBlock] = Field(default_factory=list)
     visual_aids: list[LessonVisualAid] = Field(default_factory=list)
+    required_materials: list[LessonRequiredMaterial] = Field(default_factory=list)
     materials: list[str] = Field(default_factory=list)
     teacher_notes: list[str] = Field(default_factory=list)
     co_teacher_notes: list[str] = Field(default_factory=list)

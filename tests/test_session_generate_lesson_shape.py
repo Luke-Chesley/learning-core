@@ -137,6 +137,32 @@ def test_structured_lesson_draft_accepts_canonical_lesson_shape():
     assert artifact.lesson_shape == "direct_instruction"
 
 
+def test_structured_lesson_draft_accepts_required_materials():
+    raw_artifact = _lesson_artifact("direct_instruction")
+    raw_artifact["required_materials"] = [
+        {
+            "name": "Chessboard",
+            "quantity": "1 board",
+            "category": "manipulative",
+            "required": True,
+            "why_needed": "Used to show the check position.",
+            "used_in_blocks": ["Show the rule", "Quick check"],
+            "easy_substitutes": ["paper board", "online board"],
+        }
+    ]
+    raw_artifact["adaptations"].append(
+        {
+            "trigger": "if_materials_missing",
+            "action": "Use a paper board sketch and point to the squares.",
+        }
+    )
+
+    artifact = StructuredLessonDraft.model_validate(raw_artifact)
+
+    assert artifact.required_materials[0].name == "Chessboard"
+    assert artifact.required_materials[0].easy_substitutes == ["paper board", "online board"]
+
+
 def test_structured_lesson_draft_rejects_app_overlong_block_action():
     artifact = _lesson_artifact("direct_instruction")
     artifact["blocks"][0]["teacher_action"] = "x" * 401
@@ -234,6 +260,9 @@ def test_session_generate_prompt_preview_constrains_lesson_shape_values():
     assert "`teacher_action` and `learner_action` under 400 characters" in preview.system_prompt
     assert "Field limits must match the app" in preview.user_prompt
     assert "Never use a lesson_shape slug as blocks[].type" in preview.user_prompt
+    assert "required_materials is the parent-facing gather-before-teaching list" in preview.user_prompt
+    assert "Top-level materials is only a compatibility summary" in preview.user_prompt
+    assert "if_materials_missing" in preview.user_prompt
     assert (
         "Lesson shape preference (canonical lesson_shape slug; reuse exactly if included): "
         "direct_instruction"

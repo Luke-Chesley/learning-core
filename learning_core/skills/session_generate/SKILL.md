@@ -12,6 +12,7 @@ Schema (all fields are strings or string arrays unless annotated):
   "total_minutes": number,
   "visual_aids": VisualAid[],
   "blocks": Block[],
+  "required_materials": RequiredMaterial[],
   "materials": string[],
   "teacher_notes": string[],
   "adaptations": Adaptation[],
@@ -56,6 +57,17 @@ Adaptation shape:
   "action": string
 }
 
+RequiredMaterial shape:
+{
+  "name": string,
+  "quantity": string or null,
+  "category": string,
+  "required": boolean,
+  "why_needed": string,
+  "used_in_blocks": string[],
+  "easy_substitutes": string[]
+}
+
 Rules:
 - Block minutes must sum to total_minutes +/- 15%.
 - Include at least one instructional block (model, guided_practice, independent_practice, demonstration, read_aloud, discussion, or project_work).
@@ -81,6 +93,14 @@ Rules:
   - `evidenceToSave`
 - Do not replace concrete route item content with generic skills. If a route item names specific facts, examples, terms, people, places, problems, or source sections, those must appear in the lesson draft.
 - If route item content is thin, keep the lesson honest and practical rather than inventing unsupported source facts.
+- `required_materials` is the parent-facing "gather before teaching" list. Include only physical, printed, or digital things the adult should gather before the lesson.
+- Do not put vocabulary words, lesson titles, curriculum titles, skill names, abstract concepts, or content-anchor labels in `required_materials` or top-level `materials`.
+- Prefer common household or kid-friendly substitutes when possible. For early-childhood hands-on work, use items such as small toys, picture cards, paper, crayons, sticky notes, counters, blocks, cups, or a cloth only when the lesson actually uses them.
+- Every required material must include a short `why_needed`, one or more `used_in_blocks` values matching block titles, and at least one practical `easy_substitutes` option unless no substitute is realistic.
+- Blocks that use materials must name them in `materials_needed` using the same plain names from `required_materials`.
+- Top-level `materials` is a compatibility summary. Populate it from `required_materials[].name` only; do not add extra words there.
+- If the lesson needs no gathered supplies, return empty arrays for `required_materials`, `materials`, and block `materials_needed`.
+- If any material is required, include an `adaptations` entry with trigger `if_materials_missing` that gives a concrete fallback path.
 - If total time is tight, mark lower-priority blocks as optional:true.
 - Adaptations are short, actionable, and ready to use during live teaching.
 - Do not include optional top-level fields unless they add clear value for this lesson.

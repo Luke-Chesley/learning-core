@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import re
+from typing import Any
 
 from learning_core.contracts.curriculum import CurriculumArtifact, CurriculumGenerationRequest
 from learning_core.observability.traces import PromptPreview
@@ -51,6 +53,9 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
         if constraints.totalWeeks is None or constraints.sessionsPerWeek is None:
             return None
         return constraints.totalWeeks * constraints.sessionsPerWeek
+
+    def _has_exact_session_count(self, payload: CurriculumGenerationRequest) -> bool:
+        return self._explicit_total_sessions(payload) is not None
 
     def _large_session_sequence_guidance(self, payload: CurriculumGenerationRequest) -> list[str]:
         total_sessions = self._explicit_total_sessions(payload)
@@ -142,8 +147,9 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     )
                 return (
                     "This is a parent-authored curriculum request. Build a concrete model-suggested curriculum map "
-                    "from the stated topic, grade, learner context, and planningConstraints. Use session_sequence "
-                    "when a total session count is present; otherwise choose the smallest honest planning model."
+                    "from the stated topic, grade, learner context, and planningConstraints. Do not use planningModel "
+                    "session_sequence unless planningConstraints.totalSessions or an exact session/day count is present; "
+                    "otherwise choose content_map or source_sequence."
                 )
             if payload.sourceKind == "timeboxed_plan":
                 return (
@@ -289,6 +295,7 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                 "Session sequence structural contract:",
                 "- Treat IDs as a closed inventory: every referenced skillId, unitRef, anchorId, and teachableItemId must be declared in its matching top-level array.",
                 "- Do not reference a future or convenient ID such as skill-7 unless that exact object exists in top-level skills.",
+                "- If the request did not provide an exact total session/day count, do not use planningModel session_sequence.",
                 "- If you choose planningModel session_sequence, every deliverySequence item is one concrete session.",
                 "- Each session must reference a unique teachableItemId.",
                 "- The first skillIds entry for each session is its primary skillId and must be unique across the deliverySequence.",
@@ -301,6 +308,171 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             ]
         )
         return "\n".join(lines)
+
+    def repair_invalid_artifact(self, *, raw_artifact, payload, context, error):
+        del context
+        if not isinstance(raw_artifact, dict):
+            return None
+
+        repaired = deepcopy(raw_artifact)
+        changed = False
+
+        if (
+            repaired.get("planningModel") == "session_sequence"
+            and not self._has_exact_session_count(payload)
+        ):
+            repaired["planningModel"] = "content_map"
+            changed = True
+
+        if self._repair_delivery_skill_membership(repaired):
+            changed = True
+
+        if repaired.get("planningModel") == "session_sequence" and self._repair_session_sequence_repeats(repaired):
+            changed = True
+
+        return repaired if changed else None
+
+    def _repair_delivery_skill_membership(self, artifact: dict[str, Any]) -> bool:
+        teachable_items = artifact.get("teachableItems")
+        delivery_sequence = artifact.get("deliverySequence")
+        if not isinstance(teachable_items, list) or not isinstance(delivery_sequence, list):
+            return False
+
+        item_by_id = {
+            item.get("itemId"): item
+            for item in teachable_items
+            if isinstance(item, dict) and isinstance(item.get("itemId"), str)
+        }
+        changed = False
+        for sequence_item in delivery_sequence:
+            if not isinstance(sequence_item, dict):
+                continue
+            teachable_item = item_by_id.get(sequence_item.get("teachableItemId"))
+            skill_ids = sequence_item.get("skillIds")
+            if not isinstance(teachable_item, dict) or not isinstance(skill_ids, list):
+                continue
+            item_skill_ids = teachable_item.get("skillIds")
+            if not isinstance(item_skill_ids, list):
+                continue
+            missing_skill_ids = [skill_id for skill_id in skill_ids if skill_id not in item_skill_ids]
+            if not missing_skill_ids:
+                continue
+            teachable_item["skillIds"] = [*item_skill_ids, *missing_skill_ids]
+            changed = True
+
+            sequence_anchor_ids = sequence_item.get("contentAnchorIds")
+            item_anchor_ids = teachable_item.get("contentAnchorIds")
+            if isinstance(sequence_anchor_ids, list) and isinstance(item_anchor_ids, list):
+                missing_anchor_ids = [
+                    anchor_id for anchor_id in sequence_anchor_ids if anchor_id not in item_anchor_ids
+                ]
+                if missing_anchor_ids:
+                    teachable_item["contentAnchorIds"] = [*item_anchor_ids, *missing_anchor_ids]
+
+        return changed
+
+    def _repair_session_sequence_repeats(self, artifact: dict[str, Any]) -> bool:
+        skills = artifact.get("skills")
+        units = artifact.get("units")
+        teachable_items = artifact.get("teachableItems")
+        delivery_sequence = artifact.get("deliverySequence")
+        if not all(isinstance(value, list) for value in (skills, units, teachable_items, delivery_sequence)):
+            return False
+
+        skill_by_id = {
+            skill.get("skillId"): skill
+            for skill in skills
+            if isinstance(skill, dict) and isinstance(skill.get("skillId"), str)
+        }
+        item_by_id = {
+            item.get("itemId"): item
+            for item in teachable_items
+            if isinstance(item, dict) and isinstance(item.get("itemId"), str)
+        }
+        unit_by_ref = {
+            unit.get("unitRef"): unit
+            for unit in units
+            if isinstance(unit, dict) and isinstance(unit.get("unitRef"), str)
+        }
+
+        seen_item_ids: set[str] = set()
+        seen_primary_skill_ids: set[str] = set()
+        changed = False
+        for sequence_item in delivery_sequence:
+            if not isinstance(sequence_item, dict):
+                continue
+            skill_ids = sequence_item.get("skillIds")
+            teachable_item_id = sequence_item.get("teachableItemId")
+            if not isinstance(skill_ids, list) or not skill_ids or not isinstance(teachable_item_id, str):
+                continue
+            primary_skill_id = skill_ids[0]
+            needs_clone = (
+                teachable_item_id in seen_item_ids
+                or primary_skill_id in seen_primary_skill_ids
+            )
+            if not needs_clone:
+                seen_item_ids.add(teachable_item_id)
+                seen_primary_skill_ids.add(primary_skill_id)
+                continue
+
+            original_item = item_by_id.get(teachable_item_id)
+            original_skill = skill_by_id.get(primary_skill_id)
+            if not isinstance(original_item, dict) or not isinstance(original_skill, dict):
+                continue
+
+            position = sequence_item.get("position")
+            suffix = f"session-{position}" if isinstance(position, int) else str(sequence_item.get("sequenceId") or "session")
+            new_skill_id = self._unique_id(f"{primary_skill_id}-{suffix}", skill_by_id)
+            new_item_id = self._unique_id(f"{teachable_item_id}-{suffix}", item_by_id)
+
+            cloned_skill = deepcopy(original_skill)
+            cloned_skill["skillId"] = new_skill_id
+            cloned_skill["title"] = str(sequence_item.get("title") or original_skill.get("title") or "Session skill")
+            cloned_skill["description"] = str(
+                sequence_item.get("sessionFocus")
+                or original_skill.get("description")
+                or cloned_skill["title"]
+            )
+            if isinstance(sequence_item.get("contentAnchorIds"), list) and sequence_item["contentAnchorIds"]:
+                cloned_skill["contentAnchorIds"] = list(sequence_item["contentAnchorIds"])
+            skills.append(cloned_skill)
+            skill_by_id[new_skill_id] = cloned_skill
+
+            cloned_item = deepcopy(original_item)
+            cloned_item["itemId"] = new_item_id
+            cloned_item["title"] = str(sequence_item.get("title") or original_item.get("title") or "Session item")
+            cloned_item["learnerOutcome"] = str(
+                sequence_item.get("sessionFocus")
+                or original_item.get("learnerOutcome")
+                or cloned_item["title"]
+            )
+            cloned_item["skillIds"] = [new_skill_id]
+            if isinstance(sequence_item.get("contentAnchorIds"), list) and sequence_item["contentAnchorIds"]:
+                cloned_item["contentAnchorIds"] = list(sequence_item["contentAnchorIds"])
+            teachable_items.append(cloned_item)
+            item_by_id[new_item_id] = cloned_item
+
+            unit = unit_by_ref.get(cloned_item.get("unitRef"))
+            if isinstance(unit, dict):
+                unit_skill_ids = unit.get("skillIds")
+                if isinstance(unit_skill_ids, list) and new_skill_id not in unit_skill_ids:
+                    unit["skillIds"] = [*unit_skill_ids, new_skill_id]
+
+            sequence_item["teachableItemId"] = new_item_id
+            sequence_item["skillIds"] = [new_skill_id]
+            seen_item_ids.add(new_item_id)
+            seen_primary_skill_ids.add(new_skill_id)
+            changed = True
+
+        return changed
+
+    def _unique_id(self, preferred: str, existing: dict[str, Any]) -> str:
+        candidate = preferred
+        counter = 2
+        while candidate in existing:
+            candidate = f"{preferred}-{counter}"
+            counter += 1
+        return candidate
 
     def build_validation_retry_preview(
         self,

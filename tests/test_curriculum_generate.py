@@ -169,6 +169,32 @@ def test_curriculum_generate_prompt_uses_soft_multweek_pacing_budget_without_for
     assert "Use planningModel session_sequence. planningConstraints.totalSessions is" not in preview.user_prompt
 
 
+def test_curriculum_generate_prompt_forbids_session_sequence_without_exact_count():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "entryStrategy": "scaffold_only",
+            "entryLabel": None,
+            "continuationMode": "manual_review",
+            "deliveryPattern": "mixed",
+            "recommendedHorizon": "starter_module",
+            "sourceText": "Teach American Sign Language for the summer.",
+            "detectedChunks": ["American Sign Language", "for the summer"],
+            "assumptions": ["Summer is interpreted as about 8 weeks."],
+            "planningConstraints": {
+                "totalWeeks": 8,
+                "learnerContext": "siblings learning together",
+            },
+        }
+    )
+
+    preview = CurriculumGenerateSkill().build_prompt_preview(payload, _context())
+
+    assert "Do not use planningModel session_sequence unless planningConstraints.totalSessions" in preview.user_prompt
+    assert "If the request did not provide an exact total session/day count" in preview.user_prompt
+
+
 def test_curriculum_generate_prompt_infers_exact_sessions_from_source_entry_label():
     payload = CurriculumGenerationRequest.model_validate(
         {
@@ -708,3 +734,182 @@ def test_curriculum_artifact_requires_one_sequence_item_per_timeboxed_session():
 
     artifact = CurriculumArtifact.model_validate(payload)
     assert [item.position for item in artifact.deliverySequence] == [1, 2]
+
+
+def test_curriculum_generate_repair_coerces_inferred_session_sequence_to_content_map():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "entryStrategy": "scaffold_only",
+            "entryLabel": None,
+            "continuationMode": "manual_review",
+            "deliveryPattern": "mixed",
+            "recommendedHorizon": "starter_module",
+            "sourceText": "Teach introductory algebra for the first quarter.",
+            "planningConstraints": {
+                "totalWeeks": 9,
+                "sessionsPerWeek": 2,
+            },
+        }
+    )
+    artifact = _artifact_payload()
+    artifact["planningModel"] = "session_sequence"
+    artifact["pacing"]["totalWeeks"] = 9
+    artifact["pacing"]["sessionsPerWeek"] = 2
+    artifact["pacing"]["totalSessions"] = 4
+    artifact["deliverySequence"] = [
+        {
+            "sequenceId": "session-1",
+            "position": 1,
+            "label": "Session 1",
+            "title": "Compare same-denominator fractions",
+            "sessionFocus": "Use strips to compare 2/4 and 3/4.",
+            "teachableItemId": "item-1",
+            "contentAnchorIds": ["anchor-1"],
+            "skillIds": ["skill-1"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": [],
+            "reviewOf": [],
+        },
+        {
+            "sequenceId": "session-2",
+            "position": 2,
+            "label": "Session 2",
+            "title": "Review same-denominator fractions",
+            "sessionFocus": "Repeat same-denominator comparison with a new example.",
+            "teachableItemId": "item-1",
+            "contentAnchorIds": ["anchor-1"],
+            "skillIds": ["skill-1"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": [],
+            "reviewOf": [],
+        },
+    ]
+
+    with pytest.raises(ValueError, match="unique teachableItemId"):
+        CurriculumArtifact.model_validate(artifact)
+
+    repaired = CurriculumGenerateSkill().repair_invalid_artifact(
+        raw_artifact=artifact,
+        payload=payload,
+        context=_context(),
+        error=ValueError("duplicate sequence references"),
+    )
+    validated = CurriculumArtifact.model_validate(repaired)
+
+    assert validated.planningModel == "content_map"
+    assert len(validated.deliverySequence) == 2
+
+
+def test_curriculum_generate_repair_extends_teachable_item_for_delivery_membership():
+    payload = _conversation_payload()
+    artifact = _artifact_payload()
+    artifact["pacing"]["totalSessions"] = 1
+    artifact["deliverySequence"] = [
+        {
+            "sequenceId": "session-1",
+            "position": 1,
+            "label": "Session 1",
+            "title": "Compare and explain",
+            "sessionFocus": "Compare same-denominator fractions and explain two fourths as one half.",
+            "teachableItemId": "item-1",
+            "contentAnchorIds": ["anchor-1", "anchor-2"],
+            "skillIds": ["skill-1", "skill-2"],
+            "estimatedMinutes": 30,
+            "evidenceToSave": [],
+            "reviewOf": [],
+        }
+    ]
+
+    with pytest.raises(ValueError, match="must use skillIds from its teachable item"):
+        CurriculumArtifact.model_validate(artifact)
+
+    repaired = CurriculumGenerateSkill().repair_invalid_artifact(
+        raw_artifact=artifact,
+        payload=payload,
+        context=_context(),
+        error=ValueError("membership mismatch"),
+    )
+    validated = CurriculumArtifact.model_validate(repaired)
+
+    assert validated.teachableItems[0].skillIds == ["skill-1", "skill-2"]
+    assert validated.teachableItems[0].contentAnchorIds == ["anchor-1", "anchor-2"]
+
+
+def test_curriculum_generate_repair_clones_repeated_exact_session_sequence_items():
+    payload = CurriculumGenerationRequest.model_validate(
+        {
+            **_source_entry_payload().model_dump(mode="json"),
+            "sourceKind": "curriculum_request",
+            "entryStrategy": "timebox_start",
+            "entryLabel": "3 sessions",
+            "continuationMode": "timebox",
+            "deliveryPattern": "mixed",
+            "recommendedHorizon": "one_week",
+            "sourceText": "Teach fractions in 3 sessions.",
+            "detectedChunks": ["3 sessions"],
+        }
+    )
+    artifact = _artifact_payload()
+    artifact["planningModel"] = "session_sequence"
+    artifact["pacing"]["totalSessions"] = 3
+    artifact["deliverySequence"] = [
+        {
+            "sequenceId": "session-1",
+            "position": 1,
+            "label": "Session 1",
+            "title": "Compare same-denominator fractions",
+            "sessionFocus": "Use strips to compare 2/4 and 3/4.",
+            "teachableItemId": "item-1",
+            "contentAnchorIds": ["anchor-1"],
+            "skillIds": ["skill-1"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": [],
+            "reviewOf": [],
+        },
+        {
+            "sequenceId": "session-2",
+            "position": 2,
+            "label": "Session 2",
+            "title": "Practice same-denominator fractions",
+            "sessionFocus": "Use a second example to compare same-denominator fractions.",
+            "teachableItemId": "item-1",
+            "contentAnchorIds": ["anchor-1"],
+            "skillIds": ["skill-1"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": [],
+            "reviewOf": [],
+        },
+        {
+            "sequenceId": "session-3",
+            "position": 3,
+            "label": "Session 3",
+            "title": "Explain two fourths as one half",
+            "sessionFocus": "Fold paper to match 2/4 and 1/2.",
+            "teachableItemId": "item-2",
+            "contentAnchorIds": ["anchor-2"],
+            "skillIds": ["skill-2"],
+            "estimatedMinutes": 20,
+            "evidenceToSave": [],
+            "reviewOf": [],
+        },
+    ]
+
+    with pytest.raises(ValueError, match="unique teachableItemId"):
+        CurriculumArtifact.model_validate(artifact)
+
+    repaired = CurriculumGenerateSkill().repair_invalid_artifact(
+        raw_artifact=artifact,
+        payload=payload,
+        context=_context(),
+        error=ValueError("duplicate sequence references"),
+    )
+    validated = CurriculumArtifact.model_validate(repaired)
+
+    assert validated.planningModel == "session_sequence"
+    assert len(validated.deliverySequence) == 3
+    assert len(validated.skills) == 3
+    assert len(validated.teachableItems) == 3
+    assert validated.deliverySequence[1].teachableItemId == "item-1-session-2"
+    assert validated.deliverySequence[1].skillIds == ["skill-1-session-2"]
