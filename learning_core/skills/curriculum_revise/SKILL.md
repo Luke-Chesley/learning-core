@@ -17,6 +17,7 @@ Revision rules:
 - Skills are durable route/planning handles and must be grounded in content anchors.
 - Units group teachable arcs. They are not scripts.
 - If the current curriculum has `planningModel: "session_sequence"`, preserve one delivery sequence item per session unless the parent changes the timebox.
+- Always preserve or emit concrete positive integers for `pacing.totalWeeks`, `pacing.sessionsPerWeek`, `pacing.sessionMinutes`, and `pacing.totalSessions`; if the revision changes scope, recompute them and explain assumptions in `coverageNotes`.
 - Use `skillId` only as a local membership id inside the artifact.
 - Units must reference skills only by `skillIds`.
 - Teachable items must reference units, skills, and content anchors.

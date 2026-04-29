@@ -88,7 +88,9 @@ Planning constraints:
 - Always include `planningConstraints`.
 - For `curriculum_request`, extract any explicit delivery constraints into `planningConstraints` instead of encoding them only in prose.
 - Set `planningConstraints.totalSessions` when the request includes an explicit total count of sessions, lessons, days, or equivalent delivery units.
-- Set `planningConstraints.totalWeeks`, `sessionsPerWeek`, or `sessionMinutes` only when stated or directly implied.
+- Set `planningConstraints.totalWeeks`, `sessionsPerWeek`, or `sessionMinutes` when stated or directly implied by horizon/cadence language.
+- When both total weeks and sessions per week are explicit or directly implied, set `planningConstraints.totalSessions` to their product.
+- Treat phrases like "this week", "in 4 weeks", "in 6 weeks", "this month", "one focused session per week", "two lessons and one review day each week", "four short days and one project day", and "20 minutes per day" as pacing cues rather than burying them only in prose.
 - Set `planningConstraints.gradeLevel` when the request includes a grade level, age band, or similar learner-level cue.
 - Set `planningConstraints.learnerContext` when the request includes learner readiness, confidence, acceleration, struggle, or prior-knowledge notes.
 - Set `planningConstraints.practiceCadence` when the request includes review or practice frequency, intensity, or format.

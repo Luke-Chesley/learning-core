@@ -85,10 +85,10 @@ class CurriculumDraftSummary(StrictModel):
 
 
 class CurriculumPacing(StrictModel):
-    totalWeeks: int | None = Field(default=None, gt=0, le=52)
-    sessionsPerWeek: int | None = Field(default=None, gt=0, le=14)
-    sessionMinutes: int | None = Field(default=None, gt=0, le=360)
-    totalSessions: int | None = Field(default=None, gt=0, le=500)
+    totalWeeks: int = Field(gt=0, le=104)
+    sessionsPerWeek: int = Field(gt=0, le=14)
+    sessionMinutes: int = Field(gt=0, le=360)
+    totalSessions: int = Field(gt=0, le=500)
     coverageStrategy: str
     coverageNotes: list[str] = Field(default_factory=list)
 

@@ -70,5 +70,9 @@ def test_curriculum_revise_repairs_legacy_document_shape_into_flat_skill_catalog
         "Use real tools",
         "Assemble a simple snack",
     ]
+    assert validated.artifact.pacing.totalWeeks == 1
+    assert validated.artifact.pacing.sessionsPerWeek == 2
+    assert validated.artifact.pacing.sessionMinutes == 30
+    assert validated.artifact.pacing.totalSessions == 2
     assert validated.artifact.units[0].skillIds == ["skill-1"]
     assert validated.artifact.units[1].skillIds == ["skill-2"]

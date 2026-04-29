@@ -59,6 +59,50 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
             "- Do not write long rationales, long summaries, or repeated prose; compactness is part of the contract for large session_sequence artifacts.",
         ]
 
+    def _pacing_contract_guidance(self, payload: CurriculumGenerationRequest) -> list[str]:
+        lines = [
+            "Pacing contract:",
+            "- Always emit positive integers for pacing.totalWeeks, pacing.sessionsPerWeek, pacing.sessionMinutes, and pacing.totalSessions.",
+            "- Preserve explicit parent/source pacing constraints exactly when present.",
+            "- If any pacing value is missing, choose a conservative assumption from the request horizon, cadence language, learner needs, and scope.",
+            "- Explain inferred pacing assumptions in pacing.coverageNotes.",
+            "- pacing.totalSessions should normally equal pacing.totalWeeks * pacing.sessionsPerWeek; explain any irregular cadence in coverageNotes.",
+            "- pacing.sessionMinutes is the expected parent-led learning block for one session.",
+            "- For short horizons, narrow or defer content before overloading individual sessions.",
+            "- Do not plan more than 10 new durable skills per week unless the source explicitly requires it; defer extra scope in coverageNotes.",
+        ]
+        if payload.requestMode == "source_entry" and payload.planningConstraints:
+            constraints = payload.planningConstraints
+            explicit_values = {
+                "totalSessions": constraints.totalSessions,
+                "totalWeeks": constraints.totalWeeks,
+                "sessionsPerWeek": constraints.sessionsPerWeek,
+                "sessionMinutes": constraints.sessionMinutes,
+            }
+            present = [
+                f"{key}={value}"
+                for key, value in explicit_values.items()
+                if value is not None
+            ]
+            if present:
+                lines.append(f"- Explicit planningConstraints to preserve: {', '.join(present)}.")
+        elif payload.requestMode == "conversation_intake" and payload.pacingExpectations:
+            expectations = payload.pacingExpectations
+            present = [
+                f"{key}={value}"
+                for key, value in {
+                    "totalWeeks": expectations.totalWeeks,
+                    "sessionsPerWeek": expectations.sessionsPerWeek,
+                    "sessionMinutes": expectations.sessionMinutes,
+                    "totalSessionsLowerBound": expectations.totalSessionsLowerBound,
+                    "totalSessionsUpperBound": expectations.totalSessionsUpperBound,
+                }.items()
+                if value is not None
+            ]
+            if present:
+                lines.append(f"- Pacing expectations to honor: {', '.join(present)}.")
+        return lines
+
     def _scale_guidance(self, payload: CurriculumGenerationRequest) -> str:
         if payload.requestMode == "source_entry":
             planning_constraints = payload.planningConstraints
@@ -224,6 +268,7 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                 "- The first skillIds entry for each session is its primary skillId and must be unique across the deliverySequence.",
                 "- If a broad concept repeats, create a narrower session-specific skill for the new review, practice, application, or project move.",
                 "- The deliverySequence skillIds must be a subset of the referenced teachable item's skillIds.",
+                *self._pacing_contract_guidance(payload),
                 *self._large_session_sequence_guidance(payload),
                 "",
                 "Return the durable curriculum artifact only.",
@@ -271,7 +316,8 @@ class CurriculumGenerateSkill(StructuredOutputSkill):
                     "- Every deliverySequence skillIds value must also appear in the referenced teachable item's skillIds.",
                     "- Delivery sequence positions must be contiguous and start at 1.",
                     "- If the artifact is large or the prior output was truncated, preserve the sequence while shortening strings, limiting details arrays, and removing repeated prose.",
-                    "- `estimatedWeeks`, `estimatedSessions`, `totalWeeks`, `sessionsPerWeek`, `sessionMinutes`, and `totalSessions` must be positive integers when present.",
+                    "- `pacing.totalWeeks`, `pacing.sessionsPerWeek`, `pacing.sessionMinutes`, and `pacing.totalSessions` are required positive integers.",
+                    "- `estimatedWeeks`, `estimatedSessions`, and delivery `estimatedMinutes` must be positive integers when present.",
                     "- Do not use `0` for any estimate. Use `1` for a very small unit or omit the estimate.",
                     "- Do not add `document`, `skillRefs`, `lessons`, `launchPlan`, or `progression`.",
                     "",

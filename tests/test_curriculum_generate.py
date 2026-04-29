@@ -91,6 +91,8 @@ def test_curriculum_generate_prompt_preview_mentions_source_entry_fields():
     assert "Attached source files:" in preview.user_prompt
     assert "egypt-reader.pdf" in preview.user_prompt
     assert "Primary source text:" in preview.user_prompt
+    assert "Pacing contract:" in preview.user_prompt
+    assert "Always emit positive integers for pacing.totalWeeks" in preview.user_prompt
 
 
 def test_curriculum_generate_policy_has_room_for_session_sequence_artifacts():
@@ -131,6 +133,7 @@ def test_curriculum_generate_prompt_uses_planning_constraints_for_curriculum_req
     assert "Use exactly one primary skill, one content anchor, one teachable item, and one deliverySequence item per session" in preview.user_prompt
     assert '"totalSessions": 30' in preview.user_prompt
     assert '"gradeLevel": "4th grade"' in preview.user_prompt
+    assert "Explicit planningConstraints to preserve: totalSessions=30" in preview.user_prompt
 
 
 def test_curriculum_generate_prompt_infers_exact_sessions_from_source_entry_label():
@@ -188,6 +191,7 @@ def test_curriculum_generate_prompt_preview_mentions_conversation_fields():
     assert "Teach my daughter fractions this summer" in preview.user_prompt
     assert "Granularity guidance:" in preview.user_prompt
     assert "Correction notes for this retry:" in preview.user_prompt
+    assert "Pacing contract:" in preview.user_prompt
     assert "Requested route:" not in preview.user_prompt
     assert "Routed route:" not in preview.user_prompt
 
@@ -197,6 +201,7 @@ def test_curriculum_generate_prompt_allows_scale_matched_hierarchy():
 
     assert "Choose a curriculum scale" in preview.system_prompt
     assert "teachable content map" in preview.system_prompt
+    assert "every artifact must include concrete `pacing.totalWeeks`" in preview.system_prompt
     assert "micro" in preview.system_prompt
     assert "week" in preview.system_prompt
     assert "Avoid generic skills" in preview.system_prompt
@@ -321,6 +326,10 @@ def _artifact_payload():
         },
         "intakeSummary": "Summary",
         "pacing": {
+            "totalWeeks": 1,
+            "sessionsPerWeek": 2,
+            "sessionMinutes": 30,
+            "totalSessions": 2,
             "coverageStrategy": "Strategy",
         },
         "curriculumScale": "module",
@@ -434,6 +443,7 @@ def test_curriculum_artifact_accepts_week_scale_without_hierarchy_labels():
             "pacing": {
                 "totalWeeks": 1,
                 "sessionsPerWeek": 4,
+                "sessionMinutes": 20,
                 "totalSessions": 4,
                 "coverageStrategy": "Observe and classify common cloud types this week.",
             },

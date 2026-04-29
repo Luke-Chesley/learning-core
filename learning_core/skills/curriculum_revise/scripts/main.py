@@ -53,6 +53,7 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- Return one flat skills list plus units that reference those skills by skillId.",
                 "- Every skill must be grounded in contentAnchorIds or teachableItems.",
                 "- If planningModel is session_sequence, deliverySequence must contain one item per session.",
+                "- Preserve or emit pacing.totalWeeks, pacing.sessionsPerWeek, pacing.sessionMinutes, and pacing.totalSessions as positive integers.",
                 "- Return the full revised curriculum artifact when action is \"apply\".",
                 "- If the request is too vague to apply safely, ask one precise clarification question.",
             ]
@@ -218,10 +219,19 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 }
                 for index, skill in enumerate(skills, start=1)
             ]
+            pacing = dict(repaired_artifact.get("pacing") or {})
+            total_sessions = max(1, len(skills))
+            pacing.setdefault("totalWeeks", 1)
+            pacing.setdefault("sessionsPerWeek", total_sessions)
+            pacing.setdefault("sessionMinutes", 30)
+            pacing.setdefault("totalSessions", total_sessions)
+            pacing.setdefault("coverageStrategy", "Preserve repaired curriculum scope.")
+            pacing.setdefault("coverageNotes", ["Pacing was inferred while repairing a legacy revision artifact."])
+
             repaired_artifact = {
                 "source": repaired_artifact.get("source"),
                 "intakeSummary": repaired_artifact.get("intakeSummary"),
-                "pacing": repaired_artifact.get("pacing"),
+                "pacing": pacing,
                 "curriculumScale": repaired_artifact.get("curriculumScale"),
                 "planningModel": repaired_artifact.get("planningModel") or "content_map",
                 "skills": skills,
@@ -260,6 +270,7 @@ class CurriculumReviseSkill(StructuredOutputSkill):
                 "- Units may reference those skills only through units[].skillIds.",
                 "- Teachable items must reference existing unitRef, skillIds, and contentAnchorIds.",
                 "- If planningModel is session_sequence and pacing.totalSessions is present, deliverySequence must have one item per session.",
+                "- artifact.pacing.totalWeeks, sessionsPerWeek, sessionMinutes, and totalSessions are required positive integers.",
                 "- Preserve the intended curriculum content while fixing the JSON structure.",
             ]
         )

@@ -19,6 +19,7 @@ Design principle:
 - Curriculum generation creates a teachable content map.
 - Lesson/session generation turns one or more teachable items into a live parent-led lesson.
 - The content map must survive downstream: source anchors -> teachable items -> optional delivery sequence -> lesson drafts.
+- The pacing contract must survive downstream: every artifact must include concrete `pacing.totalWeeks`, `pacing.sessionsPerWeek`, `pacing.sessionMinutes`, and `pacing.totalSessions`.
 
 Request-mode rules:
 
@@ -67,7 +68,15 @@ Shared generation rules:
   - `session_sequence`: explicit session-counted plan, such as "15 sessions", "30 sessions", or an authored numbered day/session sequence.
   - `source_sequence`: ordered source such as a workbook, book, chapter list, or unit sequence.
   - `reference_map`: broad source that will be entered selectively.
-- A week/month/semester horizon alone is not enough reason to use `session_sequence`; without an exact session count, prefer `content_map` or `source_sequence` and let launch/session planning choose the opening days.
+- A week/month/semester horizon alone is not enough reason to use `session_sequence`; without an exact session count, prefer `content_map` or `source_sequence`, but still choose and emit honest pacing assumptions in `pacing`.
+- Pacing is part of the durable curriculum contract:
+  - Always emit positive integers for `pacing.totalWeeks`, `pacing.sessionsPerWeek`, `pacing.sessionMinutes`, and `pacing.totalSessions`.
+  - Preserve explicit parent/source constraints exactly when they are present.
+  - When one or more pacing values are missing, choose conservative assumptions from the horizon, cadence language, learner needs, and scope; explain the assumption in `coverageNotes`.
+  - `totalSessions` should normally equal `totalWeeks * sessionsPerWeek`. If the source uses an irregular cadence, choose the nearest honest weekly cadence and explain the irregularity in `coverageNotes`.
+  - `sessionMinutes` is the expected parent-led learning block for one session, not an unbounded total for every possible follow-up activity.
+  - For short horizons, trim scope before compressing too much content into each session.
+  - As a general ceiling, avoid more than 10 new durable skills per week unless the source explicitly requires it. When a request is broader than the pacing can support, name the intentionally deferred topics or skills in `coverageNotes`.
 - Units group teachable arcs. They are not scripts, but they must not be vague containers.
 - Skills are durable route/planning handles. Their titles must be teachable and content-specific.
 - Avoid generic skills. A skill title must name the concrete content, concept, procedure, text, problem type, artifact, or source section the learner will work with.
@@ -137,10 +146,10 @@ Detailed schema:
   },
   "intakeSummary": "string",
   "pacing": {
-    "totalWeeks": "positive integer or omitted",
-    "sessionsPerWeek": "positive integer or omitted",
-    "sessionMinutes": "positive integer or omitted",
-    "totalSessions": "positive integer or omitted",
+    "totalWeeks": "positive integer",
+    "sessionsPerWeek": "positive integer",
+    "sessionMinutes": "positive integer",
+    "totalSessions": "positive integer",
     "coverageStrategy": "string",
     "coverageNotes": ["string"]
   },
